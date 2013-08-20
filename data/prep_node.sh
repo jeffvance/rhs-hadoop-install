@@ -316,7 +316,7 @@ function install_common(){
     echo
     display "-- Creating $SUDOER_PATH file to grant \"mapred\" user access"
     echo "$MAPRED_SUDOER" >> $SUDOER_PATH
-    /bin/chown $SUDOER_PERM $SUDOER_PATH
+    /bin/chmod $SUDOER_PERM $SUDOER_PATH
   fi
 
   # rhn register, if username/pass provided

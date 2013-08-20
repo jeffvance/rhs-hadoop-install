@@ -314,7 +314,7 @@ function verify_local_deploy_setup(){
 
   # main #
   if [[ ! -e $HOSTS_FILE ]] ; then
-    errmsg+=" * \"$HOSTS_FILE\" file is missing.\n   This file contains a list of storage hostnames followed by ip-address, one\n   pair per line.\n"
+    errmsg+=" * \"$HOSTS_FILE\" file is missing.\n   This file contains a list of IP address followed by hostname, one\n   pair per line.\n"
     ((errcnt++))
   else
     # read and verify/validate hosts file format
