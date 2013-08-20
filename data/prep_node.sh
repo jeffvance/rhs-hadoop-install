@@ -10,18 +10,16 @@
 # This script is a companion script to install.sh and runs on a remote node. It
 # does the following:
 #  - reports the gluster version,
-#  - creates the brick dir and glusterfs mount point,
-#  - installs the gluster-hadoop shim (plug-in),
+#  - installs the gluster-hadoop plug-in,
 #  - checks if NTP is running and synchronized,
-#  - yum installs the ambai agent rpm,
+#  - yum installs the ambai agent and/or ambari-server rpms depending on passed
+#    in arguments.
 #  - installs the FUSE patch if it has not already been installed.
-#    Note: the current design requires that the fuse check be the last step
-#          done in this script (for now...)
 #
-# Arguments (all positional): 
-#   $1=self hostname*, $2=HOSTS(array)*, $3=HOST IP-addrs(array)*, $4=ambari
-#   server host*, $5=working dir, $6=logfile, $7=rhn user,
-#   $8=rhn user password
+# Arguments (all positional):
+#   $1=self hostname*, $2=install storage flag*, $3=install mgmt server flag*,
+#   $4=HOSTS(array)*, $5=HOST IP-addrs(array)*, $6=management server hostname*,
+#   $7=working dir, $8=logfile, $9=rhn user,   $10=rhn user password
 # '*' means required argument, others are optional.
 #
 # Note on passing arrays: the caller (install.sh) needs to surround the array
@@ -29,20 +27,19 @@
 
 # constants and args
 NODE=$1
-HOSTS=($2)
-HOST_IPS=($3)
-MGMT_NODE="$4" # note: for now the server node is assumed to also be a data
-               #       (agent) node
-DEPLOY_DIR=${5:-/tmp/RHS-Ambari-install/data/}
-LOGFILE=${6:-/var/log/RHS-install.log}
-RHN_USER=${7:-}
-RHN_PW=${8:-}
-#echo -e "***** $(basename $0)\n 1=$NODE, 2=${HOSTS[@]}, 3=${HOST_IPS[@]}, 4=$MGMT_NODE, 5=$DEPLOY_DIR, 6=$LOGFILE, 7=$RHN_USER, 8=$RHN_PW"
+STORAGE_INSTALL=$2 # true or false
+MGMT_INSTALL=$3    # true or false
+HOSTS=($4)
+HOST_IPS=($5)
+MGMT_NODE="$6" # note: this node can be inside or outside the storage cluster
+DEPLOY_DIR=${7:-/tmp/RHS-Ambari-install/data/}
+LOGFILE=${8:-/var/log/RHS-install.log}
+RHN_USER=${9:-}
+RHN_PW=${10:-}
+#echo -e "***** $(basename $0)\n 1=$NODE, 2=$STORAGE_INSTALL, 3=$MGMT_INSTALL, 4=${HOSTS[@]}, 5=${HOST_IPS[@]}, 6=$MGMT_NODE, 7=$DEPLOY_DIR, 8=$LOGFILE, 9=$RHN_USER, 10=$RHN_PW"
 
 NUMNODES=${#HOSTS[@]}
 AMBARI_TMPDIR=${DEPLOY_DIR}tmpAmbari
-amMgmtNode=false  # is NODE the management/server node?
-(( MGMT_NODE == NODE )) && { amMgmtNode=true; }
 
 
 # display: Write the message to stdlist and append it to the local logfil.
@@ -74,31 +71,31 @@ function fixup_etc_hosts_file(){
   fi
 }
 
-# install_shim: copy the shim from the rhs install files to the appropriate 
-# Hadoop directory. Fatal errors exit script.
+# install_plugin: copy the Hadoop-Gluster plug-in from the rhs install files to
+# the appropriate Hadoop directory. Fatal errors exit script.
 #
-function install_shim(){
+function install_plugin(){
 
-  local GLUSTER_SHIM_JAR=a0gluster0afs.jar
-  local GLUSTER_SHIM_TARGET_DIR=/usr/lib/hadoop/lib/
-  local GLUSTER_SHIM_PATH=$GLUSTER_SHIM_TARGET_DIR$GLUSTER_SHIM_JAR
+  local GLUSTER_SHIM_TARGET_DIR='/usr/lib/hadoop/lib/'
+  local jar=''
 
-  if (( $(ls glusterfs-*.jar|wc -l) != 1 )) ; then
-    display "  Gluster Hadoop shim missing, or too many gluster jar files, in $DEPLOY_DIR"
+  jar=$(ls glusterfs-hadoop*.jar)
+  if [[ -z "$jar" ]] ; then
+    display "  Gluster Hadoop plug-in missing in $DEPLOY_DIR"
     exit 5
   fi
 
-  display "-- Installing Gluster-Hadoop shim ..."
+  display "-- Installing Gluster-Hadoop plug-in ($jar)..."
   # create /usr/lib/hadoop/lib if it does not exist
   if [[ ! -d $GLUSTER_SHIM_TARGET_DIR ]] ; then
     /bin/mkdir -p $GLUSTER_SHIM_TARGET_DIR
   fi
-  /bin/cp -uf glusterfs-hadoop*.jar $GLUSTER_SHIM_PATH
+  /bin/cp -uf $jar $GLUSTER_SHIM_TARGET_DIR
   if (( $? != 0 )) ; then
-    display "  Copy of shim failed: \"cp glusterfs-hadoop*.jar $GLUSTER_SHIM_PATH\""
+    display "  Copy of plug-in failed"
     exit 10
   fi
-  display "   ... shim install successful"
+  display "   ... Gluster-Hadoop plug-in install successful"
 }
 
 # copy_ambari_repo: copy the ambari.repo file to the correct location.
@@ -108,7 +105,7 @@ function copy_ambari_repo(){
   local REPO='ambari.repo'; local REPO_DIR='/etc/yum.repos.d'
 
   [[ -e $REPO ]] || { display "ERROR: \"$REPO\" file missing"; exit 15;}
-  [[ -d $REPO_DIR ]] || { mkdir -p $REPO_DIR; }
+  [[ -d $REPO_DIR ]] || /bin/mkdir -p $REPO_DIR
   /bin/cp $REPO $REPO_DIR
 }
 
@@ -123,20 +120,31 @@ function install_epel(){
 }
 
 # install_ambari_agent: untar the ambari rpm tarball, yum install the ambari
-# agent rpm, modify the .ini file to point to the ambari server, and start the
-# agent.
+# agent rpm, modify the .ini file to point to the ambari server, start the
+# agent, and set up agent to start automatically after a reboot.
 #
 function install_ambari_agent(){
 
   local agent_rpm=''
   local ambari_ini='/etc/ambari-agent/conf/ambari-agent.ini'
-  local SERVER_SECTION='\[server\]'; SERVER_KEY='hostname='
+  local SERVER_SECTION='server'; SERVER_KEY='hostname='
   local KEY_VALUE="$MGMT_NODE"
+  local AMBARI_AGENT_PID='/var/run/ambari-agent/ambari-agent.pid'
+
+  if [[ ! -d $AMBARI_TMPDIR ]] ; then
+    /bin/mkdir $AMBARI_TMPDIR
+    /bin/tar -C $AMBARI_TMPDIR -xzf ambari-*.tar.gz  # extract ambari rpms
+  fi
+
+  pushd $AMBARI_TMPDIR > /dev/null
+
+  # stop agent if running
+  if [[ -e $AMBARI_AGENT_PID ]] ; then
+    display "   stopping ambari-agent"
+    ambari-agent stop
+  fi
 
   # install agent rpm
-  rm -rf $AMBARI_TMPDIR; mkdir $AMBARI_TMPDIR
-  pushd $AMBARI_TMPDIR > /dev/null
-  tar xzf ../ambari-*.tar.gz  # extract ambari rpms to tmpdir
   agent_rpm=$(ls ambari-agent-*.rpm)
   if [[ -z "$agent_rpm" ]] ; then
     display "ERROR: Ambari agent RPM missing"
@@ -150,34 +158,49 @@ function install_ambari_agent(){
 
   # start the agent
   ambari-agent start
+  # start agent after reboot
+  chkconfig ambari-agent on 
 }
 
-# install_ambari_server: yum install the ambari server rpm, setup and start the
-# ambari server.
-# Note: the ambari rpm tarball is expected to have been extracted in the
-# previously called install_ambari_agent() function.
+# install_ambari_server: yum install the ambari server rpm, setup start the
+# server, start ambari server, and start the server after a reboot.
 #
 function install_ambari_server(){
 
   local server_rpm=''
+  local AMBARI_SERVER_PID='/var/run/ambari-server/ambari-server.pid'
 
-  [[ -d $AMBARI_TMPDIR ]] || { display "Internal Error: \"$AMBARI_TMPDIR\" missing" ; exit 25; }
+  if [[ ! -d $AMBARI_TMPDIR ]] ; then
+    /bin/mkdir $AMBARI_TMPDIR
+    /bin/tar -C $AMBARI_TMPDIR -xzf ambari-*.tar.gz  # extract ambari rpms
+  fi
+
+  pushd $AMBARI_TMPDIR > /dev/null
+
+  # stop and reset server if running
+  if [[ -e $AMBARI_SERVER_PID ]] ; then
+    display "   stopping ambari-server"
+    ambari-server stop
+    ambari-server reset -s
+  fi
 
   # install server rpm
-  pushd $AMBARI_TMPDIR > /dev/null
   server_rpm=$(ls ambari-server-*.rpm)
   if [[ -z "$server_rpm" ]] ; then
     display "ERROR: Ambari server RPM missing"
     exit 30
   fi
+  # install server rpm
   yum -y install $server_rpm
+  popd
 
   # setup the ambari-server
   ambari-server setup -s  # -s accepts all defaults with no prompting
 
   # start the server
   ambari-server start
-  popd
+  # start the server after a reboot
+  chkconfig ambari-server on
 }
 
 # verify_java: verify the version of Java on NODE. Fatal errors exit script.
@@ -202,7 +225,7 @@ function verify_java(){
     display "   Java is not installed. Download Java $TEST_JAVA_VER JRE from Oracle now."
     err=35
   fi
-  (( $err == 0 )) || { exit $err; }
+  (( $err == 0 )) || exit $err
 }
 
 # verify_ntp: verify that ntp is installed and synchronized.
@@ -239,24 +262,21 @@ function rhn_register(){
 }
 
 # verify_fuse: verify this node has the correct kernel FUSE patch installed. If
-# not then it will be installed and the script is exited with a status
-# indicating that the node needs to be rebooted. There is no reliable shell
-# command/utility to report whether or not the FUSE patch has been installed
-# (eg. uname -r doesn't), so a file is used for this test.
-# NOTE: this function needs to be the last functional piece of this script, ie,
-#   fuse checking must be the last step in this script.
+# not then it will be installed and a global variable is set to indicate that
+# this node needs to be rebooted. There is no shell command/utility to report
+# whether or not the FUSE patch has been installed (eg. uname -r doesn't), so
+# a file is used for this test.
 #
 function verify_fuse(){
 
   local FUSE_TARBALL='fuse-*.tar.gz'
   # if file exists then fuse patch installed
-  local FUSE_INSTALLED='/tmp/FUSE_INSTALLED' # Note: deploy dir rm'd
+  local FUSE_INSTALLED='/tmp/FUSE_INSTALLED' # Note: deploy dir is rm'd
 
   if [[ -e "$FUSE_INSTALLED" ]]; then # file exists, assume installed
     display "   ... verified"
   else
-    display "-- Installing FUSE patch..."
-    display "   A reboot of $NODE is required and will be done automatically"
+    display "-- Installing FUSE patch which may take more than a few seconds..."
     echo
     /bin/rm -rf fusetmp  # scratch dir
     /bin/mkdir fusetmp
@@ -269,11 +289,100 @@ function verify_fuse(){
     # create kludgy fuse-has-been-installed file
     touch $FUSE_INSTALLED
     display "yum -y install fusetmp/*.rpm  output:\n$out"
+    display "   A reboot of $NODE is required and will be done automatically"
     echo
-    display "-- Starting reboot of $NODE..."
-    display "$(/bin/date). End: prep_node"
-    exit 99  # flag to initiate reboot from deploy.sh script
+    REBOOT_REQUIRED=true
   fi
+}
+
+# install_common: perform node installation steps independent of whether or not
+# the node is to be the ambari-server or an ambari-agent.
+#
+function install_common(){
+
+  local SUDOER_PATH='/etc/sudoers.d/20_gluster' # new file
+  local SUDOER_PERM='440'
+  local MAPRED_SUDOER='mapred ALL= NOPASSWD: /usr/bin/getfattr'
+
+  # set up /etc/hosts to map ip -> hostname
+  echo
+  display "-- Setting up IP -> hostname mapping"
+  fixup_etc_hosts_file
+  echo $NODE >/etc/hostname
+  /bin/hostname $NODE
+
+  # create /etc/sudoers.d/gluster file to grant access to mapred user
+  if [[ ! -e "$SUDOER_PATH" ]] ; then
+    echo
+    display "-- Creating $SUDOER_PATH file to grant \"mapred\" user access"
+    echo "$MAPRED_SUDOER" >> $SUDOER_PATH
+    /bin/chown $SUDOER_PERM $SUDOER_PATH
+  fi
+
+  # rhn register, if username/pass provided
+  rhn_register
+
+  # verify NTP setup and sync clock
+  echo
+  display "-- Verifying NTP is running"
+  verify_ntp
+
+  # copy Ambari repo
+  echo
+  display "-- Copying Ambari repo file"
+  copy_ambari_repo
+
+  # install epel
+  echo
+  display "-- Installing EPEL package"
+  install_epel
+}
+
+# install_storage: perform the installation steps needed when the node is an
+#  ambari agent.
+#
+function install_storage(){
+
+  local i
+
+  # set this node's IP variable
+  for (( i=0; i<$NUMNODES; i++ )); do
+	[[ $NODE == ${HOSTS[$i]} ]] && break
+  done
+  IP=${HOST_IPS[$i]}
+
+  # report Gluster version 
+  display "-- Gluster version: $(gluster --version | head -n 1)"
+
+  # install Gluster-Hadoop plug-in on agent nodes
+  install_plugin
+
+  # install Ambari agent rpm only on agent (data/storage) nodes
+  echo
+  display "-- Installing Ambari agent"
+  install_ambari_agent
+
+  # verify FUSE patch on data (agent) nodes, if not installed yum install it.
+  # NOTE: this must be the last step in this script!
+  echo
+  display "-- Verifying FUSE patch installation:"
+  verify_fuse
+}
+
+# install_mgmt: perform the installations steps needed when the node is the
+# ambari server.
+#
+function install_mgmt(){
+  echo
+  display "-- Installing Ambari server"
+
+  # verify java version (note: java not provided by RHS install)
+  #NOTE: currently not in use. Using ambari to install correct Java
+  #echo
+  #display "-- Verifying Java version"
+  #verify_java
+
+  install_ambari_server
 }
 
 
@@ -281,74 +390,20 @@ function verify_fuse(){
 echo
 display "$(/bin/date). Begin: prep_node"
 
-[[ -d $DEPLOY_DIR ]] || { display "$NODE: Directory '$DELOY_DIR' missing on $(hostname)"; exit -1; }
+[[ -d $DEPLOY_DIR ]] || { display "$NODE: Directory '$DEPLOY_DIR' missing on $(hostname)"; exit -1; }
 
 cd $DEPLOY_DIR
 /bin/ls >/dev/null
 (( $? == 0 )) || { display "$NODE: No files found in $DEPLOY_DIR"; exit -1; }
 
-# set this node's IP variable
-for (( i=0; i<$NUMNODES; i++ )); do
-	[[ $NODE == ${HOSTS[$i]} ]] && { break ; }
-done
-IP=${HOST_IPS[$i]}
+install_common
 
-# report Gluster version 
-display "-- Guster version: $(gluster --version | head -n 1)"
-
-# set up /etc/hosts to map ip -> hostname
-echo
-display "-- Setting up IP -> hostname mapping"
-fixup_etc_hosts_file
-echo $NODE >/etc/hostname
-/bin/hostname $NODE
-
-# verify NTP setup and sync clock
-echo
-display "-- Verifying NTP is running"
-verify_ntp
-
-# rhn register, if username/pass provided
-rhn_register
-
-# verify java version (note: java not provided by RHS install)
-#NOTE: currently not in use. Using ambari to install correct Java
-#echo
-#display "-- Verifying Java version"
-#verify_java
-
-# install Gluster-Hadoop shim on agent nodes
-echo
-display "-- Installing Gluster-Hadoop shim" 
-install_shim
-
-# copy Ambari repo on all (agent and server) nodes
-echo
-display "-- Copying Ambari repo file"
-copy_ambari_repo
-
-# install epel on all (agent and server) nodes
-echo
-display "-- Installing EPEL package"
-install_epel
-
-# install Ambari agent rpm only on agent (data/storage) nodes
-echo
-display "-- Installing Ambari agent"
-install_ambari_agent
-
-# install Ambari server rpm only on server node
-if $amMgmtNode ; then
-  echo
-  display "-- Installing Ambari server"
-  install_ambari_server
-fi
-
-# verify FUSE patch on data (agent) nodes, if not installed yum install it.
-# NOTE: this must be the last step in this script!
-echo
-display "-- Verifying FUSE patch installation:"
-verify_fuse
+[[ $STORAGE_INSTALL == true ]] && install_storage
+[[ $MGMT_INSTALL == true    ]] && install_mgmt
 
 display "$(/bin/date). End: prep_node"
+
+[[ -n "$REBOOT_REQUIRED" ]] && exit 99 # tell install.sh a reboot is needed
+exit 0
+#
 # end of script

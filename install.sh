@@ -12,9 +12,11 @@
 #
 # A tarball named "rhs-ambari-<version>.tar.gz" is downloaded to one of the
 # cluster nodes (more common) or to the user's localhost (less common). The
-# download location is arbitrary. Password-less ssh is needed from the node
-# hosting the rhs install tarball to all nodes in the cluster. Password-less
-# ssh is not necessary to and from all nodes within the cluster.
+# download location is arbitrary, though installing from the same node as will
+# become the management node will reduce password-less ssh set up. Password-
+# less ssh is needed from the node hosting the rhs install tarball to all nodes
+# in the cluster. Password-less ssh is not necessary to and from all nodes
+# within the cluster.
 #
 # The rhs tarball contains the following:
 #  - install.sh: this script, executed by the root user
@@ -22,7 +24,7 @@
 #  - hosts.example: sample "hosts" config file
 #  - data/: directory containing:
 #    - prep_node.sh: companion script, not to be executed directly
-#    - gluster-hadoop-<version>.jar: Gluster-Hadoop shim
+#    - gluster-hadoop-<version>.jar: Gluster-Hadoop plug-in
 #    - fuse-patch.tar.gz: FUSE patch RPMs
 #    - ambari.repo: repo file needed to install ambari
 #    - ambari-<version>.rpms.tar.gz: Ambari server and agent RPMs
@@ -34,21 +36,21 @@
 # but an example hosts file is provided. The "hosts" file is expected to be
 # created in the same location where the tarball has been downloaded. If a
 # different location is required the --hosts option can be used to specify the
-# "hosts" file path. The "hosts" file contains a list of hostname and IP
-# address pairs, one pair per line. Each line represents one node in the
+# "hosts" file path. The "hosts" file contains a list of IP address and
+# hostname pairs, one pair per line. Each line represents one node in the
 # storage cluster (gluster trusted pool). Example:
-#    node-1  ip-for-node-1
-#    node-3  ip-for-node-3
-#    node-2  ip-for-node-2 
-#    node-4  ip-for-node-4 
+#    ip-for-node-1 node-1
+#    ip-for-node-3 node-3
+#    ip-for-node-2 node-2
+#    ip-for-node-4 node-4
 #
 # IMPORTANT: the node order in the hosts file is critical. Assuming the gluster
 #   volume is created with replica 2 (which is the only config tested for RHS)
 #   then each pair of lines in hosts represents replica pairs. For example, the
 #   first 2 lines in hosts are replica pairs, as are the next two lines, etc.
-# IMPORTANT: for now, the first host in the hosts file is assumed to be the
-#   Ambari server node (and it is also a storage node). Later, the server node
-#   will be defined in a separate manner.
+# IMPORTANT: unless the --mgmt-node option is specified, the first host in the
+#   hosts file is assumed to be the Ambari server node (and it is also a
+#   storage node).
 #
 # Assumptions:
 #  - passwordless SSH is setup between the installation node and each storage
@@ -63,13 +65,14 @@
 
 # set global variables
 SCRIPT=$(/bin/basename $0)
-INSTALL_VER=0.5      # self version
+INSTALL_VER='0.11'   # self version
 INSTALL_DIR=$(pwd)   # name of deployment (install-from) dir
+INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/RHS-Ambari-install/" # on each node
-DATA_DIR="data/"     # subdir in rhs-ambari install dir
+DATA_DIR='data/'     # subdir in rhs-ambari install dir
 # companion install script name
 PREP_SH="$REMOTE_INSTALL_DIR${DATA_DIR}prep_node.sh" # full path
-LOGFILE=/var/log/RHS-install.log
+LOGFILE='/var/log/RHS-install.log'
 NUMNODES=0           # number of nodes in hosts file (= trusted pool size)
 bricks=''            # string list of node:/brick-mnts for volume create
 
@@ -88,8 +91,9 @@ function short_usage(){
   echo -e "Syntax:\n"
   echo "$SCRIPT [-v|--version] | [-h|--help]"
   echo "$SCRIPT [--brick-mnt <path>] [--vol-name <name>] [--vol-mnt <path>]"
-  echo "           [--replica <num>] [--hosts <path>] [--rhn-user <name>]"
-  echo "           [--rhn-pw <value>] [--old-deploy] brick-dev"
+  echo "           [--replica <num>] [--hosts <path>] [--mgmt-node <node>]"
+  echo "           [--rhn-user <name>] [--rhn-pw <value>] [--old-deploy]"
+  echo "           brick-dev"
   echo
 }
 
@@ -122,14 +126,17 @@ function usage(){
   echo "  --replica   <num>  : Volume replication count. The number of storage nodes"
   echo "                       must be a multiple of the replica count. Default: 2"
   echo "  --hosts     <path> : path to \"hosts\" file. This file contains a list of"
-  echo "                       hostname followed by host's ip-addr for each node in"
-  echo "                       the cluster. Default: \"./hosts\""
+  echo "                       \"IP-addr hostname\" pairs for each node in the cluster."
+  echo "                       Default: \"./hosts\""
+  echo "  --mgmt-node <node> : hostname of the node to be used as the management node."
+  echo "                       Default: the first node appearing in the \"hosts\" file"
   echo "  --rhn-user  <name> : Red Hat Network user name. Default is to not register"
   echo "                       the storage nodes"
   echo "  --rhn-pw   <value> : RHN password for rhn-user. Default is to not register"
   echo "                       the storage nodes"
   echo "  --old-deploy       : Use if this is an existing deployment. The default"
-  echo "                       is a new (\"greenfield\") RHS customer installation"
+  echo "                       is a new (\"greenfield\") RHS customer installation".
+  echo "                       Not currently supported."
   echo "  -v|--version       : current version string"
   echo "  -h|--help          : help text (this)"
   echo
@@ -141,9 +148,9 @@ function usage(){
 function parse_cmd(){
 
   local OPTIONS='vh'
-  local LONG_OPTS='brick-mnt:,vol-name:,vol-mnt:,replica:,hosts:,rhn-user:,rhn-pw:,old-deploy,help,version'
+  local LONG_OPTS='brick-mnt:,vol-name:,vol-mnt:,replica:,hosts:,mgmt-node:,rhn-user:,rhn-pw:,old-deploy,help,version'
 
-  # defaults
+  # defaults (global variables)
   BRICK_DIR='/mnt/brick1'
   VOLNAME='HadoopVol'
   GLUSTER_MNT='/mnt/glusterfs'
@@ -151,6 +158,7 @@ function parse_cmd(){
   NEW_DEPLOY=true
   # "hosts" file concontains hostname ip-addr for all nodes in cluster
   HOSTS_FILE="$INSTALL_DIR/hosts"
+  MGMT_NODE=''
   RHN_USER=''
   RHN_PW=''
 
@@ -181,11 +189,14 @@ function parse_cmd(){
 	--hosts)
 	    HOSTS_FILE=$2; shift 2; continue
 	;;
+	--mgmt-node)
+	    MGMT_NODE=$2; shift 2; continue
+	;;
 	--rhn-user)
-	   RHN_USER=$2; shift 2; continue
+	    RHN_USER=$2; shift 2; continue
 	;;
 	--rhn-pw)
-	   RHN_PW=$2; shift 2; continue
+	    RHN_PW=$2; shift 2; continue
 	;;
 	--old-deploy)
 	    NEW_DEPLOY=false ;shift; continue
@@ -248,17 +259,9 @@ function verify_local_deploy_setup(){
     numTokens=${#hosts_ary[@]}
     HOSTS=(); HOST_IPS=() # global vars
 
+    # hosts file format: ip-address  hostname  # one pair per line
     for (( i=0; i<$numTokens; i++ )); do
-	host=${hosts_ary[$i]}
-	(( i == 0 )) && { MGMT_NODE="$host"; } # by definition for now...
-	# validate basic hostname syntax
- 	if [[ ! $host =~ $VALID_HOSTNAME_RE ]] ; then
-	  errmsg+=" * $HOSTS_FILE record $((i/2)):\n   Unexpected hostname syntax for \"$host\"\n"
-	  ((errcnt++))
-	  break # exit loop
-        fi
-	HOSTS+=($host)
-	((i++))
+	# IP address:
 	ip=${hosts_ary[$i]}
 	# validate basic ip-addr syntax
 	if [[ ! $ip =~ $VALID_IP_RE ]] ; then
@@ -267,8 +270,28 @@ function verify_local_deploy_setup(){
 	  break # exit loop
 	fi
 	HOST_IPS+=($ip)
+
+	# hostname:
+	((i++))
+	host=${hosts_ary[$i]}
+        # set MGMT_NODE to first node unless --mgmt-node specified
+	if [[ -z "$MGMT_NODE" && $i == 1 ]] ; then # 1st hosts file record
+	  MGMT_NODE="$host"
+          MGMT_NODE_IN_POOL=true
+	elif [[ -n "$MGMT_NODE" && "$MGMT_NODE" == "$host" ]] ; then
+          MGMT_NODE_IN_POOL=true
+        fi
+	# validate basic hostname syntax
+ 	if [[ ! $host =~ $VALID_HOSTNAME_RE ]] ; then
+	  errmsg+=" * $HOSTS_FILE record $((i/2)):\n   Unexpected hostname syntax for \"$host\"\n"
+	  ((errcnt++))
+	  break # exit loop
+        fi
+	HOSTS+=($host)
+
         # verify connectivity from localhost to data node
-	ssh -q -oBatchMode=yes root@$host exit
+	# note: ip used since /etc/hosts may not be set up to map ip to hostname
+	ssh -q -oBatchMode=yes root@$ip exit
         if (( $? != 0 )) ; then
 	  errmsg+=" * $HOSTS_FILE record $((i/2)):\n   Cannot connect via password-less ssh to \"$host\"\n"
 	  ((errcnt++))
@@ -276,7 +299,7 @@ function verify_local_deploy_setup(){
 	fi
     done
 
-    (( errcnt != 0 )) && { return; } # errors in hosts checking loop are fatal
+    (( errcnt != 0 )) && return # errors in hosts checking loop are fatal
 
     # validate the number of nodes in the hosts file
     NUMNODES=${#HOSTS[@]}
@@ -290,26 +313,21 @@ function verify_local_deploy_setup(){
   }
 
   # main #
-  if [[ ! -d $INSTALL_DIR ]] ; then
-    errmsg+=" * Directory \"$INSTALL_DIR\" missing.\n"
+  if [[ ! -e $HOSTS_FILE ]] ; then
+    errmsg+=" * \"$HOSTS_FILE\" file is missing.\n   This file contains a list of storage hostnames followed by ip-address, one\n   pair per line.\n"
     ((errcnt++))
   else
-    if [[ ! -e $HOSTS_FILE ]] ; then
-      errmsg+=" * \"$HOSTS_FILE\" file is missing.\n   This file contains a list of storage hostnames followed by ip-address, one\n   pair per line.\n"
-      ((errcnt++))
-    else
-      # read and verify/validate hosts file format
-      read_verify_local_hosts_file
-    fi
-    if [[ ! -d $INSTALL_DIR/data ]] ; then
-      errmsg+=" * \"$INSTALL_DIR/data\" sub-directory is missing.\n"
-      ((errcnt++))
-    fi
+    # read and verify/validate hosts file format
+    read_verify_local_hosts_file
+  fi
+  if [[ ! -d $INSTALL_DIR/data ]] ; then
+    errmsg+=" * \"$INSTALL_DIR/data\" sub-directory is missing.\n"
+    ((errcnt++))
   fi
 
   if (( errcnt > 0 )) ; then
     local plural='s'
-    (( errcnt == 1 )) && { plural=''; }
+    (( errcnt == 1 )) && plural=''
     display "$errcnt error$plural:\n$errmsg"
     exit 1
   fi
@@ -317,14 +335,19 @@ function verify_local_deploy_setup(){
 }
 
 # report_deploy_values: write out args and default values to be used in this
-# deploy/installation.
+# deploy/installation. Prompts to continue the script.
 #
 function report_deploy_values(){
+
+  local ans
 
   echo
   display "__________ Deployment Values __________"
   display "  Install-from dir:   $INSTALL_DIR"
+  display "  Install-from IP:    $INSTALL_FROM_IP"
   display "  Remote install dir: $REMOTE_INSTALL_DIR"
+  [[ -n "$RHN_USER" ]] && \
+    display "  RHN user:           $RHN_USER"
   display "  \"hosts\" file:       $HOSTS_FILE"
   display "  Number of nodes:    $NUMNODES"
   display "  Management node:    $MGMT_NODE"
@@ -338,6 +361,9 @@ function report_deploy_values(){
   display "  New install?:       $NEW_DEPLOY"
   display "  Log file:           $LOGFILE"
   echo    "_______________________________________"
+
+  read -p "Continue? [Y|N] " ans
+  [[ "$ans" == 'Y' || "$ans" == 'y' ]] || exit 0
 }
 
 # cleanup:
@@ -356,6 +382,7 @@ function cleanup(){
   local node=''; local out
 
   # 1) umount vol on every node, if mounted
+  display "  -- stopping ambari on all nodes..."
   display "  -- un-mounting $GLUSTER_MNT on all nodes..."
   for node in "${HOSTS[@]}"; do
       ssh root@$node "
@@ -446,9 +473,8 @@ function verify_vol_created(){
   local i=0; local LIMIT=10
 
   while (( i < LIMIT )) ; do # don't loop forever
-      #ssh root@$firstNode "gluster volume info $VOLNAME >& /dev/null"
       ssh root@$firstNode "gluster volume info $VOLNAME"
-      (( $? == 0 )) && { break; }
+      (( $? == 0 )) && break
       sleep 1
       ((i++))
   done
@@ -481,9 +507,9 @@ function verify_vol_started(){
 		cut -f $VOL_ONLINE_FIELD")
       # all "Y" in onlineBricks means that all bricks are online
       for (( j=0; j<$NUMNODES; j++ )); do
-	[[ ${onlineBricks[$j]} == 'Y' ]] || { break; }
+	[[ ${onlineBricks[$j]} == 'Y' ]] || break
       done
-      (( j == NUMNODES )) && { break; } # all bricks online
+      (( j == NUMNODES )) && break # all bricks online
       sleep 1
       ((i++))
   done
@@ -507,7 +533,7 @@ function create_trusted_pool(){
   for (( i=1; i<$NUMNODES; i++ )); do
       ssh root@$firstNode "gluster peer probe ${HOSTS[$i]}"
   done
-  out=`ssh root@$firstNode "gluster peer status; gluster pool list"`
+  out=$(ssh root@$firstNode "gluster peer status")
   display "gluster peer status output:\n$out"
 }
 
@@ -516,13 +542,14 @@ function create_trusted_pool(){
 # 2) mkdir brick_dir; mkdir vol_mnt
 # 3) append mount entries to fstab
 # 4) mount brick
-# 5) mkdir mapred scratch dir (must be done after brick mount!)
+# 5) mkdir mapredlocal scratch dir (must be done after brick mount!)
 # 6) create trusted pool
 # 7) create vol **
 # 8) start vol **
 # 9) mount vol
-# 10) chmod on the gluster mnt and mapred scratch dir
-# 11) chown to mapred:hadoop on the gluster mnt and mapred scratch dir
+# 10) create distributed mapred/system dir (done after vol mount)
+# 11) chmod gluster mnt, mapred/system and brick1/mapred scratch dir
+# 12) chown to mapred:hadoop the above
 # ** gluster cmd only done once for entire pool; all other cmds executed on
 #    each node
 # TODO: limit disk space usage in MapReduce scratch dir so that it does not
@@ -533,7 +560,7 @@ function create_trusted_pool(){
 function setup(){
 
   local i=0; local node=''; local ip=''
-  local PERMISSIONS='770'
+  local PERMISSIONS='777'
   local OWNER='mapred'; local GROUP='hadoop'
   local BRICK_MNT_OPTS="noatime,inode64"
   local GLUSTER_MNT_OPTS="entry-timeout=0,attribute-timeout=0,_netdev"
@@ -542,7 +569,7 @@ function setup(){
   # 2) mkdir brick_dir and vol_mnt on every node
   # 3) append brick_dir and gluster mount entries to fstab on every node
   # 4) mount brick on every node
-  # 5) mkdir mapred scratch dir on every node (must be done after brick mount)
+  # 5) mkdir mapredlocal scratch dir on every node (done after brick mount)
   display "  -- on all nodes:"
   display "       mkfs.xfs $BRICK_DEV..."
   display "       mkdir $BRICK_DIR, $GLUSTER_MNT and $MAPRED_SCRATCH_DIR..."
@@ -588,10 +615,12 @@ function setup(){
   verify_vol_started
 
   # 9) mount vol on every node
-  # 10) chmod on the gluster mnt and the mapred scracth dir on every node
-  # 11) chown on the gluster mnt and mapred scratch dir on every node
+  # 10) create distributed mapred/system dir on every node
+  # 11) chmod on the gluster mnt and the mapred scracth dir on every node
+  # 12) chown on the gluster mnt and mapred scratch dir on every node
   display "  -- on all nodes:"
   display "       mount $GLUSTER_MNT..."
+  display "       create $MAPRED_SYSTEM_DIR dir..."
   display "       create $OWNER user and $GROUP group if needed..."
   display "       change owner and permissions..."
   # Note: ownership and permissions must be set *afer* the gluster vol is
@@ -607,15 +636,22 @@ function setup(){
       ssh root@$node "
 	 ##/bin/mount $GLUSTER_MNT # from fstab (UNCOMMENT this for rhs 2.1)
 	 glusterfs --attribute-timeout=0 --entry-timeout=0 --volfile-id=/$VOLNAME --volfile-server=$node $GLUSTER_MNT # (DELETE this for rhs 2.1)
+
+	 # create mapred/system dir
+	 /bin/mkdir -p $MAPRED_SYSTEM_DIR
+
 	 # create mapred scratch dir and gluster mnt owner and group
        	 if ! /bin/grep -qsi \"^$GROUP\" /etc/group ; then
 	   groupadd $GROUP # note: no password, no explicit GID!
        	 fi
        	 if ! /bin/grep -qsi \"^$OWNER\" /etc/passwd ; then
-	   adduser -g $GROUP $OWNER >&/dev/null # note: no password, no UID!
+           # user added with no password and no hard-coded UID
+           useradd --system -g $GROUP $OWNER >&/dev/null
        	 fi
-	 /bin/chmod $PERMISSIONS $GLUSTER_MNT $MAPRED_SCRATCH_DIR
-	 /bin/chown $OWNER:$GROUP $GLUSTER_MNT $MAPRED_SCRATCH_DIR
+
+	 /bin/chmod $PERMISSIONS $GLUSTER_MNT $MAPRED_SCRATCH_DIR \
+		    $MAPRED_SYSTEM_DIR
+	 /bin/chown -R $OWNER:$GROUP $GLUSTER_MNT $MAPRED_SCRATCH_DIR
       "
   done
 }
@@ -630,6 +666,52 @@ function install_nodes(){
   aNodeRebooted=false # global
   local REBOOT_SLEEP_MINS=2m  # 2 minutes for a reboot
   local i; local node=''; local ip=''
+  local install_mgmt_node
+
+  # prep_node: sub-function which copies the data/ dir from the tarball to the
+  # passed-in node. Then the prep_node.sh script is invoked on the passed-in
+  # node to install these files. If prep.sh returns the "reboot-node" error
+  # code and the node is not the "install-from" node then the global reboot-
+  # needed variable is set. If an unexpected error code is returned then this
+  # function exits.
+  # Args: $1=hostname, $2=node's ip (can be hostname if no ip is known),
+  #       $3=flag to install storage node, $4=flag to install the mgmt node.
+  #
+  function prep_node(){
+
+    local node="$1"; local ip="$2"; local install_storage="$3"
+    local install_mgmt="$4"; local err
+
+    # copy the data subdir to each node...
+    # use ip rather than node for scp and ssh until /etc/hosts is set up
+    ssh root@$ip "rm -rf $REMOTE_INSTALL_DIR; /bin/mkdir -p $REMOTE_INSTALL_DIR"
+    echo "-- Copying RHS-Ambari install files..."
+    scp -rq $DATA_DIR root@$ip:$REMOTE_INSTALL_DIR
+
+    # prep_node.sh may apply the FUSE patch on storage node in which case the
+    # node needs to be rebooted.
+    ssh root@$ip $PREP_SH $node $install_storage $install_mgmt \
+	"\"${HOSTS[@]}\"" "\"${HOST_IPS[@]}\"" $MGMT_NODE \
+	$REMOTE_INSTALL_DIR$DATA_DIR $LOGFILE "$RHN_USER" "$RHN_PW"
+    err=$?
+
+    if (( err == 99 )) ; then # this node needs to be rebooted
+      # don't reboot if node is the install-from node!
+      if [[ "$ip" == "$INSTALL_FROM_IP" ]] ; then
+        DEFERRED_REBOOT_NODE="$node"
+      else
+        display "-- Starting reboot of $node now..."
+        ssh root@$node reboot
+        aNodeRebooted=true
+      fi
+    elif (( err != 0 )) ; then # fatal error in install.sh so quit now
+      display " *** ERROR! prep_node script exited with error: $err ***"
+      display " *** See logfile \"$LOGFILE\" on both \"$node\" and install host for details ***"
+      exit 20
+  fi
+  }
+
+  ## main ##
 
   for (( i=0; i<$NUMNODES; i++ )); do
       node=${HOSTS[$i]}; ip=${HOST_IPS[$i]}
@@ -644,26 +726,21 @@ function install_nodes(){
       #  brick, and to name this subdir same as volname.
       bricks+=" $node:$BRICK_MNT"
 
-      # copy the data subdir to each node
-      ssh root@$node "rm -rf $REMOTE_INSTALL_DIR; mkdir -p $REMOTE_INSTALL_DIR"
-      echo "-- Copying RHS-Ambari install files..."
-      scp -rq $DATA_DIR root@$node:$REMOTE_INSTALL_DIR
-
-      # prep_node.sh may apply the FUSE patch on node in which case the
-      # node needs to be rebooted.
-      ssh root@$node $PREP_SH $node "\"${HOSTS[@]}\"" \
-	"\"${HOST_IPS[@]}\"" $MGMT_NODE $REMOTE_INSTALL_DIR$DATA_DIR $LOGFILE \
-        "$RHN_USER" "$RHN_PW"
-      err=$?
-      if (( err == 99 )) ; then # this node needs to be rebooted
-        ssh root@$node reboot
-        aNodeRebooted=true
-      elif (( err != 0 )) ; then # fatal error in install.sh so quit now
-        display " *** ERROR! install script exited with error: $err ***"
-        display " *** See logfile \"$LOGFILE\" on both \"$node\" and install host for details ***"
-        exit 20
-      fi
+      install_mgmt_node=false
+      [[ -n "$MGMT_NODE_IN_POOL" && "$node" == "$MGMT_NODE" ]] && \
+	install_mgmt_node=true
+#echo "******install_mgmt_node=$install_mgmt_node, MGMT_NODE_IN_POOL=$MGMT_NODE_IN_POOL, MGMT_NODE=$MGMT_NODE*****"
+      prep_node $node $ip true $install_mgmt_node
   done
+
+  # if the mgmt node is not in the storage pool (not in hosts file) then
+  # we  need to copy the management rpm to the mgmt node and install the
+  # management server
+  if [[ -z "$MGMT_NODE_IN_POOL" ]] ; then
+    echo
+    display "-- Starting install of management node \"$MGMT_NODE\""
+    prep_node $MGMT_NODE $MGMT_NODE false true
+  fi
 
   # if we get here then there were no fatal errors in the companion install
   # script...
@@ -688,16 +765,35 @@ function perf_config(){
   display "Performance config output:\n$out"
 }
 
+# reboot_self: invoked when the install-from node (self) is also one of the
+# storage nodes. In this case the reboot of the storage node (needed to 
+# complete the FUSE patch installation) has been deferred -- until now.
+# The user is prompted to confirm the reboot of their node.
+#
+function reboot_self(){
+
+  local ans=''
+
+  echo "*** Your system ($(hostname -s)) needs to be rebooted to complete the"
+  echo "    installation of the FUSE patch."
+  read -p "    Reboot now? [Y|N] " ans
+  if [[ "$ans" == 'Y' || "$ans" == 'y' ]] ; then
+    reboot
+  else
+    echo "No reboot! You must reboot your system prior to running Hadoop jobs."
+  fi
+}
 
 ## ** main ** ##
+
+display "$(/bin/date). Begin: $SCRIPT -- version $INSTALL_VER ***"
 
 parse_cmd $@
 
 # convention is to use the volname as the subdir under the brick as the mnt
 BRICK_MNT=$BRICK_DIR/$VOLNAME
-MAPRED_SCRATCH_DIR="$BRICK_DIR/mapred" # xfs but not distributed
-
-display "$(/bin/date). Begin: $SCRIPT -- version $INSTALL_VER ***"
+MAPRED_SCRATCH_DIR="$BRICK_DIR/mapredlocal"    # xfs but not distributed
+MAPRED_SYSTEM_DIR="$GLUSTER_MNT/mapred/system" # distributed, not local
 
 echo
 display "-- Verifying the deploy environment, including the \"hosts\" file format:"
@@ -705,10 +801,6 @@ verify_local_deploy_setup
 firstNode=${HOSTS[0]}
 
 report_deploy_values
-
-# change dir to the installation dir. All unqualified file references
-# beyond this point in the script are relative to $INSTALL_DIR
-cd $INSTALL_DIR
 
 # per-node install and config...
 install_nodes
@@ -732,4 +824,11 @@ perf_config
 echo
 display "$(/bin/date). End: $SCRIPT"
 echo
+
+# if install-from node is one of the data nodes and the fuse patch was
+# installed on that data node, then the reboot of the node was deferred but
+# can be done now.
+[[ -n "$DEFERRED_REBOOT_NODE" ]] && reboot_self
+exit 0
+#
 # end of script
