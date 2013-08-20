@@ -686,7 +686,7 @@ function install_nodes(){
     # use ip rather than node for scp and ssh until /etc/hosts is set up
     ssh root@$ip "rm -rf $REMOTE_INSTALL_DIR; /bin/mkdir -p $REMOTE_INSTALL_DIR"
     echo "-- Copying RHS-Ambari install files..."
-    scp -rq $DATA_DIR root@$ip:$REMOTE_INSTALL_DIR
+    scp -r $DATA_DIR root@$ip:$REMOTE_INSTALL_DIR
 
     # prep_node.sh may apply the FUSE patch on storage node in which case the
     # node needs to be rebooted.
