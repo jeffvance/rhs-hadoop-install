@@ -362,7 +362,7 @@ function report_deploy_values(){
   display "  Log file:           $LOGFILE"
   echo    "_______________________________________"
 
-  read -p "Continue? [Y|N] " ans
+  read -p "Continue? [y|N] " ans
   [[ "$ans" == 'Y' || "$ans" == 'y' ]] || exit 0
 }
 
