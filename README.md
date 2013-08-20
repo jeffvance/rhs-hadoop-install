@@ -1,4 +1,4 @@
 rhs-ambari-install
 ==================
 
-Jeff / Steve / Erin et al's installation tarball.  
+The official git repo for the install script and related packaging 
