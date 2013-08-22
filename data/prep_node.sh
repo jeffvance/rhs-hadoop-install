@@ -363,10 +363,16 @@ function install_storage(){
   install_ambari_agent
 
   # verify FUSE patch on data (agent) nodes, if not installed yum install it.
-  # NOTE: this must be the last step in this script!
   echo
   display "-- Verifying FUSE patch installation:"
   verify_fuse
+
+  # apply the tuned-admin rhs-high-throughput profile
+  # verified tuned-adm is installed after a fresh RHS install, so not doing a yum install tuned-adm
+  echo
+  display "-- Applying the rhs-high-throughput profile using tuned-adm"
+  tuned-adm profile rhs-high-throughput
+
 }
 
 # install_mgmt: perform the installations steps needed when the node is the

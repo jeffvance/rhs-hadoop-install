@@ -1,4 +1,4 @@
-		RHS-Ambari Installation Script v0.11
+		RHS-Ambari Installation Script 
 
 == Overview ==
 
