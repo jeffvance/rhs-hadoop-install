@@ -65,7 +65,7 @@
 
 # set global variables
 SCRIPT=$(/bin/basename $0)
-INSTALL_VER='0.11'   # self version
+INSTALL_VER='0.13'   # self version
 INSTALL_DIR=$(pwd)   # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/RHS-Ambari-install/" # on each node
@@ -358,7 +358,7 @@ function report_deploy_values(){
   display "  XFS brick dir:      $BRICK_DIR"
   display "  XFS brick mount:    $BRICK_MNT"
   display "  M/R scratch dir:    $MAPRED_SCRATCH_DIR"
-  display "  New install?:       $NEW_DEPLOY"
+  display "  New install:        $NEW_DEPLOY"
   display "  Log file:           $LOGFILE"
   echo    "_______________________________________"
 
@@ -776,7 +776,7 @@ function reboot_self(){
 
   echo "*** Your system ($(hostname -s)) needs to be rebooted to complete the"
   echo "    installation of the FUSE patch."
-  read -p "    Reboot now? [Y|N] " ans
+  read -p "    Reboot now? [y|N] " ans
   if [[ "$ans" == 'Y' || "$ans" == 'y' ]] ; then
     reboot
   else
