@@ -504,7 +504,7 @@ function verify_vol_started(){
       read -a onlineBricks <<< $(ssh root@$firstNode "
 	gluster volume status $VOLNAME 2>/dev/null | \
 		grep $FILTER | \
-		awk '{ print \$$ONLINE_FIELD }'")
+		awk '{ print \$$VOL_ONLINE_FIELD }'")
       # all "Y" in onlineBricks means that all bricks are online
       for (( j=0; j<$NUMNODES; j++ )); do
 	[[ ${onlineBricks[$j]} == 'Y' ]] || break
