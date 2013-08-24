@@ -32,47 +32,72 @@ DOC_FILE=${2:-Ambari_Configuration_Guide.odt}
 [[ -z "$VERSION" && -e .git ]] && VERSION=$(git describe --abbrev=0 --tag)
 [[ -n "$VERSION" ]] && VERSION=${VERSION//./_} # x.y -> x_y
 
-# user can provide docfile.odt or just docfile w/o .odt
-DOC_FILE=$(basename -s .odt $DOC_FILE)
-ODT_FILE="$DOC_FILE.odt"
-PDF_FILE="$DOC_FILE.pdf"
 
-# tarball is created in user's cwd
-# note: tarball contains the rhs-ambari-install-<version> dir, thus we have to
-#   copy target files under this dir, create the tarball and then rm the dir
-TARBALL_PREFIX="rhs-ambari-install-$VERSION"
-TARBALL="$TARBALL_PREFIX.tar.gz"
-TARBALL_DIR="$TARBALL_PREFIX"
-TARBALL_PATH="$TARBALL_DIR/$TARBALL"
-FILES_TO_TAR=(install.sh README.txt Ambari_Configuration_Guide.pdf data/)
+# convert_odt_2_pdf: if possible convert the .odt doc file in the user's cwd
+# to a pdf file using libreoffice. Report warning if this can't be done.
+#
+function convert_odt_2_pdf(){
 
-echo -e "\n\nThis tool converts the existing .odt doc file to pdf and then creates"
-echo "a tarball containing the install package."
-echo -e "\n  - Converting $ODT_FILE to pdf..."
-f=$(ls $ODT_FILE)
-if [[ -z "$f" ]] ; then
-  echo "WARN: $ODT_FILE file does not exist, skipping this step."
-else
-  libreoffice --headless --invisible --convert-to pdf $ODT_FILE	
-  if [[ $? != 0 || $(ls $PDF_FILE|wc -l) != 1 ]] ; then
-    echo "WARN: $ODT_FILE not converted to pdf."
+  # user can provide docfile.odt or just docfile w/o .odt
+  DOC_FILE=$(basename -s .odt $DOC_FILE)
+  local ODT_FILE="$DOC_FILE.odt"
+  local PDF_FILE="$DOC_FILE.pdf"
+  local f
+
+  echo -e "\n  - Converting $ODT_FILE to pdf..."
+
+  f=$(ls $ODT_FILE)
+  if [[ -z "$f" ]] ; then
+    echo "WARN: $ODT_FILE file does not exist, skipping this step."
+  else
+    libreoffice --headless --invisible --convert-to pdf $ODT_FILE	
+    if [[ $? != 0 || $(ls $PDF_FILE|wc -l) != 1 ]] ; then
+      echo "WARN: $ODT_FILE not converted to pdf."
+    fi
   fi
-fi
+}
 
-echo -e "\n  - Creating $TARBALL tarball..."
-[[ -e $TARBALL ]] && /bin/rm $TARBALL
-# create temp tarball dir and copy subset of content there
-[[ -d $TARBALL_DIR ]] && /bin/rm -rf $TARBALL_DIR
-/bin/mkdir $TARBALL_DIR
-for f in "${FILES_TO_TAR[@]}" ; do
-  /bin/cp -R $f $TARBALL_DIR
-done
-/bin/tar cvzf $TARBALL $TARBALL_DIR
-if [[ $? != 0 || $(ls $TARBALL|wc -l) != 1 ]] ; then
-  echo "ERROR: creation of tarball failed."
-  exit 1
-fi
-/bin/rm -rf $TARBALL_DIR
+# create_tarball: create a versioned directory in the user's cwd, copy the
+# target contents to that dir, create the tarball, and finally rm the
+# versioned dir.
+#
+function create_tarball(){
+
+  # tarball contains the rhs-ambari-install-<version> dir, thus we have to copy
+  # target files under this dir, create the tarball and then rm the dir
+  local TARBALL_PREFIX="rhs-ambari-install-$VERSION"
+  local TARBALL="$TARBALL_PREFIX.tar.gz"
+  local TARBALL_DIR="$TARBALL_PREFIX"
+  local TARBALL_PATH="$TARBALL_DIR/$TARBALL"
+  local FILES_TO_TAR=(install.sh README.txt Ambari_Configuration_Guide.pdf data/)
+  local f
+
+  echo -e "\n  - Creating $TARBALL tarball..."
+  [[ -e $TARBALL ]] && /bin/rm $TARBALL
+
+  # create temp tarball dir and copy subset of content there
+  [[ -d $TARBALL_DIR ]] && /bin/rm -rf $TARBALL_DIR
+  /bin/mkdir $TARBALL_DIR
+  for f in "${FILES_TO_TAR[@]}" ; do
+    /bin/cp -R $f $TARBALL_DIR
+  done
+
+  /bin/tar cvzf $TARBALL $TARBALL_DIR
+  if [[ $? != 0 || $(ls $TARBALL|wc -l) != 1 ]] ; then
+    echo "ERROR: creation of tarball failed."
+    exit 1
+  fi
+  /bin/rm -rf $TARBALL_DIR
+}
+
+
+## main ##
+##
+echo -e "\n\nThis script converts the existing .odt doc file to pdf and then creates"
+echo "a tarball containing the install package."
+
+convert_odt_2_pdf
+create_tarball
 
 echo
 #
