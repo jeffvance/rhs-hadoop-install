@@ -24,8 +24,20 @@
 # Args: $2= name of the .odt doc file to bo converted to PDF. Default is
 #       "Ambari_Configuration_Guide.odt"
 
+### OPTIONAL PARAMETERS, NOT REQUIRED IF libreoffice path and source is local
+
+#The normal defaults..
+LIBREOFFICE=libreoffice
+SOURCE=.
+
+#To work on jenkins: 
+#LIBREOFFICE=/usr/bin/libreoffice4.1
+#SOURCE=/opt/JEFF/rhs-ambari-install
+
 VERSION=${1:-}
-DOC_FILE=${2:-Ambari_Configuration_Guide.odt}
+
+DOC_FILE=${2:-$SOURCE/Ambari_Configuration_Guide.odt}
+DOC_FILE=$SOURCE/Ambari_Configuration_Guide.odt
 
 # get latest package version in checked out branch
 # note: supplied version arg trumps git tag/versison
@@ -45,18 +57,25 @@ DOC_FILE=${2:-Ambari_Configuration_Guide.odt}
 function convert_odt_2_pdf(){
 
   # user can provide docfile.odt or just docfile w/o .odt
-  DOC_FILE=$(basename -s .odt $DOC_FILE)
+  echo $DOC_FILE
+  
+  #Declarative hipster stuff that works on Jeff's fedora to extract basename .
+  #DOC_FILE=$(basename -s .odt $DOC_FILE)
+  
+  #Simpler version of basename command: works on any linux. 
+  DOC_FILE=`echo $DOC_FILE | cut -f 1 -d'.'`
+
   local ODT_FILE="$DOC_FILE.odt"
   local PDF_FILE="$DOC_FILE.pdf"
   local f
 
-  echo -e "\n  - Converting $ODT_FILE to pdf..."
+  echo -e "\n  - Converting file='$ODT_FILE' to pdf..."
 
   f=$(ls $ODT_FILE)
   if [[ -z "$f" ]] ; then
     echo "WARN: $ODT_FILE file does not exist, skipping this step."
   else
-    libreoffice --headless --invisible --convert-to pdf $ODT_FILE	
+    $LIBREOFFICE --headless --invisible --convert-to pdf $ODT_FILE	
     if [[ $? != 0 || $(ls $PDF_FILE|wc -l) != 1 ]] ; then
       echo "WARN: $ODT_FILE not converted to pdf."
     fi
