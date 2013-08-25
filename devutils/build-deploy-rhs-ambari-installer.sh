@@ -4,29 +4,36 @@
 #### First, define the build location. ####
 BUILD_LOCATION=/var/lib/jenkins/workspace/Ambari/rhs-ambari-install-current.tar.gz
 
+SOURCE=/opt/JEFF/rhs-ambari-install
+
 ####### BUILD THE TAR/GZ FILE ~ THIS SHOULD RUN IN JENKINS (future) ####### 
-cd rhs-ambari-install
+cd $SOURCE
 git pull
 
 ### Generally the cut SHOULD NOT be required ## 
 TAGNAME=`git describe --tags | sed s/v//g | cut -d'-' -f 1`
-git archive HEAD | gzip > $BUILD_LOCATION
-cd ..
+
+$SOURCE/devutils/mk_tarball.sh #converts .odt to .pdf and creates tarball
+cp $SOURCE/rhs-ambari-install*gz $BUILD_LOCATION
+
+#git archive HEAD | gzip > $BUILD_LOCATION
+cd /opt/JEFF/
 
 echo "Done archiving $TAGNAME to $BUILD_LOCATION..." 
 ls -altrh $BUILD_LOCATION 
 echo "proceed <ENTER>?..."
 read 
 #### NOW RUN SOME TESTS against the tar file (again, should run in jenkins) ##### 
-./shelltest.sh ### <-- dummy script.
+/opt/JEFF/shelltest.sh ### <-- dummy script.
 result=$?
 echo "Test result = $result press any key to continue..."
 if [[ ! $result == 0 ]]; then
-      echo "Tests Passed ! "
+      echo "Tests FAILED ! "
       exit 1
+      return 1
+else
+   echo "TEST PASSED !!!! DEPLOYING $TAGNAME !"
 fi
-
-echo "TEST PASSED !!!! DEPLOYING $TAGNAME !"
  
 ### IF TESTS PASSED, we PROCEED WITH THE DEPLOYMENT !!! (yup - jenkins should run this to :) ### 
 

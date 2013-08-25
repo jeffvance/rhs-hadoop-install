@@ -29,7 +29,13 @@ DOC_FILE=${2:-Ambari_Configuration_Guide.odt}
 
 # get latest package version in checked out branch
 # note: supplied version arg trumps git tag/versison
+
+
+#Create version from GIT metadata.  This is the "right" way to do it for CI.
 [[ -z "$VERSION" && -e .git ]] && VERSION=$(git describe --abbrev=0 --tag)
+
+# TODO: Remove the VERSION//./_ replacement.  This seems dangerous to scripts
+# Expecting version input to be faithfully observerd.
 [[ -n "$VERSION" ]] && VERSION=${VERSION//./_} # x.y -> x_y
 
 
@@ -72,7 +78,7 @@ function create_tarball(){
   local FILES_TO_TAR=(install.sh README.txt Ambari_Configuration_Guide.pdf data/)
   local f
 
-  echo -e "\n  - Creating $TARBALL tarball..."
+  echo -e "\n  - Creating $TARBALL tarball... for version : $VERSION"
   [[ -e $TARBALL ]] && /bin/rm $TARBALL
 
   # create temp tarball dir and copy subset of content there
