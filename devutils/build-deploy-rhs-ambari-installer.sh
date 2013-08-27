@@ -4,8 +4,6 @@
 #### First, define the build location. ####
 BUILD_LOCATION=/var/lib/jenkins/workspace/Ambari/rhs-ambari-install-current.tar.gz
 REPO=/root/archivainstall/apache-archiva-1.3.6/data/repositories/internal
-SOURCE=/opt/JEFF/rhs-ambari-install
-
 SOURCE=/opt/JEFF/rhs-ambari-install #expected to be a git directory
 
 ####### BUILD THE TAR/GZ FILE ~ THIS SHOULD RUN IN JENKINS (future) ####### 
