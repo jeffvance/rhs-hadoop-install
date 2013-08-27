@@ -123,7 +123,7 @@ function convert_odt_2_pdf(){
   if [[ -z "$f" ]] ; then
     echo "WARN: $ODT_FILE file does not exist, skipping this step."
   else
-    libreoffice --headless --invisible --convert-to pdf $ODT_FILE	
+    $LIBREOFFICE --headless --invisible --convert-to pdf $ODT_FILE	
     if [[ $? != 0 || $(ls $PDF_FILE|wc -l) != 1 ]] ; then
       echo "WARN: $ODT_FILE not converted to pdf."
     fi

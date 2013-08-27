@@ -1,5 +1,5 @@
 mk_tarball:
------------
+
 Use --help to see script command line options.
 
 This script converts the .odt file (if present) to a PDF and then creates a
@@ -17,3 +17,4 @@ Note: there is a depdendency on libreoffice. To install it:
 
 Then create a symlink to the downloaded version, eg:
  ln -s /usr/bin/libreoffice4.1 /bin/libreoffice
+

@@ -3,6 +3,8 @@
  
 #### First, define the build location. ####
 BUILD_LOCATION=/var/lib/jenkins/workspace/Ambari/rhs-ambari-install-current.tar.gz
+REPO=/root/archivainstall/apache-archiva-1.3.6/data/repositories/internal
+SOURCE=/opt/JEFF/rhs-ambari-install
 
 SOURCE=/opt/JEFF/rhs-ambari-install #expected to be a git directory
 
@@ -41,10 +43,18 @@ fi
 
 sudo mvn deploy:deploy-file \
 -Dfile=$BUILD_LOCATION \
--Durl=file:/root/archivainstall/apache-archiva-1.3.6/data/repositories/internal \
+-Durl=file:$REPO \
 -DgroupId=rhbd \
 -DartifactId=rhs-ambari-install \
 -Dversion=$TAGNAME 
+
+#The artifact has now been created here:
+BASEARTIFACT=$REPO/rhbd/rhs-ambari-install/$TAGNAME/rhs-ambari-install-$TAGNAME
+
+#But since maven doesnt support the tar.gz, we must move it to be a tar.gz file
+sudo mv $BASEARTIFACT.gz $BASEARTIFACT.tar.gz
+sudo chmod -R 777 $BASEARTIFACT.tar.gz
+sudo ls -altrh $BASEARTIFACT.tar.gz
 
 ########################################
 
