@@ -15,8 +15,7 @@ TAGNAME=$(git describe --abbrev=0 --tag)
 #convert .odt to .pdf and create tarball
 $SOURCE/devutils/mk_tarball.sh \
 	--source="$SOURCE" \
-	--target-dir="$BUILD_LOCATION" \
-	--pkg-version="$TAGNAME"
+	--target-dir="$BUILD_LOCATION"
 
 #git archive HEAD | gzip > $BUILD_LOCATION
 cd /opt/JEFF/  ##why??
