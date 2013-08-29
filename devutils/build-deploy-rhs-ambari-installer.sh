@@ -39,15 +39,18 @@ fi
  
 ### IF TESTS PASSED, we PROCEED WITH THE DEPLOYMENT !!! (yup - jenkins should run this to :) ### 
 
+# target tarball versioned name
+TARBALL=$(ls $BUILD_LOCATION/rhs-ambari-*.tar.gz) #expect 1 and only 1 file
+
 sudo mvn deploy:deploy-file \
--Dfile=$(ls $BUILD_LOCATION/rhs-ambari-install-*.tar.gz) \
+-Dfile=$BUILD_LOCATION/$TARBALL \
 -Durl=file:$REPO \
 -DgroupId=rhbd \
 -DartifactId=rhs-ambari-install \
 -Dversion=$TAGNAME 
 
-#The artifact has now been created here:
-BASEARTIFACT=$REPO/rhbd/rhs-ambari-install/$TAGNAME/rhs-ambari-install-$TAGNAME
+#The artifact has been created here: (after stripping tar.gz extension)
+BASEARTIFACT=$REPO/rhbd/rhs-ambari-install/$TAGNAME/${TARBALL//.tar.gz/}
 
 #But since maven doesnt support the tar.gz, we must move it to be a tar.gz file
 sudo mv $BASEARTIFACT.gz $BASEARTIFACT.tar.gz
