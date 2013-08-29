@@ -6,8 +6,7 @@
 BUILD_LOCATION=/var/lib/jenkins/workspace/Ambari
 REPO=/root/archivainstall/apache-archiva-1.3.6/data/repositories/internal
 SOURCE=/opt/JEFF/rhs-ambari-install #expected to be a git directory
-S3="s3://rhbd/rhs-ambari-install/"
-
+S3="s3://rhbd/rhs-ambari-install"
 
 ####### BUILD THE TAR/GZ FILE ~ THIS SHOULD RUN IN JENKINS (future) ####### 
 cd $SOURCE
@@ -42,15 +41,18 @@ fi
 ### IF TESTS PASSED, we PROCEED WITH THE DEPLOYMENT !!! (yup - jenkins should run this to :) ### 
 
 #First deploy into s3: This is the preferred (but new) place where we store binaries:
-echo "Press a key to deploy to $TARBALL in $S3"
-read x
-s3cmd put $BUILD_LOCATION/$TARBALL $TARBALL
-echo "Your tarball is now deployed to : $S3/$TARBALL"
 
 # Now, we deploy into archiva.
 # target tarball versioned name
 TARBALL=$(ls $BUILD_LOCATION/rhs-ambari-*.tar.gz) #expect 1 and only 1 file
 TARBALL=$(basename $TARBALL)
+
+#Jeff youcan modify this however you want, this is just an example of how to push to s3. it works asis.
+echo "Press a key to deploy to $TARBALL in $S3 - note that you need to run s3cmd --configure the first time you do this or pass the -c "
+read x
+s3cmd put $BUILD_LOCATION/$TARBALL $S3/$TARBALL
+echo "Your tarball is now deployed to : $S3/$TARBALL"
+
 
 sudo mvn deploy:deploy-file \
 -Dfile=$BUILD_LOCATION/$TARBALL \
