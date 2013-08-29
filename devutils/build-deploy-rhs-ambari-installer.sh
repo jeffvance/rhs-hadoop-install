@@ -2,7 +2,8 @@
 #a proper jenkins build. And afterwards, it will copy the jenkins current build to archiva as a release. This entire process should actually run inside of jenkins, rather than as a manually run shell script.
  
 #### First, define the build location. ####
-BUILD_LOCATION=/var/lib/jenkins/workspace/Ambari/rhs-ambari-install-current.tar.gz
+# NOTE: this the target tarball directory
+BUILD_LOCATION=/var/lib/jenkins/workspace/Ambari
 REPO=/root/archivainstall/apache-archiva-1.3.6/data/repositories/internal
 SOURCE=/opt/JEFF/rhs-ambari-install #expected to be a git directory
 
@@ -11,11 +12,12 @@ cd $SOURCE
 git pull
 
 TAGNAME=$(git describe --abbrev=0 --tag)
+#TAGNAME=${TAGNAME://./_} #sub _ for . per linux versioned filename convention
 
 #convert .odt to .pdf and create tarball
 $SOURCE/devutils/mk_tarball.sh \
-	--source="$SOURCE" \
-	--target-dir="$BUILD_LOCATION"
+	--target-dir="$BUILD_LOCATION" \
+	--version="$TAGNAME"
 
 #git archive HEAD | gzip > $BUILD_LOCATION
 cd /opt/JEFF/  ##why??
@@ -31,7 +33,6 @@ echo "Test result = $result press any key to continue..."
 if [[ ! $result == 0 ]]; then
       echo "Tests FAILED ! "
       exit 1
-      return 1
 else
    echo "TEST PASSED !!!! DEPLOYING $TAGNAME !"
 fi
@@ -39,7 +40,7 @@ fi
 ### IF TESTS PASSED, we PROCEED WITH THE DEPLOYMENT !!! (yup - jenkins should run this to :) ### 
 
 sudo mvn deploy:deploy-file \
--Dfile=$BUILD_LOCATION \
+-Dfile=$(ls $BUILD_LOCATION/rhs-ambari-install-*.tar.gz) \
 -Durl=file:$REPO \
 -DgroupId=rhbd \
 -DartifactId=rhs-ambari-install \
