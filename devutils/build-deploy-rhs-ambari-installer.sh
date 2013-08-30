@@ -2,7 +2,7 @@
 #a proper jenkins build. And afterwards, it will copy the jenkins current build to archiva as a release. This entire process should actually run inside of jenkins, rather than as a manually run shell script.
  
 #### First, define the build location. ####
-# NOTE: this the target tarball directory
+# NOTE: this is an intermediate target tarball directory
 BUILD_LOCATION=/var/lib/jenkins/workspace/Ambari
 REPO=/root/archivainstall/apache-archiva-1.3.6/data/repositories/internal
 SOURCE=/opt/JEFF/rhs-ambari-install #expected to be a git directory
@@ -17,7 +17,7 @@ TAGNAME=$(git describe --abbrev=0 --tag)
 #convert .odt to .pdf and create tarball
 $SOURCE/devutils/mk_tarball.sh \
 	--target-dir="$BUILD_LOCATION" \
-	--version="$TAGNAME"
+	--pkg-version="$TAGNAME"
 
 #git archive HEAD | gzip > $BUILD_LOCATION
 cd /opt/JEFF/  ##why??
@@ -41,6 +41,7 @@ fi
 
 # target tarball versioned name
 TARBALL=$(ls $BUILD_LOCATION/rhs-ambari-*.tar.gz) #expect 1 and only 1 file
+TARBALL=$(basename $TARBALL)
 
 sudo mvn deploy:deploy-file \
 -Dfile=$BUILD_LOCATION/$TARBALL \
@@ -51,6 +52,7 @@ sudo mvn deploy:deploy-file \
 
 #The artifact has been created here: (after stripping tar.gz extension)
 BASEARTIFACT=$REPO/rhbd/rhs-ambari-install/$TAGNAME/${TARBALL//.tar.gz/}
+BASEARTIFACT=${BASEARTIFACT//_/.} # change version "_" back to "."
 
 #But since maven doesnt support the tar.gz, we must move it to be a tar.gz file
 sudo mv $BASEARTIFACT.gz $BASEARTIFACT.tar.gz
