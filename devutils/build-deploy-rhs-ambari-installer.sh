@@ -6,6 +6,7 @@
 BUILD_LOCATION=/var/lib/jenkins/workspace/Ambari
 REPO=/root/archivainstall/apache-archiva-1.3.6/data/repositories/internal
 SOURCE=/opt/JEFF/rhs-ambari-install #expected to be a git directory
+S3="s3://rhbd/rhs-ambari-install"
 
 ####### BUILD THE TAR/GZ FILE ~ THIS SHOULD RUN IN JENKINS (future) ####### 
 cd $SOURCE
@@ -39,27 +40,37 @@ fi
  
 ### IF TESTS PASSED, we PROCEED WITH THE DEPLOYMENT !!! (yup - jenkins should run this to :) ### 
 
+#First deploy into s3: This is the preferred (but new) place where we store binaries:
+
+# Now, we deploy into archiva.
 # target tarball versioned name
 TARBALL=$(ls $BUILD_LOCATION/rhs-ambari-*.tar.gz) #expect 1 and only 1 file
 TARBALL=$(basename $TARBALL)
 
-sudo mvn deploy:deploy-file \
--Dfile=$BUILD_LOCATION/$TARBALL \
--Durl=file:$REPO \
--DgroupId=rhbd \
--DartifactId=rhs-ambari-install \
--Dversion=$TAGNAME 
+#Jeff youcan modify this however you want, this is just an example of how to push to s3. it works asis.
+echo "Press a key to deploy to $TARBALL in $S3 - note that you need to run s3cmd --configure the first time you do this or pass the -c "
+read x
+s3cmd put $BUILD_LOCATION/$TARBALL $S3/$TARBALL
+echo "Your tarball is now deployed to : $S3/$TARBALL"
+exit 0
+
+#Not using mvn now since using s3, but may later...
+#sudo mvn deploy:deploy-file \
+#-Dfile=$BUILD_LOCATION/$TARBALL \
+#-Durl=file:$REPO \
+#-DgroupId=rhbd \
+#-DartifactId=rhs-ambari-install \
+#-Dversion=$TAGNAME 
 
 #The artifact has been created here: (after stripping tar.gz extension)
-BASEARTIFACT=$REPO/rhbd/rhs-ambari-install/$TAGNAME/${TARBALL//.tar.gz/}
-BASEARTIFACT=${BASEARTIFACT//_/.} # change version "_" back to "."
+#BASEARTIFACT=$REPO/rhbd/rhs-ambari-install/$TAGNAME/${TARBALL//.tar.gz/}
+#BASEARTIFACT=${BASEARTIFACT//_/.} # change version "_" back to "."
 
 #But since maven doesnt support the tar.gz, we must move it to be a tar.gz file
-sudo mv $BASEARTIFACT.gz $BASEARTIFACT.tar.gz
-sudo chmod -R 777 $BASEARTIFACT.tar.gz
-sudo ls -altrh $BASEARTIFACT.tar.gz
-
+#sudo mv ${BASEARTIFACT_NOTARGZ}.gz $BASEARTIFACT
+#sudo chmod -R 777 $BASEARTIFACT
+#sudo ls -altrh $BASEARTIFACT
 ########################################
 
-echo "Done ! The file will now be in archiva at http://23.23.239.119/archiva/repository/internal/rhbd/rhs-ambari-install/"
+#echo "Done ! The file will now be in archiva at http://23.23.239.119/archiva/repository/internal/rhbd/rhs-ambari-install/"
 
