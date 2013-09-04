@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#! /bin/bash
 #
 # Copyright (c) 2013 Red Hat, Inc.
 # License: Apache License v2.0
@@ -65,7 +65,7 @@
 
 # set global variables
 SCRIPT=$(/bin/basename $0)
-INSTALL_VER='0.16'   # self version
+INSTALL_VER='0.17'   # self version
 INSTALL_DIR=$(pwd)   # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/RHS-Ambari-install/" # on each node
@@ -101,8 +101,7 @@ function short_usage(){
 #
 function usage(){
 
-  echo
-  echo -e "$SCRIPT (version $INSTALL_VER)  Usage:\n"
+  echo -e "\nUsage:\n"
   echo "Deploys Hadoop on top of Red Hat Storage (RHS). Each node in the storage"
   echo "cluster must be defined in the \"hosts\" file. The \"hosts\" file is not"
   echo "included in the RHS tarball but must be created prior to running this"
