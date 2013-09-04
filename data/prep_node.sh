@@ -76,7 +76,8 @@ function fixup_etc_hosts_file(){
 #
 function install_plugin(){
 
-  local GLUSTER_SHIM_TARGET_DIR='/usr/lib/hadoop/lib/'
+  local USR_JAVA_DIR='/usr/share/java'
+  local HADOOP_JAVA_DIR='/usr/lib/hadoop/lib/'
   local jar=''
 
   jar=$(ls glusterfs-hadoop*.jar)
@@ -86,15 +87,19 @@ function install_plugin(){
   fi
 
   display "-- Installing Gluster-Hadoop plug-in ($jar)..."
-  # create /usr/lib/hadoop/lib if it does not exist
-  if [[ ! -d $GLUSTER_SHIM_TARGET_DIR ]] ; then
-    /bin/mkdir -p $GLUSTER_SHIM_TARGET_DIR
-  fi
-  /bin/cp -uf $jar $GLUSTER_SHIM_TARGET_DIR
+  # create target dirs if they does not exist
+  [[ -d $USR_JAVA_DIR ]]    || /bin/mkdir -p $USR_JAVA_DIR
+  [[ -d $HADOOP_JAVA_DIR ]] || /bin/mkdir -p $HADOOP_JAVA_DIR
+
+  # copy jar and create symlink
+  /bin/cp -uf $jar $USR_JAVA_DIR
   if (( $? != 0 )) ; then
     display "  Copy of plug-in failed"
     exit 10
   fi
+  rm -f $HADOOP_JAVA_DIR/$jar
+  ln -s $USR_JAVA_DIR/$jar $HADOOP_JAVA_DIR/$jar
+
   display "   ... Gluster-Hadoop plug-in install successful"
 }
 
