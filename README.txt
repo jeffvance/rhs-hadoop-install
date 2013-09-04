@@ -134,7 +134,7 @@ Ambari Installation Instructions:
         
     *** Host Registration Information: Select ‘Perform Manual Registration on 
         hosts, do not use SSH’.
-	You will get a pop of warning. The manual install of the agents was 
+	You will get a pop-up warning. The manual install of the agents was 
         completed by the install.sh script.  No addition action needs to take 
         place. Select OK and continue.
 
