@@ -493,22 +493,19 @@ function verify_vol_created(){
 #
 function verify_vol_started(){
 
-  local i=0; local j; local LIMIT=10
-  local FILTER='^Brick'    # grep filter
-  local VOL_ONLINE_FIELD=4 # for awk print
-  local onlineBricks=()    # array of bricks, "Y" if brick is online
+  local i=0; local LIMIT=10; local rtn
+  local FILTER='^Online' # grep filter
+  local ONLINE=': Y'     # grep not-match value
 
   while (( i < LIMIT )) ; do # don't loop forever
-      # ensure all bricks are online
-      read -a onlineBricks <<< $(ssh root@$firstNode "
-	gluster volume status $VOLNAME 2>/dev/null | \
-		grep $FILTER | \
-		awk '{ print \$$VOL_ONLINE_FIELD }'")
-      # all "Y" in onlineBricks means that all bricks are online
-      for (( j=0; j<$NUMNODES; j++ )); do
-	[[ ${onlineBricks[$j]} == 'Y' ]] || break
-      done
-      (( j == NUMNODES )) && break # all bricks online
+      # grep for Online status != Y
+      rtn=$(ssh root@$firstNode "
+	gluster volume status $VOLNAME detail 2>/dev/null |
+	 	/bin/grep $FILTER |
+		/bin/grep -v '$ONLINE' |
+		wc -l
+	")
+      (( rtn == 0 )) && break # exit loop
       sleep 1
       ((i++))
   done
