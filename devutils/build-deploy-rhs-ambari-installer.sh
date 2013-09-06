@@ -30,7 +30,7 @@ cd /opt/JEFF/  ##why??
 echo "Done archiving $TAGNAME to $BUILD_LOCATION..." 
 ls -alth $BUILD_LOCATION 
 echo
-echo "proceed <ENTER>?..."
+echo "Proceed? <ENTER>"
 read 
 #### NOW RUN SOME TESTS against the tar file (again, should run in jenkins) ##### 
 /opt/JEFF/shelltest.sh ### <-- dummy script.
@@ -58,7 +58,7 @@ echo "this or pass the -c option."
 echo "    build   -> $BUILD_LOCATION"
 echo "    tarball -> $TARBALL"
 echo "    s3      -> $S3"
-echo "PROCEED ? <ENTER>"
+echo "Proceed? <ENTER>"
 read
 s3cmd put $BUILD_LOCATION/$TARBALL $S3/$TARBALL
 (( $? == 0 )) && echo "Your tarball is now deployed to : $S3/$TARBALL"
