@@ -57,8 +57,8 @@ echo "Note that you need to run: \"s3cmd --configure\" the first time you do thi
 echo "proceed <ENTER>?..."
 read x
 s3cmd put $BUILD_LOCATION/$TARBALL $S3/$TARBALL
-echo "Your tarball is now deployed to : $S3/$TARBALL"
-exit 0
+(( $? == 0 )) && echo "Your tarball is now deployed to : $S3/$TARBALL"
+exit
 
 #Not using mvn now since using s3, but may later...
 #sudo mvn deploy:deploy-file \
