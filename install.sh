@@ -653,16 +653,25 @@ function setup(){
 }
 
 # install_nodes: for each node in the hosts file copy the "data" sub-directory
-# and invoke the companion "prep" script. The global bricks variable is
-# set here. A variable is set if the remote node is rebooted (eg. due to
-# installing the FUSE patch).
+# and invoke the companion "prep" script. Some global variables are set here:
+#   bricks               : string of all bricks (ip/dir)
+#   DEFERRED_REBOOT_NODE : install-from hostname if install-from node needs
+#     to be rebooted, else not defined
+#   REBOOT_NODES         : array of IPs for all nodes needing to be rebooted,
+#     except the install-from node which is handled by DEFERRED_REBOOT_NODE
+#
+# A node needs to be rebooted if the FUSE patch is installed. However, the node
+# running the install script is not rebooted unless the users says yes.
+# 
+# Since the server(mgmt) node is known all other nodes are assumed to be 
+# storage(agent) nodes. However the management node can also be a storage node.
+# The right Ambari steps are performed depending on whether the target node is
+# a management node, storage node, or both. 
 #
 function install_nodes(){
 
-  aNodeRebooted=false # global
-  local REBOOT_SLEEP_MINS=2m  # 2 minutes for a reboot
-  local i; local node=''; local ip=''
-  local install_mgmt_node
+  local i; local node=''; local ip=''; local install_mgmt_node
+  REBOOT_NODES=() # global
 
   # prep_node: sub-function which copies the data/ dir from the tarball to the
   # passed-in node. Then the prep_node.sh script is invoked on the passed-in
@@ -670,7 +679,7 @@ function install_nodes(){
   # code and the node is not the "install-from" node then the global reboot-
   # needed variable is set. If an unexpected error code is returned then this
   # function exits.
-  # Args: $1=hostname, $2=node's ip (can be hostname if no ip is known),
+  # Args: $1=hostname, $2=node's ip (can be hostname if ip is unknown),
   #       $3=flag to install storage node, $4=flag to install the mgmt node.
   #
   function prep_node(){
@@ -696,9 +705,7 @@ function install_nodes(){
       if [[ "$ip" == "$INSTALL_FROM_IP" ]] ; then
         DEFERRED_REBOOT_NODE="$node"
       else
-        display "-- Starting reboot of $node now..."
-        ssh root@$node reboot
-        aNodeRebooted=true
+	REBOOT_NODES+=("$ip")
       fi
     elif (( err != 0 )) ; then # fatal error in install.sh so quit now
       display " *** ERROR! prep_node script exited with error: $err ***"
@@ -725,7 +732,6 @@ function install_nodes(){
       install_mgmt_node=false
       [[ -n "$MGMT_NODE_IN_POOL" && "$node" == "$MGMT_NODE" ]] && \
 	install_mgmt_node=true
-#echo "******install_mgmt_node=$install_mgmt_node, MGMT_NODE_IN_POOL=$MGMT_NODE_IN_POOL, MGMT_NODE=$MGMT_NODE*****"
       prep_node $node $ip true $install_mgmt_node
   done
 
@@ -737,14 +743,41 @@ function install_nodes(){
     display "-- Starting install of management node \"$MGMT_NODE\""
     prep_node $MGMT_NODE $MGMT_NODE false true
   fi
-
   # if we get here then there were no fatal errors in the companion install
   # script...
-  # sleep a few mins if any node was rebooted
-  if $aNodeRebooted ; then
+}
+
+# reboot_nodes: if one of more nodes need to be rebooted, due to installing the
+# FUSE patch, then they are rebooted here. Note: if the "install-from" node 
+# also needs to be rebooted that node is not in the REBOOT_NODES array and is
+# handled separately (see the DEFERRED_REBOOT_NODE global variable).
+#
+function reboot_nodes(){
+
+  local ip; local i
+
+  if (( ${#REBOOT_NODES[@]} > 0 )) ; then # nodes to reboot
     echo
-    display "...sleeping ${REBOOT_SLEEP_MINS}inutes due to 1 or more nodes rebooting..."
-    /bin/sleep $REBOOT_SLEEP_MINS
+    display "-- ${#REBOOT_NODES[@]} nodes need to be rebooted..."
+    for ip in "${REBOOT_NODES[@]}"; do
+	display "   * rebooting node: $ip..."
+	ssh root@$ip reboot -f &  # reboot asynchronously
+    done
+
+    # makes sure all rebooted nodes are back up before returning
+    while true ; do
+	for i in "${!REBOOT_NODES[@]}"; do # array of non-null element indices
+	    ip=${REBOOT_NODES[$i]}         # unset leaves sparse array
+	    # if possible to ssh to ip then unset that array entry
+	    ssh -q -oBatchMode=yes root@$ip exit
+	    if (( $? == 0 )) ; then # node has rebooted
+	      display "   * node $ip sucessfully rebooted"
+	      unset REBOOT_NODES[$i] # null entry in array
+	    fi
+	done
+	(( ${#REBOOT_NODES[@]} == 0 )) && break # exit loop
+	sleep 30
+    done
   fi
 }
 
@@ -773,11 +806,8 @@ function reboot_self(){
   echo "*** Your system ($(hostname -s)) needs to be rebooted to complete the"
   echo "    installation of the FUSE patch."
   read -p "    Reboot now? [y|N] " ans
-  if [[ "$ans" == 'Y' || "$ans" == 'y' ]] ; then
-    reboot
-  else
-    echo "No reboot! You must reboot your system prior to running Hadoop jobs."
-  fi
+  [[ "$ans" == 'Y' || "$ans" == 'y' ]] && reboot # bye!
+  echo "No reboot! You must reboot your system prior to running Hadoop jobs."
 }
 
 ## ** main ** ##
@@ -816,6 +846,9 @@ setup
 echo
 display "-- Performance config --"
 perf_config
+
+# reboot nodes where the FUSE patch was installed
+reboot_nodes
 
 echo
 display "$(/bin/date). End: $SCRIPT"
