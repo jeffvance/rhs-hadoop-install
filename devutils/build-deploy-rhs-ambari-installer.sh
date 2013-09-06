@@ -47,8 +47,8 @@ fi
 # Now, we deploy into archiva.
 # target tarball versioned name
 #TARBALL=$(ls -ltr $BUILD_LOCATION/rhs-ambari-*.tar.gz) #expect 1 and only 1 file
-TARBALL=$(ls -Rt /var/lib/jenkins/workspace/Ambari/rhs-ambari-*.tar.gz | head -1 | cut -f 9 -d' ')
-TARBALL=$(basename $TARBALL) #<-- doesnt work on some linux
+TARBALL=$(ls -Rt $BUILD_LOCATION/rhs-ambari-*.tar.gz | head -1 | cut -f 9 -d' ')
+TARBALL=$(basename $TARBALL) #<-- doesnt work out of the box on some linux
 
 
 #you can modify this however you want, this is just an example of how to push
