@@ -1,5 +1,7 @@
 #This script will copy the current git master to jenkins, to mock
-#a proper jenkins build. And afterwards, it will copy the jenkins current build to archiva as a release. This entire process should actually run inside of jenkins, rather than as a manually run shell script.
+#a proper jenkins build. And afterwards, it will copy the jenkins current
+#build to s3 as a release. This entire process should actually run inside of
+#jenkins, rather than as a manually run shell script.
  
 #### First, define the build location. ####
 # NOTE: this is an intermediate target tarball directory
@@ -13,7 +15,6 @@ cd $SOURCE
 git pull
 
 TAGNAME=$(git describe --abbrev=0 --tag)
-#TAGNAME=${TAGNAME://./_} #sub _ for . per linux versioned filename convention
 
 #convert .odt to .pdf and create tarball
 $SOURCE/devutils/mk_tarball.sh \
@@ -47,7 +48,8 @@ fi
 TARBALL=$(ls $BUILD_LOCATION/rhs-ambari-*.tar.gz) #expect 1 and only 1 file
 TARBALL=$(basename $TARBALL)
 
-#Jeff youcan modify this however you want, this is just an example of how to push to s3. it works asis.
+#you can modify this however you want, this is just an example of how to push
+#to s3. it works as is.
 echo "Press a key to deploy to $TARBALL in $S3 - note that you need to run s3cmd --configure the first time you do this or pass the -c "
 read x
 s3cmd put $BUILD_LOCATION/$TARBALL $S3/$TARBALL
