@@ -7,7 +7,7 @@
 # NOTE: this is an intermediate target tarball directory
 BUILD_LOCATION=/var/lib/jenkins/workspace/Ambari
 REPO=/root/archivainstall/apache-archiva-1.3.6/data/repositories/internal
-SOURCE=/opt/JEFF/rhs-ambari-install #expected to be a git directory
+SOURCE=$(pwd) #expected to be a git directory
 S3="s3://rhbd/rhs-ambari-install"
 
 ####### BUILD THE TAR/GZ FILE ~ THIS SHOULD RUN IN JENKINS (future) ####### 
@@ -26,6 +26,7 @@ cd /opt/JEFF/  ##why??
 
 echo "Done archiving $TAGNAME to $BUILD_LOCATION..." 
 ls -altrh $BUILD_LOCATION 
+echo
 echo "proceed <ENTER>?..."
 read 
 #### NOW RUN SOME TESTS against the tar file (again, should run in jenkins) ##### 
@@ -50,7 +51,10 @@ TARBALL=$(basename $TARBALL)
 
 #you can modify this however you want, this is just an example of how to push
 #to s3. it works as is.
-echo "Press a key to deploy to $TARBALL in $S3 - note that you need to run s3cmd --configure the first time you do this or pass the -c "
+echo
+echo "Press a key to deploy to $TARBALL in $S3. Note that you need to run:"
+echo "\" s3cmd --configure\" the first time you do this or pass the -c option"
+echo "proceed <ENTER>?..."
 read x
 s3cmd put $BUILD_LOCATION/$TARBALL $S3/$TARBALL
 echo "Your tarball is now deployed to : $S3/$TARBALL"
