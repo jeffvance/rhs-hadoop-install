@@ -52,8 +52,8 @@ TARBALL=$(basename $TARBALL)
 #you can modify this however you want, this is just an example of how to push
 #to s3. it works as is.
 echo
-echo "Press a key to deploy to $TARBALL in $S3. Note that you need to run:"
-echo "\" s3cmd --configure\" the first time you do this or pass the -c option"
+echo "Press a key to deploy to $TARBALL in $S3."
+echo "Note that you need to run: \"s3cmd --configure\" the first time you do this or pass the -c option"
 echo "proceed <ENTER>?..."
 read x
 s3cmd put $BUILD_LOCATION/$TARBALL $S3/$TARBALL
