@@ -8,13 +8,16 @@
 BUILD_LOCATION=/var/lib/jenkins/workspace/Ambari
 REPO=/root/archivainstall/apache-archiva-1.3.6/data/repositories/internal
 SOURCE=$(pwd) #expected to be a git directory
-S3="s3://rhbd/rhs-ambari-install"
+S3='s3://rhbd/rhs-ambari-install'
+TARBALL_PREFIX='rhs-ambari-install-'
+TARBALL_SUFFIX='.tar.gz'
 
 ####### BUILD THE TAR/GZ FILE ~ THIS SHOULD RUN IN JENKINS (future) ####### 
 cd $SOURCE
 git pull
 
 TAGNAME=$(git describe --abbrev=0 --tag)
+TARBALL="$TARBALL_PREFIX${TAGNAME//./_}$TARBALL_SUFFIX" # s/./_/ in tag
 
 #convert .odt to .pdf and create tarball
 $SOURCE/devutils/mk_tarball.sh \
@@ -45,14 +48,9 @@ fi
 #First deploy into s3: This is the preferred (but new) place where we store binaries:
 
 # Now, we deploy into archiva.
-# target tarball versioned name
-#TARBALL=$(ls -ltr $BUILD_LOCATION/rhs-ambari-*.tar.gz) #expect 1 and only 1 file
-TARBALL=$(ls -Rt $BUILD_LOCATION/rhs-ambari-*.tar.gz | head -1 | cut -f 9 -d' ')
-TARBALL=$(basename $TARBALL) #<-- doesnt work out of the box on some linux
+#TARBALL=$(ls -Rt $BUILD_LOCATION/rhs-ambari-*.tar.gz | head -1 | cut -f 9 -d' ')
+#TARBALL=$(basename $TARBALL) #<-- doesnt work out of the box on some linux
 
-
-#you can modify this however you want, this is just an example of how to push
-#to s3. it works as is.
 echo
 echo "Press a key to deploy to $TARBALL in $S3."
 echo "Note that you need to run: \"s3cmd --configure\" the first time you do this or pass the -c option"
