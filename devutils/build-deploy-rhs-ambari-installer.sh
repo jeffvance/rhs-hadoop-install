@@ -28,7 +28,7 @@ $SOURCE/devutils/mk_tarball.sh \
 cd /opt/JEFF/  ##why??
 
 echo "Done archiving $TAGNAME to $BUILD_LOCATION..." 
-ls -altrh $BUILD_LOCATION 
+ls -alth $BUILD_LOCATION 
 echo
 echo "proceed <ENTER>?..."
 read 
@@ -53,13 +53,13 @@ fi
 
 echo
 echo "Press a key to deploy to $TARBALL in $S3."
-echo "Note that you need to run: \"s3cmd --configure\" the first time you do this or pass the -c option"
-echo "To proceed hit <ENTER>..."
-echo "build -> $BUILD_LOCATION"
-echo "tarball -> $TARBALL"
-echo "s3 -> $S3"
+echo "Note that you need to run: \"s3cmd --configure\" the first time you do"
+echo "this or pass the -c option."
+echo "    build   -> $BUILD_LOCATION"
+echo "    tarball -> $TARBALL"
+echo "    s3      -> $S3"
 echo "PROCEED ? <ENTER>"
-read "running::: s3cmd put $BUILD_LOCATION/$TARBALL $S3/$TARBALL"
+read
 s3cmd put $BUILD_LOCATION/$TARBALL $S3/$TARBALL
 (( $? == 0 )) && echo "Your tarball is now deployed to : $S3/$TARBALL"
 exit
