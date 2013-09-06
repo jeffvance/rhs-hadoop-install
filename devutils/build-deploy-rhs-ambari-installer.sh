@@ -46,16 +46,22 @@ fi
 
 # Now, we deploy into archiva.
 # target tarball versioned name
-TARBALL=$(ls $BUILD_LOCATION/rhs-ambari-*.tar.gz) #expect 1 and only 1 file
-TARBALL=$(basename $TARBALL)
+#TARBALL=$(ls -ltr $BUILD_LOCATION/rhs-ambari-*.tar.gz) #expect 1 and only 1 file
+TARBALL=$(ls -Rt /var/lib/jenkins/workspace/Ambari/rhs-ambari-*.tar.gz | head -1 | cut -f 9 -d' ')
+TARBALL=$(basename $TARBALL) #<-- doesnt work on some linux
+
 
 #you can modify this however you want, this is just an example of how to push
 #to s3. it works as is.
 echo
 echo "Press a key to deploy to $TARBALL in $S3."
 echo "Note that you need to run: \"s3cmd --configure\" the first time you do this or pass the -c option"
-echo "proceed <ENTER>?..."
-read x
+echo "To proceed hit <ENTER>..."
+echo "build -> $BUILD_LOCATION"
+echo "tarball -> $TARBALL"
+echo "s3 -> $S3"
+echo "PROCEED ? <ENTER>"
+read "running::: s3cmd put $BUILD_LOCATION/$TARBALL $S3/$TARBALL"
 s3cmd put $BUILD_LOCATION/$TARBALL $S3/$TARBALL
 (( $? == 0 )) && echo "Your tarball is now deployed to : $S3/$TARBALL"
 exit
