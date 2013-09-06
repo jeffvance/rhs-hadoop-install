@@ -747,10 +747,10 @@ function install_nodes(){
   # script...
 }
 
-# reboot_nodes: if one of more nodes need to be rebooted, due to installing the
-# FUSE patch, then they are rebooted here. Note: if the "install-from" node 
-# also needs to be rebooted that node is not in the REBOOT_NODES array and is
-# handled separately (see the DEFERRED_REBOOT_NODE global variable).
+# reboot_nodes: if one or more nodes need to be rebooted, due to installing
+# the FUSE patch, then they are rebooted here. Note: if the "install-from"
+# node also needs to be rebooted that node is not in the REBOOT_NODES array
+# and is handled separately (see the DEFERRED_REBOOT_NODE global variable).
 #
 function reboot_nodes(){
 
@@ -770,13 +770,13 @@ function reboot_nodes(){
 	    ip=${REBOOT_NODES[$i]}         # unset leaves sparse array
 	    # if possible to ssh to ip then unset that array entry
 	    ssh -q -oBatchMode=yes root@$ip exit
-	    if (( $? == 0 )) ; then # node has rebooted
+	    if (( $? == 0 )) ; then
 	      display "   * node $ip sucessfully rebooted"
 	      unset REBOOT_NODES[$i] # null entry in array
 	    fi
 	done
 	(( ${#REBOOT_NODES[@]} == 0 )) && break # exit loop
-	sleep 30
+	sleep 10
     done
   fi
 }
