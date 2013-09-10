@@ -74,7 +74,7 @@ function parse_cmd(){
 
   # defaults (global variables)
   REPLICA_CNT=2
-  SETHOSNAME=true
+  SETHOSTNAME=true
   # "hosts" file concontains hostname ip-addr for all nodes in cluster
   HOSTS_FILE="$INSTALL_DIR/hosts"
 
