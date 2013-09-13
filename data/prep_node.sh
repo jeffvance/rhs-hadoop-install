@@ -111,7 +111,7 @@ function copy_ambari_repo(){
  
   local REPO='ambari.repo'; local REPO_DIR='/etc/yum.repos.d'
 
-  [[ -e $REPO ]] || { display "ERROR: \"$REPO\" file missing"; exit 15;}
+  [[ -f $REPO ]] || { display "ERROR: \"$REPO\" file missing"; exit 15;}
   [[ -d $REPO_DIR ]] || /bin/mkdir -p $REPO_DIR
 
   /bin/cp $REPO $REPO_DIR 2>&1
@@ -148,7 +148,7 @@ function install_ambari_agent(){
   pushd $AMBARI_TMPDIR > /dev/null
 
   # stop agent if running
-  if [[ -e $AMBARI_AGENT_PID ]] ; then
+  if [[ -f $AMBARI_AGENT_PID ]] ; then
     display "   stopping ambari-agent"
     ambari-agent stop 2>&1
   fi
@@ -189,7 +189,7 @@ function install_ambari_server(){
   pushd $AMBARI_TMPDIR > /dev/null
 
   # stop and reset server if running
-  if [[ -e $AMBARI_SERVER_PID ]] ; then
+  if [[ -f $AMBARI_SERVER_PID ]] ; then
     display "   stopping ambari-server"
     ambari-server stop 2>&1
     ambari-server reset -s 2>&1
@@ -201,13 +201,11 @@ function install_ambari_server(){
     display "ERROR: Ambari server RPM missing"
     exit 30
   fi
-  # Note: the Oracle Java install takes a fair amount of time and yum will
-  # display progress updates to stdout when stdout is a terminal. Redirect
-  # output to disk to suppress the progress messages; otherwise, the logfile
-  # will have thousands of progress related records.
-  yum -y install $server_rpm >/tmp/yum-install-ambari-server 2>&1
-  # need to write output to stdout to be captured by the calling install script
-  /bin/cat /tmp/yum-install-ambari-server
+  # Note: the Oracle Java install takes a fair amount of time and yum does
+  # thousands of progress updates. On a terminal this is fine but when output
+  # is redirected to disk you get a *very* long record. The invoking script will
+  # delete this one very long record in order to make the logfile more usable.
+  yum -y install $server_rpm
 
   popd
 
@@ -293,7 +291,7 @@ function verify_fuse(){
   # if file exists then fuse patch installed
   local FUSE_INSTALLED='/tmp/FUSE_INSTALLED' # Note: deploy dir is rm'd
 
-  if [[ -e "$FUSE_INSTALLED" ]]; then # file exists, assume installed
+  if [[ -f "$FUSE_INSTALLED" ]]; then # file exists, assume installed
     display "   ... verified"
   else
     display "-- Installing FUSE patch which may take more than a few seconds..."
@@ -331,7 +329,7 @@ function install_common(){
   /bin/hostname $NODE
 
   # create /etc/sudoers.d/gluster file to grant access to mapred user
-  if [[ ! -e "$SUDOER_PATH" ]] ; then
+  if [[ ! -f "$SUDOER_PATH" ]] ; then
     echo
     display "-- Creating $SUDOER_PATH file to grant \"mapred\" user access"
     echo "$MAPRED_SUDOER" >> $SUDOER_PATH

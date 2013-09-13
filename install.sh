@@ -66,7 +66,7 @@
 # set global variables
 SCRIPT=$(/bin/basename $0)
 INSTALL_VER='0.18'   # self version
-INSTALL_DIR=$(pwd)   # name of deployment (install-from) dir
+INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/RHS-Ambari-install/" # on each node
 DATA_DIR='data/'     # subdir in rhs-ambari install dir
@@ -328,7 +328,7 @@ function verify_local_deploy_setup(){
   }
 
   # main #
-  if [[ ! -e $HOSTS_FILE ]] ; then
+  if [[ ! -f $HOSTS_FILE ]] ; then
     errmsg+=" * \"$HOSTS_FILE\" file is missing.\n   This file contains a list of IP address followed by hostname, one\n   pair per line. Use \"hosts.example\" as an example.\n"
     ((errcnt++))
   else
@@ -397,14 +397,12 @@ function cleanup(){
   local node=''; local out
 
   # 1) umount vol on every node, if mounted
-  display "  -- stopping ambari on all nodes..."
   display "  -- un-mounting $GLUSTER_MNT on all nodes..."
   for node in "${HOSTS[@]}"; do
       ssh root@$node "
           if /bin/grep -qs $GLUSTER_MNT /proc/mounts ; then
             /bin/umount $GLUSTER_MNT
-          fi
-      "
+          fi"
   done
 
   # 2) stop vol on a single node, if started
@@ -804,7 +802,7 @@ function reboot_nodes(){
   local ip; local i; local msg; local num
 
   num=${#REBOOT_NODES[@]} # number of nodes to reboot
-  if (( num > 0 )) ; then # nodes to reboot
+  if (( num > 0 )) ; then
     echo
     msg='node'
     (( num != 1 )) && msg+='s'
@@ -845,6 +843,20 @@ function perf_config(){
 	gluster volume set $VOLNAME performance.stat-prefetch off 2>&1
   ")
   display "$out"
+}
+
+# cleanup_logfile: the ambari-server yum install depends on Oracle JDK which
+# is large and results in *many* progress updates. When written to disk this
+# results in a *very* long record in the logfile and the user has to forward
+# through hundreds of "pages" to get to the next useful record. So, this one
+# very long record is deleted here.
+#
+function cleanup_logfile(){
+
+  # yum install string for the ambari-server progress message
+  local DELETE_STR='jdk-'
+
+  sed -i "/$DELETE_STR/d" $LOGFILE
 }
 
 # reboot_self: invoked when the install-from node (self) is also one of the
@@ -905,6 +917,8 @@ setup
 echo
 display "-- Performance config --"
 perf_config
+
+cleanup_logfile
 
 # reboot nodes where the FUSE patch was installed
 reboot_nodes
