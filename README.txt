@@ -11,10 +11,13 @@
   the cluster nodes or to the user's localhost. The download directory is
   arbitrary. install.sh requires password-less ssh from the node hosting the
   rhs install tarball (the "install-from" node) to all nodes in the cluster. In
-  addition, Ambari requires password-less ssh from the management node to all
-  storage/agent nodes in the cluster. To simplify password-less ssh set up,
-  the install-from node can be the same as the Ambari management node. The
-  --mgmt-node option is available to specify the Ambari management node.
+  addition, Ambari requires password-less ssh from the Ambari server
+  "management node" to all storage/agent nodes in the cluster. To simplify
+  password-less ssh set up, the install-from node can be the same as the Ambari
+  management node. The --mgmt-node option is available to specify the Ambari
+  management node if the default is not suitable. The default Ambari server
+  (management) node is the first host defined in the local "hosts" file,
+  described below.
  
   The RHS tarball contains the following:
    - install.sh: this script, executed by the root user.
@@ -49,10 +52,10 @@
      configuration supported for RHS) then each pair of lines in hosts
      represents replica pairs. For example, the first 2 lines in hosts are
      replica pairs, as are the next two lines, etc.
-  2) If the --mgmt-node option is not specified then the default management
-     node is the *first* hostname listed in the "hosts" file. In this case the
-     first node in the hosts file is both a storge node and the management
-     node.
+  2) If the --mgmt-node option is not specified then the default Ambari server
+     "management" node is the *first* hostname listed in the "hosts" file. In
+     this case the first node in the hosts file is both a storge node and the
+     management node.
 
   Red Hat Network Registering (RHN):
   install.sh will automatically register each node in the "hosts" file with the
@@ -76,8 +79,8 @@
 
 Instructions:
  0) upload rhs-ambari-install-<version> tarball to the deployment directory on
-    the "install-from" node (most convenient if this is the Ambari management
-    node, but this is not required)
+    the "install-from" node. It is usually convenient if the "install-from"
+    node is also the Ambari server (management) node, but this is not required
  1) extract tarball to the local directory:
     $ tar xvzf rhs-ambari-install-<version>.tar.gz
  2) cd to the extracted rhs-ambari-install directory:
@@ -114,7 +117,7 @@ Ambari Installation Instructions:
  2) Wizard Install
  
     Note: If you wish to see a visual guide which includes screenshots for this 
-    process, please refer to the Ambari_Configuration_Guide.odt that was
+    process, please refer to the Ambari_Configuration_Guide.pdf that was
     packaged with the rhs-ambari-install-<version> tar ball.
 
     Open a web browser and point the URL to the ambari-server hostname in the 

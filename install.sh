@@ -65,7 +65,7 @@
 
 # set global variables
 SCRIPT=$(/bin/basename $0)
-INSTALL_VER='0.18'   # self version
+INSTALL_VER='0.19'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/RHS-Ambari-install/" # on each node
@@ -753,7 +753,7 @@ function install_nodes(){
     elif (( err != 0 )) ; then # fatal error in install.sh so quit now
       display " *** ERROR! prep_node script exited with error: $err ***"
       exit 20
-  fi
+    fi
   }
 
   ## main ##
@@ -767,8 +767,8 @@ function install_nodes(){
       display '--------------------------------------------'
       echo
 
-      # Append to bricks string.  Convention to use a subdir under the XFS
-      #  brick, and to name this subdir same as volname.
+      # Append to bricks string. Convention to use a subdir under the XFS
+      # brick, and to name this subdir same as volname.
       bricks+=" $node:$BRICK_MNT"
 
       install_mgmt_node=false
