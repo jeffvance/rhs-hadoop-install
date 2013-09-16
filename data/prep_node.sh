@@ -34,8 +34,8 @@ HOST_IPS=($5)
 MGMT_NODE="$6" # note: this node can be inside or outside the storage cluster
 DEPLOY_DIR=${7:-/tmp/RHS-Ambari-install/data/}
 RHN_USER=${8:-}
-RHN_PW=${9:-}
-#echo -e "*** $(basename $0)\n 1=$NODE, 2=$STORAGE_INSTALL, 3=$MGMT_INSTALL, 4=${HOSTS[@]}, 5=${HOST_IPS[@]}, 6=$MGMT_NODE, 7=$DEPLOY_DIR, 8=$RHN_USER, 9=$RHN_PW"
+RHN_PASS=${9:-}
+#echo -e "*** $(basename $0)\n 1=$NODE, 2=$STORAGE_INSTALL, 3=$MGMT_INSTALL, 4=${HOSTS[@]}, 5=${HOST_IPS[@]}, 6=$MGMT_NODE, 7=$DEPLOY_DIR, 8=$RHN_USER, 9=$RHN_PASS"
 
 NUMNODES=${#HOSTS[@]}
 AMBARI_TMPDIR=${DEPLOY_DIR}tmpAmbari
@@ -271,10 +271,10 @@ function verify_ntp(){
 #
 function rhn_register(){
 
-  if [[ -n "$RHN_USER" && -n "$RHN_PW" ]] ; then
+  if [[ -n "$RHN_USER" && -n "$RHN_PASS" ]] ; then
     echo
     display "-- RHN registering with provided rhn user and password"
-    rhnreg_ks --profilename="$NODE" --username="$RHN_USER" --password="$RHN_PW" --force 2>&1
+    rhnreg_ks --profilename="$NODE" --username="$RHN_USER" --password="$RHN_PASS" --force 2>&1
   fi
 }
 
@@ -334,11 +334,11 @@ function sudoers(){
   fi
 
   if ! /bin/grep -qs $mapred $SUDOER_PATH ; then
-    display "   Appending \"$MAPRED_USER\" to $SUDOER_PATH"
+    display "   Appending \"$MAPRED_SUDOER\" to $SUDOER_PATH"
     echo "$MAPRED_SUDOER" >> $SUDOER_PATH
   fi
   if ! /bin/grep -qs $yarn $SUDOER_PATH ; then
-    display "   Appending \"$YARN_USER\" to $SUDOER_PATH"
+    display "   Appending \"$YARN_SUDOER\" to $SUDOER_PATH"
     echo "$YARN_SUDOER"  >> $SUDOER_PATH
   fi
 

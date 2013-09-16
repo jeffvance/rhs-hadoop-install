@@ -65,7 +65,7 @@
 
 # set global variables
 SCRIPT=$(/bin/basename $0)
-INSTALL_VER='0.20'   # self version
+INSTALL_VER='0.21'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/RHS-Ambari-install/" # on each node
@@ -91,7 +91,7 @@ function short_usage(){
   echo "$SCRIPT [-v|--version] | [-h|--help]"
   echo "$SCRIPT [--brick-mnt <path>] [--vol-name <name>] [--vol-mnt <path>]"
   echo "           [--replica <num>] [--hosts <path>] [--mgmt-node <node>]"
-  echo "           [--rhn-user <name>] [--rhn-pw <value>]"
+  echo "           [--rhn-user <name>] [--rhn-pass <value>]"
   echo "           [--logfile <path>] [--old-deploy] brick-dev"
   echo
 }
@@ -130,7 +130,7 @@ function usage(){
   echo "                       Default: the first node appearing in the \"hosts\" file"
   echo "  --rhn-user  <name> : Red Hat Network user name. Default is to not register"
   echo "                       the storage nodes"
-  echo "  --rhn-pw   <value> : RHN password for rhn-user. Default is to not register"
+  echo "  --rhn-pass <value> : RHN password for rhn-user. Default is to not register"
   echo "                       the storage nodes"
   echo "  --logfile   <path> : logfile name. Default is \"/var/log/RHS-install.log\""
   echo "  --old-deploy       : Use if this is an existing deployment. The default"
@@ -150,7 +150,7 @@ function usage(){
 function parse_cmd(){
 
   local OPTIONS='vh'
-  local LONG_OPTS='brick-mnt:,vol-name:,vol-mnt:,replica:,hosts:,mgmt-node:,rhn-user:,rhn-pw:,logfile:,old-deploy,help,version'
+  local LONG_OPTS='brick-mnt:,vol-name:,vol-mnt:,replica:,hosts:,mgmt-node:,rhn-user:,rhn-pass:,logfile:,old-deploy,help,version'
 
   # defaults (global variables)
   BRICK_DIR='/mnt/brick1'
@@ -162,7 +162,7 @@ function parse_cmd(){
   HOSTS_FILE="$INSTALL_DIR/hosts"
   MGMT_NODE=''
   RHN_USER=''
-  RHN_PW=''
+  RHN_PASS=''
   LOGFILE='/var/log/RHS-install.log'
 
   local args=$(getopt -n "$SCRIPT" -o $OPTIONS --long $LONG_OPTS -- $@)
@@ -198,8 +198,8 @@ function parse_cmd(){
 	--rhn-user)
 	    RHN_USER=$2; shift 2; continue
 	;;
-	--rhn-pw)
-	    RHN_PW=$2; shift 2; continue
+	--rhn-pass)
+	    RHN_PASS=$2; shift 2; continue
 	;;
 	--old-deploy)
 	    NEW_DEPLOY=false ;shift; continue
@@ -226,9 +226,9 @@ function parse_cmd(){
     exit -1
   fi
 
-  # --rhn-user and --rhn-pw, validate potentially supplied options
+  # --rhn-user and --rhn-pass, validate potentially supplied options
   if [[ -n "$RHN_USER" ]] ; then
-    if [[ -z "$RHN_PW" ]] ; then 
+    if [[ -z "$RHN_PASS" ]] ; then 
       echo "Syntax error: rhn password required when rhn user specified"
       /bin/sleep 1
       short_usage
@@ -739,7 +739,7 @@ function install_nodes(){
     # node needs to be rebooted.
     out=$(ssh root@$ip $PREP_SH $node $install_storage $install_mgmt \
 	"\"${HOSTS[@]}\"" "\"${HOST_IPS[@]}\"" $MGMT_NODE \
-	$REMOTE_INSTALL_DIR$DATA_DIR "$RHN_USER" "$RHN_PW")
+	$REMOTE_INSTALL_DIR$DATA_DIR "$RHN_USER" "$RHN_PASS")
     err=$?
     display "$out"
 
