@@ -581,7 +581,7 @@ function create_trusted_pool(){
 function setup(){
 
   local i=0; local node=''; local ip=''; local out
-  local PERMISSIONS='777'
+  local PERMISSIONS='777' # for now until we learn how to reduce this...
   local OWNER='mapred'; local GROUP='hadoop'
   local BRICK_MNT_OPTS="noatime,inode64"
   local GLUSTER_MNT_OPTS="entry-timeout=0,attribute-timeout=0,_netdev"
@@ -682,9 +682,10 @@ function setup(){
            useradd --system -g $GROUP $OWNER 2>&1
        	 fi
 
+	 /bin/chown -R $OWNER:$GROUP $GLUSTER_MNT $MAPRED_SCRATCH_DIR 2>&1
 	 /bin/chmod $PERMISSIONS $GLUSTER_MNT $MAPRED_SCRATCH_DIR \
 		    $MAPRED_SYSTEM_DIR 2>&1
-	 /bin/chown -R $OWNER:$GROUP $GLUSTER_MNT $MAPRED_SCRATCH_DIR 2>&1
+	 /bin/chmod g+s $GLUSTER_MNT 2>&1 # set s-bit so subdirs inherit group
       ")
       out+="\n"
   done
@@ -882,6 +883,7 @@ parse_cmd $@
 
 display "$(/bin/date). Begin: $SCRIPT -- version $INSTALL_VER ***"
 
+# define global variables based on --options and defaults
 # convention is to use the volname as the subdir under the brick as the mnt
 BRICK_MNT=$BRICK_DIR/$VOLNAME
 MAPRED_SCRATCH_DIR="$BRICK_DIR/mapredlocal"    # xfs but not distributed
