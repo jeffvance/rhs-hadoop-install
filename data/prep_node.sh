@@ -143,6 +143,7 @@ function install_ambari_agent(){
     /bin/mkdir $AMBARI_TMPDIR 2>&1
     # extract ambari rpms
     /bin/tar -C $AMBARI_TMPDIR -xzf ambari-*.tar.gz 2>&1
+    (( $? != 0 )) && exit 17
   fi
 
   pushd $AMBARI_TMPDIR > /dev/null
@@ -184,6 +185,7 @@ function install_ambari_server(){
     /bin/mkdir $AMBARI_TMPDIR 2>&1
     # extract ambari rpms
     /bin/tar -C $AMBARI_TMPDIR -xzf ambari-*.tar.gz 2>&1
+    (( $? != 0 )) && exit 25
   fi
 
   pushd $AMBARI_TMPDIR > /dev/null
@@ -303,6 +305,7 @@ function verify_fuse(){
       exit 40
     fi
     /bin/tar -C fusetmp/ -xzf $FUSE_TARBALL 2>&1
+    (( $? != 0 )) && exit 45
     yum -y install fusetmp/*.rpm 2>&1
     # create kludgy fuse-has-been-installed file
     touch $FUSE_INSTALLED
