@@ -312,14 +312,43 @@ function verify_fuse(){
   fi
 }
 
+# sudoers: create the /etc/sudoers.d/20_gluster file if not present, add the
+# mapred and yarn users to it (if not present) and set its permissions.
+#
+function sudoers(){
+
+  local SUDOER_DIR='/etc/sudoers.d'
+  local SUDOER_PATH="$SUDOER_DIR/20_gluster" # 20 is somewhat arbitrary
+  local SUDOER_PERM='440'
+  local SUDOER_ACC='ALL= NOPASSWD: /usr/bin/getfattr'
+  local mapred='mapred'; local yarn='yarn'
+  local MAPRED_SUDOER="$mapred $SUDOER_ACC"
+  local YARN_SUDOER="$yarn $SUDOER_ACC"
+
+  echo
+  display "-- Prepping $SUDOER_PATH for user privilege exceptions..."
+
+  if [[ ! -d "$SUDOER_DIR" ]] ; then
+    display "   Creating $SUDOER_DIR..."
+    /bin/mkdir -p $SUDOER_DIR
+  fi
+
+  if ! /bin/grep -qs $mapred $SUDOER_PATH ; then
+    display "   Appending \"$MAPRED_USER\" to $SUDOER_PATH"
+    echo "$MAPRED_SUDOER" >> $SUDOER_PATH
+  fi
+  if ! /bin/grep -qs $yarn $SUDOER_PATH ; then
+    display "   Appending \"$YARN_USER\" to $SUDOER_PATH"
+    echo "$YARN_SUDOER"  >> $SUDOER_PATH
+  fi
+
+  /bin/chmod $SUDOER_PERM $SUDOER_PATH 2>&1
+}
+
 # install_common: perform node installation steps independent of whether or not
 # the node is to be the ambari-server or an ambari-agent.
 #
 function install_common(){
-
-  local SUDOER_PATH='/etc/sudoers.d/20_gluster' # new file
-  local SUDOER_PERM='440'
-  local MAPRED_SUDOER='mapred ALL= NOPASSWD: /usr/bin/getfattr'
 
   # set up /etc/hosts to map ip -> hostname
   echo
@@ -328,13 +357,8 @@ function install_common(){
   echo $NODE >/etc/hostname
   /bin/hostname $NODE
 
-  # create /etc/sudoers.d/gluster file to grant access to mapred user
-  if [[ ! -f "$SUDOER_PATH" ]] ; then
-    echo
-    display "-- Creating $SUDOER_PATH file to grant \"mapred\" user access"
-    echo "$MAPRED_SUDOER" >> $SUDOER_PATH
-    /bin/chmod $SUDOER_PERM $SUDOER_PATH 2>&1
-  fi
+  # set up sudoers file for mapred and yarn users
+  sudoers
 
   # rhn register, if username/pass provided
   rhn_register
