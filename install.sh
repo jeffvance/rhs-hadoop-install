@@ -65,7 +65,7 @@
 
 # set global variables
 SCRIPT=$(/bin/basename $0)
-INSTALL_VER='0.23'   # self version
+INSTALL_VER='0.24'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/RHS-Ambari-install/" # on each node
@@ -74,71 +74,111 @@ DATA_DIR='data/'     # subdir in rhs-ambari install dir
 PREP_SH="$REMOTE_INSTALL_DIR${DATA_DIR}prep_node.sh" # full path
 NUMNODES=0           # number of nodes in hosts file (= trusted pool size)
 bricks=''            # string list of node:/brick-mnts for volume create
+# local logfile on each host, copied from remote host to install-from host
+PREP_NODE_LOG='prep_node.log'
+PREP_NODE_LOG_PATH="${REMOTE_INSTALL_DIR}$PREP_NODE_LOG"
+
+# log threshold values
+LOG_DEBUG=0
+LOG_INFO=1    # default for --verbose
+LOG_SUMMARY=2 # default
+LOG_REPORT=3  # suppress all output, other than final reporting
+LOG_QUIET=9   # value for --quiet = suppress all output
+LOG_FORCE=99  # force write regardless of VERBOSE setting
 
 
-# display: Write the message to stdlist and append it to localhost's logfile.
+# display: append the passed-in message to localhost's logfile, and potentially
+# write the message to stdout, depending on the value of the passed-in priority
+# setting.
+# $1=msg, $2=msg prioriy (optional, default=summary)
 #
-function display(){  # $1 is the message
+function display(){  
+
+  local pri=${2:-$LOG_SUMMARY}
+
   echo "$1" >> $LOGFILE
-  echo -e "$1"
+  (( pri >= VERBOSE )) && echo -e "$1"
 }
+
 
 # short_usage: write short usage to stdout.
 #
 function short_usage(){
 
-  echo -e "Syntax:\n"
-  echo "$SCRIPT [-v|--version] | [-h|--help]"
-  echo "$SCRIPT [--brick-mnt <path>] [--vol-name <name>] [--vol-mnt <path>]"
-  echo "           [--replica <num>] [--hosts <path>] [--mgmt-node <node>]"
-  echo "           [--rhn-user <name>] [--rhn-pass <value>]"
-  echo "           [--logfile <path>] [--old-deploy] brick-dev"
-  echo
+  cat <<EOF
+
+Syntax:
+
+$SCRIPT [-v|--version] | [-h|--help]
+
+$SCRIPT [--brick-mnt <path>] [--vol-name <name>] [--vol-mnt <path>]
+           [--replica <num>]    [--hosts <path>]    [--mgmt-node <node>]
+           [--rhn-user <name>]  [--rhn-pass <value>]
+           [--logfile <path>]   [--verbose [num] ]
+           [-q|--quiet]         [--debug]           [--old-deploy]
+           brick-dev
+
+EOF
 }
 
 # usage: write full usage/help text to stdout.
 #
 function usage(){
 
-  echo -e "\nUsage:\n"
-  echo "Deploys Hadoop on top of Red Hat Storage (RHS). Each node in the storage"
-  echo "cluster must be defined in the \"hosts\" file. The \"hosts\" file is not"
-  echo "included in the RHS tarball but must be created prior to running this"
-  echo "script. The file format is:"
-  echo "      hostname  host-ip-address"
-  echo "repeated one host per line in replica pair order. See the \"hosts.example\""
-  echo "sample hosts file for more information."
-  echo
-  echo "The required brick-dev argument names the brick device where the XFS"
-  echo "file system will be mounted. Examples include: /dev/<VGname>/<LVname>"
-  echo "or /dev/vdb1, etc. The brick-dev names a storage partition dedicated"
-  echo "for RHS. Optional arguments can specify the RHS volume name and mount"
-  echo "point, and the brick mount point."
-  echo
+  cat <<EOF
+
+Usage:
+
+Deploys Hadoop on top of Red Hat Storage (RHS). Each node in the storage
+cluster must be defined in the "hosts" file. The "hosts" file is not included
+in the RHS tarball but must be created prior to running this script. The file
+format is:
+   hostname  host-ip-address
+repeated one host per line in replica pair order. See the "hosts.example"
+sample hosts file for more information.
+  
+The required brick-dev argument names the brick device where the XFS file
+system will be mounted. Examples include: /dev/<VGname>/<LVname> or /dev/vdb1,
+etc. The brick-dev names a storage partition dedicated for RHS. Optional
+arguments can specify the RHS volume name and mount point, and the brick mount
+point.
+EOF
   short_usage
-  echo "  brick-dev          : (required) Brick device location/directory where the"
-  echo "                       XFS file system is created. Eg. /dev/vgName/lvName"
-  echo "  --brick_mnt <path> : Brick directory. Default: \"/mnt/brick1/<volname>\""
-  echo "  --vol-name  <name> : Gluster volume name. Default: \"HadoopVol\""
-  echo "  --vol-mnt   <path> : Gluster mount point. Default: \"/mnt/glusterfs\""
-  echo "  --replica   <num>  : Volume replication count. The number of storage nodes"
-  echo "                       must be a multiple of the replica count. Default: 2"
-  echo "  --hosts     <path> : path to \"hosts\" file. This file contains a list of"
-  echo "                       \"IP-addr hostname\" pairs for each node in the cluster."
-  echo "                       Default: \"./hosts\""
-  echo "  --mgmt-node <node> : hostname of the node to be used as the management node."
-  echo "                       Default: the first node appearing in the \"hosts\" file"
-  echo "  --rhn-user  <name> : Red Hat Network user name. Default is to not register"
-  echo "                       the storage nodes"
-  echo "  --rhn-pass <value> : RHN password for rhn-user. Default is to not register"
-  echo "                       the storage nodes"
-  echo "  --logfile   <path> : logfile name. Default is \"/var/log/RHS-install.log\""
-  echo "  --old-deploy       : Use if this is an existing deployment. The default"
-  echo "                       is a new (\"greenfield\") RHS customer installation".
-  echo "                       Not currently supported."
-  echo "  -v|--version       : current version string"
-  echo "  -h|--help          : help text (this)"
-  echo
+  cat <<EOF
+  brick-dev          : (required) Brick device location/directory where the
+                       XFS file system is created. Eg. /dev/vgName/lvName.
+  --brick_mnt <path> : Brick directory. Default: "/mnt/brick1/<volname>".
+  --vol-name  <name> : Gluster volume name. Default: "HadoopVol".
+  --vol-mnt   <path> : Gluster mount point. Default: "/mnt/glusterfs".
+  --replica   <num>  : Volume replication count. The number of storage nodes
+                       must be a multiple of the replica count. Default: 2.
+  --hosts     <path> : path to \"hosts\" file. This file contains a list of
+                       "IP-addr hostname" pairs for each node in the cluster.
+                       Default: "./hosts".
+  --mgmt-node <node> : hostname of the node to be used as the management node.
+                       Default: the first node appearing in the "hosts" file.
+  --rhn-user  <name> : Red Hat Network user name. Default is to not register
+                       the storage nodes.
+  --rhn-pass <value> : RHN password for rhn-user. Default is to not register
+                       the storage nodes.
+  --logfile   <path> : logfile name. Default is "/var/log/RHS-install.log".
+  --verbose   [=num] : set the verbosity level to a value of 0, 1, 2, 3. If
+                       --verbose is omitted the default value is 2(summary). If
+                       --verbose is supplied with no value verbosity is set to
+                       1(info).  0=debug, 1=info, 2=summary, 3=report-only.
+                       Note: all output is still written to the logfile.
+  --old-deploy       : Use if this is an existing deployment. The default
+                       is a new ("greenfield") RHS customer installation. Not
+                       currently supported.
+  -v|--version       : current version string.
+  -h|--help          : help text (this).
+  -q|--quiet         : suppress all output including the final summary report.
+                       Internally sets verbose=9. Note: all output is still
+                       written to the logfile.
+  --debug            : maximum output. Internally sets verbose=0.
+
+EOF
+  
 }
 
 # parse_cmd: getopt used to do general parsing. The brick-dev arg is required.
@@ -149,8 +189,8 @@ function usage(){
 #
 function parse_cmd(){
 
-  local OPTIONS='vh'
-  local LONG_OPTS='brick-mnt:,vol-name:,vol-mnt:,replica:,hosts:,mgmt-node:,rhn-user:,rhn-pass:,logfile:,old-deploy,help,version'
+  local OPTIONS='vhq'
+  local LONG_OPTS='brick-mnt:,vol-name:,vol-mnt:,replica:,hosts:,mgmt-node:,rhn-user:,rhn-pass:,logfile:,verbose::,old-deploy,help,version,quiet,debug'
 
   # defaults (global variables)
   BRICK_DIR='/mnt/brick1'
@@ -164,6 +204,7 @@ function parse_cmd(){
   RHN_USER=''
   RHN_PASS=''
   LOGFILE='/var/log/RHS-install.log'
+  VERBOSE=$LOG_SUMMARY
 
   local args=$(getopt -n "$SCRIPT" -o $OPTIONS --long $LONG_OPTS -- $@)
   (( $? == 0 )) || { echo "$SCRIPT syntax error"; exit -1; }
@@ -201,11 +242,22 @@ function parse_cmd(){
 	--rhn-pass)
 	    RHN_PASS=$2; shift 2; continue
 	;;
-	--old-deploy)
-	    NEW_DEPLOY=false ;shift; continue
-	;;
 	--logfile)
 	    LOGFILE=$2; shift 2; continue
+	;;
+	--verbose) # optional verbosity level
+	    VERBOSE=$2 # may be "" if not supplied
+            [[ -z "$VERBOSE" ]] && VERBOSE=$LOG_INFO # default
+	    shift 2; continue
+	;;
+	-q|--quiet)
+	    VERBOSE=$LOG_QUIET; shift; continue
+	;;
+	--debug)
+	    VERBOSE=$LOG_DEBUG; shift; continue
+	;;
+	--old-deploy)
+	    NEW_DEPLOY=false ;shift; continue
 	;;
 	--)  # no more args to parse
 	    shift; break
@@ -343,10 +395,10 @@ function verify_local_deploy_setup(){
   if (( errcnt > 0 )) ; then
     local plural='s'
     (( errcnt == 1 )) && plural=''
-    display "$errcnt error$plural:\n$errmsg"
+    display "$errcnt error$plural:\n$errmsg" $LOG_FORCE
     exit 1
   fi
-  display "   ...verified"
+  display "   ...verified" $LOG_DEBUG
 }
 
 # report_deploy_values: write out args and default values to be used in this
@@ -354,31 +406,36 @@ function verify_local_deploy_setup(){
 #
 function report_deploy_values(){
 
-  local ans
+  local ans='y'
 
-  echo
-  display "__________ Deployment Values __________"
-  display "  Install-from dir:   $INSTALL_DIR"
-  display "  Install-from IP:    $INSTALL_FROM_IP"
-  display "  Remote install dir: $REMOTE_INSTALL_DIR"
+  display
+  display "__________ Deployment Values __________" $LOG_REPORT
+  display "  Install-from dir:   $INSTALL_DIR"      $LOG_REPORT
+  display "  Install-from IP:    $INSTALL_FROM_IP"  $LOG_REPORT
+  display "  Remote install dir: $REMOTE_INSTALL_DIR"  $LOG_REPORT
   [[ -n "$RHN_USER" ]] && \
-    display "  RHN user:           $RHN_USER"
-  display "  \"hosts\" file:       $HOSTS_FILE"
-  display "  Number of nodes:    $NUMNODES"
-  display "  Management node:    $MGMT_NODE"
-  display "  Volume name:        $VOLNAME"
-  display "  Volume mount:       $GLUSTER_MNT"
-  display "  # of replicas:      $REPLICA_CNT"
-  display "  XFS device file:    $BRICK_DEV"
-  display "  XFS brick dir:      $BRICK_DIR"
-  display "  XFS brick mount:    $BRICK_MNT"
-  display "  M/R scratch dir:    $MAPRED_SCRATCH_DIR"
-  display "  New install:        $NEW_DEPLOY"
-  display "  Log file:           $LOGFILE"
-  echo    "_______________________________________"
+    display "  RHN user:           $RHN_USER"       $LOG_REPORT
+  display "  \"hosts\" file:       $HOSTS_FILE"     $LOG_REPORT
+  display "  Number of nodes:    $NUMNODES"         $LOG_REPORT
+  display "  Management node:    $MGMT_NODE"        $LOG_REPORT
+  display "  Volume name:        $VOLNAME"          $LOG_REPORT
+  display "  Volume mount:       $GLUSTER_MNT"      $LOG_REPORT
+  display "  # of replicas:      $REPLICA_CNT"      $LOG_REPORT
+  display "  XFS device file:    $BRICK_DEV"        $LOG_REPORT
+  display "  XFS brick dir:      $BRICK_DIR"        $LOG_REPORT
+  display "  XFS brick mount:    $BRICK_MNT"        $LOG_REPORT
+  display "  M/R scratch dir:    $MAPRED_SCRATCH_DIR"  $LOG_REPORT
+  display "  New install:        $NEW_DEPLOY"       $LOG_REPORT
+  display "  Verbose:            $VERBOSE"          $LOG_REPORT
+  display "  Log file:           $LOGFILE"          $LOG_REPORT
+  display    "_______________________________________" $LOG_REPORT
 
-  read -p "Continue? [y|N] " ans
-  [[ "$ans" == 'Y' || "$ans" == 'y' ]] || exit 0
+  (( VERBOSE < LOG_QUIET )) && read -p "Continue? [y|N] " ans
+  case $ans in
+    y|yes|Y|YES|Yes ) # ok, do nothing
+    ;;
+    * ) exit 0
+  esac
 }
 
 # cleanup:
@@ -397,19 +454,20 @@ function cleanup(){
   local node=''; local out
 
   # 1) umount vol on every node, if mounted
-  display "  -- un-mounting $GLUSTER_MNT on all nodes..."
+  display "  -- un-mounting $GLUSTER_MNT on all nodes..." $LOG_INFO
   for node in "${HOSTS[@]}"; do
-      ssh root@$node "
+      out=$(ssh root@$node "
           if /bin/grep -qs $GLUSTER_MNT /proc/mounts ; then
             /bin/umount $GLUSTER_MNT
-          fi"
+          fi")
+      display "$node: $out" $LOG_DEBUG
   done
 
   # 2) stop vol on a single node, if started
   # 3) delete vol on a single node, if created
-  display "  -- from node $firstNode:"
-  display "       stopping $VOLNAME volume..."
-  display "       deleting $VOLNAME volume..."
+  display "  -- from node $firstNode:"         $LOG_INFO
+  display "       stopping $VOLNAME volume..." $LOG_INFO
+  display "       deleting $VOLNAME volume..." $LOG_INFO
   out=$(ssh root@$firstNode "
       gluster volume status $VOLNAME >& /dev/null
       if (( \$? == 0 )); then # assume volume started
@@ -420,30 +478,30 @@ function cleanup(){
         gluster --mode=script volume delete $VOLNAME 2>&1
       fi
   ")
-  display "$out"
+  display "$out" $LOG_DEBUG
 
   # 4) detach nodes if trusted pool created, on all but first node
   # note: peer probe hostname cannot be self node
   out=$(ssh root@$firstNode "gluster peer status|head -n 1")
   # detach nodes if a pool has been already been formed
   if [[ -n "$out" && ${out##* } > 0 ]] ; then # got output, last tok=# peers
-    display "  -- from node $firstNode:"
-    display "       detaching all other nodes from trusted pool..."
+    display "  -- from node $firstNode:" $LOG_INFO
+    display "       detaching all other nodes from trusted pool..." $LOG_INFO
     out=''
     for (( i=1; i<$NUMNODES; i++ )); do
       out+=$(ssh root@$firstNode "gluster peer detach ${HOSTS[$i]} 2>&1")
       out+="\n"
     done
   fi
-  display "$out"
+  display "$out" $LOG_DEBUG
 
   # 5) rm vol_mnt on every node
   # 6) unmount brick_mnt on every node, if xfs mounted
   # 7) rm brick_mnt and mapred scratch dir on every node
-  display "  -- on all nodes:"
-  display "       rm $GLUSTER_MNT..."
-  display "       umount $BRICK_DIR..."
-  display "       rm $BRICK_DIR and $MAPRED_SCRATCH_DIR..."
+  display "  -- on all nodes:"          $LOG_INFO
+  display "       rm $GLUSTER_MNT..."   $LOG_INFO
+  display "       umount $BRICK_DIR..." $LOG_INFO
+  display "       rm $BRICK_DIR and $MAPRED_SCRATCH_DIR..." $LOG_INFO
   out=''
   for node in "${HOSTS[@]}"; do
       out+=$(ssh root@$node "
@@ -456,7 +514,7 @@ function cleanup(){
       ")
       out+="\n"
   done
-  display "$out"
+  display "$out" $LOG_DEBUG
 }
 
 # verify_pool_create: there are timing windows when using ssh and the gluster
@@ -477,9 +535,9 @@ function verify_pool_created(){
   done
 
   if (( i < LIMIT )) ; then 
-    display "   Trusted pool formed..."
+    display "   Trusted pool formed..." $LOG_DEBUG
   else
-    display "   FATAL ERROR: Trusted pool NOT formed..."
+    display "   FATAL ERROR: Trusted pool NOT formed..." $LOG_FORCE
     exit 5
   fi
 }
@@ -500,9 +558,9 @@ function verify_vol_created(){
   done
 
   if (( i < LIMIT )) ; then 
-    display "   Volume \"$VOLNAME\" created..."
+    display "   Volume \"$VOLNAME\" created..." $LOG_DEBUG
   else
-    display "   FATAL ERROR: Volume \"$VOLNAME\" creation failed..."
+    display "   FATAL ERROR: Volume \"$VOLNAME\" creation failed..." $LOG_FORCE
     exit 10
   fi
 }
@@ -532,9 +590,9 @@ function verify_vol_started(){
   done
 
   if (( i < LIMIT )) ; then 
-    display "   Volume \"$VOLNAME\" started..."
+    display "   Volume \"$VOLNAME\" started..." $LOG_DEBUG
   else
-    display "   FATAL ERROR: Volume \"$VOLNAME\" NOT started...\nTry gluster volume status $VOLNAME"
+    display "   FATAL ERROR: Volume \"$VOLNAME\" NOT started...\nTry gluster volume status $VOLNAME" $LOG_FORCE
     exit 15
   fi
 }
@@ -552,10 +610,10 @@ function create_trusted_pool(){
       out+=$(ssh root@$firstNode "gluster peer probe ${HOSTS[$i]} 2>&1")
       out+="\n"
   done
-  display "$out"
+  display "$out" $LOG_DEBUG
 
   out=$(ssh root@$firstNode 'gluster peer status 2>&1')
-  display "$out"
+  display "$out" $LOG_DEBUG
 }
 
 # setup:
@@ -591,11 +649,12 @@ function setup(){
   # 3) append brick_dir and gluster mount entries to fstab on every node
   # 4) mount brick on every node
   # 5) mkdir mapredlocal scratch dir on every node (done after brick mount)
-  display "  -- on all nodes:"
-  display "       mkfs.xfs $BRICK_DEV..."
-  display "       mkdir $BRICK_DIR, $GLUSTER_MNT and $MAPRED_SCRATCH_DIR..."
-  display "       append mount entries to /etc/fstab..."
-  display "       mount $BRICK_DIR..."
+  display "  -- on all nodes:"                           $LOG_INFO
+  display "       mkfs.xfs $BRICK_DEV..."                $LOG_INFO
+  display "       mkdir $BRICK_DIR, $GLUSTER_MNT and $MAPRED_SCRATCH_DIR..." \
+	$LOG_INFO
+  display "       append mount entries to /etc/fstab..." $LOG_INFO
+  display "       mount $BRICK_DIR..."                   $LOG_INFO
   out=''
   for (( i=0; i<$NUMNODES; i++ )); do
       node="${HOSTS[$i]}"
@@ -620,15 +679,15 @@ function setup(){
       ")
       out+="\n"
   done
-  display "$out"
+  display "$out" $LOG_DEBUG
 
   # 6) create trusted pool from first node
   # 7) create vol on a single node
   # 8) start vol on a single node
-  display "  -- from node $firstNode:"
-  display "       creating trusted pool..."
-  display "       creating $VOLNAME volume..."
-  display "       starting $VOLNAME volume..."
+  display "  -- from node $firstNode:"         $LOG_INFO
+  display "       creating trusted pool..."    $LOG_INFO
+  display "       creating $VOLNAME volume..." $LOG_INFO
+  display "       starting $VOLNAME volume..." $LOG_INFO
   create_trusted_pool
   verify_pool_created
 
@@ -636,25 +695,25 @@ function setup(){
   out=$(ssh root@$firstNode "
 	gluster volume create $VOLNAME replica $REPLICA_CNT $bricks 2>&1
   ")
-  display "$out"
+  display "$out" $LOG_DEBUG
   verify_vol_created
 
   # start vol
   out=$(ssh root@$firstNode "
 	gluster --mode=script volume start $VOLNAME 2>&1
   ")
-  display "$out"
+  display "$out" $LOG_DEBUG
   verify_vol_started
 
   # 9) mount vol on every node
   # 10) create distributed mapred/system dir on every node
   # 11) chmod on the gluster mnt and the mapred scracth dir on every node
   # 12) chown on the gluster mnt and mapred scratch dir on every node
-  display "  -- on all nodes:"
-  display "       mount $GLUSTER_MNT..."
-  display "       create $MAPRED_SYSTEM_DIR dir..."
-  display "       create $OWNER user and $GROUP group if needed..."
-  display "       change owner and permissions..."
+  display "  -- on all nodes:"                      $LOG_INFO
+  display "       mount $GLUSTER_MNT..."            $LOG_INFO
+  display "       create $MAPRED_SYSTEM_DIR dir..." $LOG_INFO
+  display "       create $OWNER user and $GROUP group if needed..." $LOG_INFO
+  display "       change owner and permissions..."  $LOG_INFO
   # Note: ownership and permissions must be set *afer* the gluster vol is
   #       mounted.
    #rhs pre-2.1 does not support the entry-timeout and attribute-timeout
@@ -689,7 +748,7 @@ function setup(){
       ")
       out+="\n"
   done
-  display "$out"
+  display "$out" $LOG_DEBUG
 }
 
 # install_nodes: for each node in the hosts file copy the "data" sub-directory
@@ -710,7 +769,8 @@ function setup(){
 #
 function install_nodes(){
 
-  local i; local node=''; local ip=''; local install_mgmt_node; local out
+  local i; local node=''; local ip=''; local install_mgmt_node
+  local LOCAL_PREP_LOG_DIR='/var/tmp/'; local out
   REBOOT_NODES=() # global
 
   # prep_node: sub-function which copies the data/ dir from the tarball to the
@@ -732,17 +792,25 @@ function install_nodes(){
     ssh root@$ip "
 	/bin/rm -rf $REMOTE_INSTALL_DIR
 	/bin/mkdir -p $REMOTE_INSTALL_DIR"
-    display "-- Copying RHS-Ambari install files..."
-    out=$(scp -r $DATA_DIR root@$ip:$REMOTE_INSTALL_DIR 2>&1)
-    display "$out"
+    display "-- Copying RHS-Ambari install files..." $LOG_INFO
+    out=$(script -q -c "scp -r $DATA_DIR root@$ip:$REMOTE_INSTALL_DIR")
+    display "$out" $LOG_DEBUG
 
     # prep_node.sh may apply the FUSE patch on storage node in which case the
-    # node needs to be rebooted.
+    # node will need to be rebooted.
     out=$(ssh root@$ip $PREP_SH $node $install_storage $install_mgmt \
-	"\"${HOSTS[@]}\"" "\"${HOST_IPS[@]}\"" $MGMT_NODE \
-	$REMOTE_INSTALL_DIR$DATA_DIR "$RHN_USER" "$RHN_PASS")
+	"\"${HOSTS[@]}\"" "\"${HOST_IPS[@]}\"" $MGMT_NODE $VERBOSE \
+        $PREP_NODE_LOG_PATH $REMOTE_INSTALL_DIR$DATA_DIR "$RHN_USER" \
+	"$RHN_PASS")
     err=$?
-    display "$out"
+    # prep_node writes all messages to the PREP_NODE_LOG logfile regardless of
+    # the verbose setting. However, it outputs (and is captured above) only
+    # messages that honor the verbose setting. We can't call display() next
+    # because we don't want to double log, so instead, append the entire
+    # PREP_NODE_LOG file to LOGFILE and echo the contents of $out.
+    scp -q root@$ip:$PREP_NODE_LOG_PATH $LOCAL_PREP_LOG_DIR
+    cat ${LOCAL_PREP_LOG_DIR}$PREP_NODE_LOG >> $LOGFILE
+    echo "$out" # prep_node.sh has honored the verbose setting
 
     if (( err == 99 )) ; then # this node needs to be rebooted
       # don't reboot if node is the install-from node!
@@ -752,7 +820,8 @@ function install_nodes(){
 	REBOOT_NODES+=("$ip")
       fi
     elif (( err != 0 )) ; then # fatal error in install.sh so quit now
-      display " *** ERROR! prep_node script exited with error: $err ***"
+      display " *** ERROR! prep_node script exited with error: $err ***" \
+	$LOG_FORCE
       exit 20
     fi
   }
@@ -762,11 +831,11 @@ function install_nodes(){
   for (( i=0; i<$NUMNODES; i++ )); do
       node=${HOSTS[$i]}; ip=${HOST_IPS[$i]}
       echo
-      echo
-      display '--------------------------------------------'
-      display "-- Installing on $node ($ip)"
-      display '--------------------------------------------'
-      echo
+      display
+      display '--------------------------------------------' $LOG_SUMMARY
+      display "-- Installing on $node ($ip)"                 $LOG_SUMMARY
+      display '--------------------------------------------' $LOG_SUMMARY
+      display
 
       # Append to bricks string. Convention to use a subdir under the XFS
       # brick, and to name this subdir same as volname.
@@ -777,9 +846,9 @@ function install_nodes(){
 	install_mgmt_node=true
       prep_node $node $ip true $install_mgmt_node
 
-      display '-------------------------------------------------'
-      display "-- Done installing on $node ($ip)"
-      display '-------------------------------------------------'
+      display '-------------------------------------------------' $LOG_SUMMARY
+      display "-- Done installing on $node ($ip)"                 $LOG_SUMMARY
+      display '-------------------------------------------------' $LOG_SUMMARY
   done
 
   # if the mgmt node is not in the storage pool (not in hosts file) then
@@ -787,8 +856,8 @@ function install_nodes(){
   # management server
   if [[ -z "$MGMT_NODE_IN_POOL" ]] ; then
     echo
-    display 'Management node is not a datanode thus mgmt code needs to be installed...'
-    display "-- Starting install of management node \"$MGMT_NODE\""
+    display 'Management node is not a datanode thus mgmt code needs to be installed...' $LOG_INFO
+    display "-- Starting install of management node \"$MGMT_NODE\"" $LOG_DEBUG
     prep_node $MGMT_NODE $MGMT_NODE false true
   fi
 }
@@ -807,11 +876,9 @@ function reboot_nodes(){
     echo
     msg='node'
     (( num != 1 )) && msg+='s'
-    msg+=' need'
-    (( num == 1 )) && msg+='s'
-    display "-- $num $msg to be rebooted..."
+    display "-- $num $msg will be rebooted..." $LOG_SUMMARY
     for ip in "${REBOOT_NODES[@]}"; do
-	display "   * rebooting node: $ip..."
+	display "   * rebooting node: $ip..." $LOG_INFO
 	ssh root@$ip reboot -f &  # reboot asynchronously
     done
 
@@ -822,7 +889,7 @@ function reboot_nodes(){
 	    # if possible to ssh to ip then unset that array entry
 	    ssh -q -oBatchMode=yes root@$ip exit
 	    if (( $? == 0 )) ; then
-	      display "   * node $ip sucessfully rebooted"
+	      display "   * node $ip sucessfully rebooted" $LOG_DEBUG
 	      unset REBOOT_NODES[$i] # null entry in array
 	    fi
 	done
@@ -843,7 +910,7 @@ function perf_config(){
 	gluster volume set $VOLNAME cluster.eager-lock on 2>&1
 	gluster volume set $VOLNAME performance.stat-prefetch off 2>&1
   ")
-  display "$out"
+  display "$out" $LOG_DEBUG
 }
 
 # cleanup_logfile: the ambari-server yum install depends on Oracle JDK which
@@ -881,7 +948,7 @@ function reboot_self(){
 echo
 parse_cmd $@
 
-display "$(/bin/date). Begin: $SCRIPT -- version $INSTALL_VER ***"
+display "$(/bin/date). Begin: $SCRIPT -- version $INSTALL_VER ***" $LOG_REPORT
 
 # define global variables based on --options and defaults
 # convention is to use the volname as the subdir under the brick as the mnt
@@ -890,7 +957,7 @@ MAPRED_SCRATCH_DIR="$BRICK_DIR/mapredlocal"    # xfs but not distributed
 MAPRED_SYSTEM_DIR="$GLUSTER_MNT/mapred/system" # distributed, not local
 
 echo
-display "-- Verifying the deploy environment, including the \"hosts\" file format:"
+display "-- Verifying the deploy environment, including the \"hosts\" file format:" $LOG_INFO
 verify_local_deploy_setup
 firstNode=${HOSTS[0]}
 
@@ -900,24 +967,25 @@ report_deploy_values
 install_nodes
 
 echo
-display '----------------------------------------'
-display '--    Begin cluster configuration     --'
-display '----------------------------------------'
+display '----------------------------------------' $LOG_SUMMARY
+display '--    Begin cluster configuration     --' $LOG_SUMMARY
+display '----------------------------------------' $LOG_SUMMARY
 
 # clean up mounts and volume from previous run, if any...
 if [[ $NEW_DEPLOY == true ]] ; then
   echo
-  display "-- Cleaning up (un-mounting, deleting volume, etc.)"
+  display "-- Cleaning up (un-mounting, deleting volume, etc.)" $LOG_SUMMARY
   cleanup
 fi
 
 # set up mounts and create volume
 echo
-display "-- Setting up brick and volume mounts, creating and starting volume"
+display "-- Setting up brick and volume mounts, creating and starting volume" \
+	$LOG_SUMMARY
 setup
 
 echo
-display "-- Performance config --"
+display "-- Performance config --" $LOG_SUMMARY
 perf_config
 
 cleanup_logfile
@@ -926,7 +994,7 @@ cleanup_logfile
 reboot_nodes
 
 echo
-display "$(/bin/date). End: $SCRIPT"
+display "$(/bin/date). End: $SCRIPT" $LOG_REPORT
 echo
 
 # if install-from node is one of the data nodes and the fuse patch was

@@ -19,7 +19,8 @@
 # Arguments (all positional):
 #   $1=self hostname*, $2=install storage flag*, $3=install mgmt server flag*,
 #   $4=HOSTS(array)*, $5=HOST IP-addrs(array)*, $6=management server hostname*,
-#   $7=working dir, $8=rhn user, $9=rhn user password
+#   $7=verbose value*, $8=special logfile*, $9=working dir, $10=rhn user, 
+#   $11=rhn user password
 # '*' means required argument, others are optional.
 #
 # Note on passing arrays: the caller (install.sh) needs to surround the array
@@ -32,23 +33,34 @@ MGMT_INSTALL=$3    # true or false
 HOSTS=($4)
 HOST_IPS=($5)
 MGMT_NODE="$6" # note: this node can be inside or outside the storage cluster
-DEPLOY_DIR=${7:-/tmp/RHS-Ambari-install/data/}
-RHN_USER=${8:-}
-RHN_PASS=${9:-}
-#echo -e "*** $(basename $0)\n 1=$NODE, 2=$STORAGE_INSTALL, 3=$MGMT_INSTALL, 4=${HOSTS[@]}, 5=${HOST_IPS[@]}, 6=$MGMT_NODE, 7=$DEPLOY_DIR, 8=$RHN_USER, 9=$RHN_PASS"
+VERBOSE=$7
+PREP_LOG=$8
+DEPLOY_DIR=${9:-/tmp/RHS-Ambari-install/data/}
+RHN_USER=${10:-}
+RHN_PASS=${11:-}
+#echo -e "*** $(basename $0)\n 1=$NODE, 2=$STORAGE_INSTALL, 3=$MGMT_INSTALL, 4=${HOSTS[@]}, 5=${HOST_IPS[@]}, 6=$MGMT_NODE, 7=$VERBOSE, 8=$PREP_LOG, 9=$DEPLOY_DIR, 10=$RHN_USER, 11=$RHN_PASS"
 
 NUMNODES=${#HOSTS[@]}
 AMBARI_TMPDIR=${DEPLOY_DIR}tmpAmbari
+# log threshold values (copied from install.sh)
+LOG_DEBUG=0
+LOG_INFO=1    # default for --verbose
+LOG_SUMMARY=2 # default
+LOG_REPORT=3  # suppress all output, other than final reporting
+LOG_QUIET=9   # value for --quiet = suppress all output
+LOG_FORCE=99  # force write regardless of VERBOSE setting
 
 
-# display: Write the message to stdlist but do not write to the logfile.
-# Note: earlier versions of prep_node.sh also wrote the passed-in msg to the
-#   logfile; however, now all logging appears in a single logfile on the 
-#   install-from host.
+# display: write all messages to the special logfile which will be copied to 
+# the "install-from" host, and potentially write the message to stdout. 
+# $1=msg, $2=msg prioriy (optional, default=summary)
 #
-function display(){  # $1 is the message
+function display(){
 
-  echo -e "$1"
+  local pri=${2:-$LOG_SUMMARY} 
+
+  echo "$1" >> $PREP_LOG
+  (( pri >= VERBOSE )) && echo -e "$1"
 }
 
 # fixup_etc_host_file: append all ips + hostnames to /etc/hosts, unless the
@@ -69,6 +81,7 @@ function fixup_etc_hosts_file(){
   done
   if (( ${#hosts_buf} > 2 )) ; then
     hosts_buf=${hosts_buf:0:${#hosts_buf}-1} # remove \n for last host entry
+    display "  appending \"$hosts_buf\" to /etc/hosts" $LOG_DEBUG
     echo "$hosts_buf" >>/etc/hosts
   fi
 }
@@ -80,41 +93,48 @@ function install_plugin(){
 
   local USR_JAVA_DIR='/usr/share/java'
   local HADOOP_JAVA_DIR='/usr/lib/hadoop/lib/'
-  local jar=''
+  local jar=''; local out
 
   jar=$(ls glusterfs-hadoop*.jar)
   if [[ -z "$jar" ]] ; then
-    display "  Gluster Hadoop plug-in missing in $DEPLOY_DIR"
+    display "  Gluster Hadoop plug-in missing in $DEPLOY_DIR" $LOG_FORCE
     exit 5
   fi
 
-  display "-- Installing Gluster-Hadoop plug-in ($jar)..."
+  display "-- Installing Gluster-Hadoop plug-in ($jar)..." $LOG_INFO
   # create target dirs if they does not exist
   [[ -d $USR_JAVA_DIR ]]    || /bin/mkdir -p $USR_JAVA_DIR
   [[ -d $HADOOP_JAVA_DIR ]] || /bin/mkdir -p $HADOOP_JAVA_DIR
 
   # copy jar and create symlink
-  /bin/cp -uf $jar $USR_JAVA_DIR 2>&1
+  out=$(/bin/cp -uf $jar $USR_JAVA_DIR 2>&1)
   if (( $? != 0 )) ; then
-    display "  Copy of plug-in failed"
+    display "  Copy of plug-in failed" $LOG_FORCE
     exit 10
   fi
-  rm -f $HADOOP_JAVA_DIR/$jar
-  ln -s $USR_JAVA_DIR/$jar $HADOOP_JAVA_DIR/$jar 2>&1
+  display "$out" $LOG_DEBUG
 
-  display "   ... Gluster-Hadoop plug-in install successful"
+  rm -f $HADOOP_JAVA_DIR/$jar
+  out=$(ln -s $USR_JAVA_DIR/$jar $HADOOP_JAVA_DIR/$jar 2>&1)
+  display "$out" $LOG_DEBUG
+
+  display "   ... Gluster-Hadoop plug-in install successful" $LOG_SUMMARY
 }
 
 # copy_ambari_repo: copy the ambari.repo file to the correct location.
 #
 function copy_ambari_repo(){
  
-  local REPO='ambari.repo'; local REPO_DIR='/etc/yum.repos.d'
+  local REPO='ambari.repo'; local REPO_DIR='/etc/yum.repos.d'; local out
 
-  [[ -f $REPO ]] || { display "ERROR: \"$REPO\" file missing"; exit 15;}
+  if [[ ! -f $REPO ]] ; then
+    display "ERROR: \"$REPO\" file missing" $LOG_FORCE
+    exit 15
+  fi
   [[ -d $REPO_DIR ]] || /bin/mkdir -p $REPO_DIR
 
-  /bin/cp $REPO $REPO_DIR 2>&1
+  out=$(/bin/cp $REPO $REPO_DIR 2>&1)
+  display "$out" $LOG_DEBUG
 }
 
 # install_epel: install the epel rpm. Note: epel package is not part of the
@@ -123,8 +143,11 @@ function copy_ambari_repo(){
 # to the correct dir prior to invoking this function.
 #
 function install_epel(){
+
+  local out
  
-  yum -y install epel-release 2>&1
+  out=$(yum -y install epel-release 2>&1)
+  display "$out" $LOG_DEBUG
 }
 
 # install_ambari_agent: untar the ambari rpm tarball, yum install the ambari
@@ -133,44 +156,52 @@ function install_epel(){
 #
 function install_ambari_agent(){
 
-  local agent_rpm=''
+  local agent_rpm=''; local out
   local ambari_ini='/etc/ambari-agent/conf/ambari-agent.ini'
   local SERVER_SECTION='server'; SERVER_KEY='hostname='
   local KEY_VALUE="$MGMT_NODE"
   local AMBARI_AGENT_PID='/var/run/ambari-agent/ambari-agent.pid'
 
-  if [[ ! -d $AMBARI_TMPDIR ]] ; then
-    /bin/mkdir $AMBARI_TMPDIR 2>&1
-    # extract ambari rpms
-    /bin/tar -C $AMBARI_TMPDIR -xzf ambari-*.tar.gz 2>&1
-    (( $? != 0 )) && exit 17
+  [[ -d $AMBARI_TMPDIR ]] || /bin/mkdir $AMBARI_TMPDIR 2>&1
+  # extract ambari rpms
+  out=$(/bin/tar -C $AMBARI_TMPDIR -xzf ambari-*.tar.gz 2>&1)
+  if (( $? == 0 )) ; then
+    display "$out" $LOG_DEBUG
+  else
+    display "ERROR: $out" $LOG_FORCE
+    exit 17
   fi
 
   pushd $AMBARI_TMPDIR > /dev/null
 
   # stop agent if running
   if [[ -f $AMBARI_AGENT_PID ]] ; then
-    display "   stopping ambari-agent"
-    ambari-agent stop 2>&1
+    display "   stopping ambari-agent" $LOG_INFO
+    out=$(ambari-agent stop 2>&1)
+    display "$out" $LOG_DEBUG
   fi
 
   # install agent rpm
   agent_rpm=$(ls ambari-agent-*.rpm)
   if [[ -z "$agent_rpm" ]] ; then
-    display "ERROR: Ambari agent RPM missing"
+    display "ERROR: Ambari agent RPM missing" $LOG_FORCE
     exit 20
   fi
-  yum -y install $agent_rpm 2>&1
-  popd
+  out=$(yum -y install $agent_rpm 2>&1)
+  display "$out" $LOG_DEBUG
+  popd > /dev/null
 
   # modify the agent's .ini file's server hostname value
+  display "  modifying $ambari_ini file" $LOG_DEBUG
   sed -i -e "/\[${SERVER_SECTION}\]/,/${SERVER_KEY}/s/=.*$/=${KEY_VALUE}/" $ambari_ini
 
   # start the agent
-  ambari-agent start 2>&1
+  out=$(ambari-agent start 2>&1)
+  display "$out" $LOG_DEBUG
 
   # start agent after reboot
-  chkconfig ambari-agent on 2>&1
+  out=$(chkconfig ambari-agent on 2>&1)
+  display "$out" $LOG_DEBUG
 }
 
 # install_ambari_server: yum install the ambari server rpm, setup start the
@@ -178,48 +209,57 @@ function install_ambari_agent(){
 #
 function install_ambari_server(){
 
-  local server_rpm=''
+  local server_rpm=''; local out
   local AMBARI_SERVER_PID='/var/run/ambari-server/ambari-server.pid'
 
-  if [[ ! -d $AMBARI_TMPDIR ]] ; then
-    /bin/mkdir $AMBARI_TMPDIR 2>&1
-    # extract ambari rpms
-    /bin/tar -C $AMBARI_TMPDIR -xzf ambari-*.tar.gz 2>&1
-    (( $? != 0 )) && exit 25
+  [[ -d $AMBARI_TMPDIR ]] || /bin/mkdir $AMBARI_TMPDIR 2>&1
+  # extract ambari rpms
+  out=$(/bin/tar -C $AMBARI_TMPDIR -xzf ambari-*.tar.gz 2>&1)
+  if (( $? == 0 )) ; then
+    display "$out" $LOG_DEBUG
+  else
+    display "ERROR: $out" $LOG_FORCE
+    exit 25
   fi
 
   pushd $AMBARI_TMPDIR > /dev/null
 
   # stop and reset server if running
   if [[ -f $AMBARI_SERVER_PID ]] ; then
-    display "   stopping ambari-server"
-    ambari-server stop 2>&1
-    ambari-server reset -s 2>&1
+    display "   stopping ambari-server" $LOG_INFO
+    out=$(ambari-server stop 2>&1)
+    display "$out" $LOG_DEBUG
+    out=$(ambari-server reset -s 2>&1)
+    display "$out" $LOG_DEBUG
   fi
 
   # install server rpm
   server_rpm=$(ls ambari-server-*.rpm)
   if [[ -z "$server_rpm" ]] ; then
-    display "ERROR: Ambari server RPM missing"
+    display "ERROR: Ambari server RPM missing" $LOG_FORCE
     exit 30
   fi
   # Note: the Oracle Java install takes a fair amount of time and yum does
   # thousands of progress updates. On a terminal this is fine but when output
   # is redirected to disk you get a *very* long record. The invoking script will
   # delete this one very long record in order to make the logfile more usable.
-  yum -y install $server_rpm
+  out=$(yum -y install $server_rpm 2>&1)
+  display "$out" $LOG_DEBUG
 
-  popd
+  popd > /dev/null
 
   # setup the ambari-server
   # note: -s accepts all defaults with no prompting
-  ambari-server setup -s 2>&1
+  out=$(ambari-server setup -s 2>&1)
+  display "$out" $LOG_DEBUG
 
   # start the server
-  ambari-server start 2>&1
+  out=$(ambari-server start 2>&1)
+  display "$out" $LOG_DEBUG
 
   # start the server after a reboot
-  chkconfig ambari-server on 2>&1
+  out=$(chkconfig ambari-server on 2>&1)
+  display "$out" $LOG_DEBUG
 }
 
 # verify_java: verify the version of Java on NODE. Fatal errors exit script.
@@ -234,14 +274,16 @@ function verify_java(){
   if (( $err == 0 )) ; then
     JAVA_VER=$(java -version 2>&1 | head -n 1 | cut -d\" -f 2)
     if [[ ! ${JAVA_VER:0:${#TEST_JAVA_VER}} == $TEST_JAVA_VER ]] ; then
-      display "   Current Java is $JAVA_VER, expected $TEST_JAVA_VER."
-      display "   Download Java $TEST_JAVA_VER JRE from Oracle now."
+      display "   Current Java is $JAVA_VER, expected $TEST_JAVA_VER." \
+	$LOG_FORCE
+      display "   Download Java $TEST_JAVA_VER JRE from Oracle now." \
+	$LOG_FORCE
       err=1
     else
-      display "   ... Java version $JAVA_VER verified"
+      display "   ... Java version $JAVA_VER verified" $LOG_INFO
     fi
   else
-    display "   Java is not installed. Download Java $TEST_JAVA_VER JRE from Oracle now."
+    display "   Java is not installed. Download Java $TEST_JAVA_VER JRE from Oracle now." $LOG_FORCE
     err=35
   fi
   (( $err == 0 )) || exit $err
@@ -258,14 +300,14 @@ function verify_ntp(){
     ntpstat >& /dev/null
     err=$?
     if (( err == 0 )) ; then 
-      display "   NTP is synchronized..."
+      display "   NTP is synchronized..." $LOG_DEBUG
     elif (( $err == 1 )) ; then
-      display "   NTP is NOT synchronized..."
+      display "   NTP is NOT synchronized..." $LOG_INFO
     else
-      display "   WARNING: NTP state is indeterminant..."
+      display "   WARNING: NTP state is indeterminant..." $LOG_FORCE
     fi
   else
-    display "   WARNING: NTP does not appear to be installed..."
+    display "   WARNING: NTP does not appear to be installed..." $LOG_FORCE
   fi
 }
 
@@ -273,10 +315,14 @@ function verify_ntp(){
 #
 function rhn_register(){
 
+  local out
+
   if [[ -n "$RHN_USER" && -n "$RHN_PASS" ]] ; then
     echo
-    display "-- RHN registering with provided rhn user and password"
-    rhnreg_ks --profilename="$NODE" --username="$RHN_USER" --password="$RHN_PASS" --force 2>&1
+    display "-- RHN registering with provided rhn user and password" \
+	$LOG_INFO
+    out=$(rhnreg_ks --profilename="$NODE" --username="$RHN_USER" --password="$RHN_PASS" --force 2>&1)
+    display "$out" $LOG_DEBUG
   fi
 }
 
@@ -288,28 +334,38 @@ function rhn_register(){
 #
 function verify_fuse(){
 
-  local FUSE_TARBALL='fuse-*.tar.gz'
+  local FUSE_TARBALL='fuse-*.tar.gz'; local out
 
   # if file exists then fuse patch installed
   local FUSE_INSTALLED='/tmp/FUSE_INSTALLED' # Note: deploy dir is rm'd
 
   if [[ -f "$FUSE_INSTALLED" ]]; then # file exists, assume installed
-    display "   ... verified"
+    display "   ... verified" $LOG_DEBUG
   else
-    display "-- Installing FUSE patch which may take more than a few seconds..."
+    display "-- Installing FUSE patch which may take more than a few seconds..." $LOG_INFO
     echo
     /bin/rm -rf fusetmp  # scratch dir
     /bin/mkdir fusetmp
     if (( $(ls $FUSE_TARBALL|wc -l) != 1 )) ; then
-      display "ERROR: missing or extra FUSE tarball"
+      display "ERROR: missing or extra FUSE tarball" $LOG_FORCE
       exit 40
     fi
-    /bin/tar -C fusetmp/ -xzf $FUSE_TARBALL 2>&1
-    (( $? != 0 )) && exit 45
-    yum -y install fusetmp/*.rpm 2>&1
+
+    out=$(/bin/tar -C fusetmp/ -xzf $FUSE_TARBALL 2>&1)
+    if (( $? == 0 )) ; then
+      display "$out" $LOG_DEBUG
+    else
+      display "ERROR: $out" $LOG_FORCE
+      exit 45
+    fi
+
+    out=$(yum -y install fusetmp/*.rpm 2>&1)
+    display "$out" $LOG_DEBUG
+
     # create kludgy fuse-has-been-installed file
     touch $FUSE_INSTALLED
-    display "   A reboot of $NODE is required and will be done automatically"
+    display "   A reboot of $NODE is required and will be done automatically" \
+	$LOG_INFO
     echo
     REBOOT_REQUIRED=true
   fi
@@ -327,25 +383,27 @@ function sudoers(){
   local mapred='mapred'; local yarn='yarn'
   local MAPRED_SUDOER="$mapred $SUDOER_ACC"
   local YARN_SUDOER="$yarn $SUDOER_ACC"
+  local out
 
   echo
-  display "-- Prepping $SUDOER_PATH for user privilege exceptions..."
+  display "-- Prepping $SUDOER_PATH for user access exceptions..." $LOG_SUMMARY
 
   if [[ ! -d "$SUDOER_DIR" ]] ; then
-    display "   Creating $SUDOER_DIR..."
+    display "   Creating $SUDOER_DIR..." $LOG_DEBUG
     /bin/mkdir -p $SUDOER_DIR
   fi
 
   if ! /bin/grep -qs $mapred $SUDOER_PATH ; then
-    display "   Appending \"$MAPRED_SUDOER\" to $SUDOER_PATH"
+    display "   Appending \"$MAPRED_SUDOER\" to $SUDOER_PATH" $LOG_INFO
     echo "$MAPRED_SUDOER" >> $SUDOER_PATH
   fi
   if ! /bin/grep -qs $yarn $SUDOER_PATH ; then
-    display "   Appending \"$YARN_SUDOER\" to $SUDOER_PATH"
+    display "   Appending \"$YARN_SUDOER\" to $SUDOER_PATH" $LOG_INFO
     echo "$YARN_SUDOER"  >> $SUDOER_PATH
   fi
 
-  /bin/chmod $SUDOER_PERM $SUDOER_PATH 2>&1
+  out=$(/bin/chmod $SUDOER_PERM $SUDOER_PATH 2>&1)
+  display "$out" $LOG_DEBUG
 }
 
 # install_common: perform node installation steps independent of whether or not
@@ -355,7 +413,7 @@ function install_common(){
 
   # set up /etc/hosts to map ip -> hostname
   echo
-  display "-- Setting up IP -> hostname mapping"
+  display "-- Setting up IP -> hostname mapping" $LOG_SUMMARY
   fixup_etc_hosts_file
   echo $NODE >/etc/hostname
   /bin/hostname $NODE
@@ -368,17 +426,17 @@ function install_common(){
 
   # verify NTP setup and sync clock
   echo
-  display "-- Verifying NTP is running"
+  display "-- Verifying NTP is running" $LOG_SUMMARY
   verify_ntp
 
   # copy Ambari repo
   echo
-  display "-- Copying Ambari repo file"
+  display "-- Copying Ambari repo file" $LOG_SUMMARY
   copy_ambari_repo
 
   # install epel
   echo
-  display "-- Installing EPEL package"
+  display "-- Installing EPEL package" $LOG_SUMMARY
   install_epel
 }
 
@@ -387,7 +445,7 @@ function install_common(){
 #
 function install_storage(){
 
-  local i
+  local i; local out
 
   # set this node's IP variable
   for (( i=0; i<$NUMNODES; i++ )); do
@@ -396,27 +454,27 @@ function install_storage(){
   IP=${HOST_IPS[$i]}
 
   # report Gluster version 
-  display "-- Gluster version: $(gluster --version | head -n 1)"
+  display "-- Gluster version: $(gluster --version | head -n 1)" $LOG_SUMMARY
 
   # install Gluster-Hadoop plug-in on agent nodes
   install_plugin
 
   # install Ambari agent rpm only on agent (data/storage) nodes
   echo
-  display "-- Installing Ambari agent"
+  display "-- Installing Ambari agent" $LOG_SUMMARY
   install_ambari_agent
 
   # verify FUSE patch on data (agent) nodes, if not installed yum install it.
   echo
-  display "-- Verifying FUSE patch installation:"
+  display "-- Verifying FUSE patch installation:" $LOG_SUMMARY
   verify_fuse
 
   # apply the tuned-admin rhs-high-throughput profile
-  # verified tuned-adm is installed after a fresh RHS install -- not doing a
-  # yum install tuned-adm
   echo
-  display "-- Applying the rhs-high-throughput profile using tuned-adm"
-  tuned-adm profile rhs-high-throughput 2>&1
+  display "-- Applying the rhs-high-throughput profile using tuned-adm" \
+	$LOG_SUMMARY
+  out=$(tuned-adm profile rhs-high-throughput 2>&1)
+  display "$out" $LOG_DEBUG
 }
 
 # install_mgmt: perform the installations steps needed when the node is the
@@ -424,7 +482,7 @@ function install_storage(){
 #
 function install_mgmt(){
   echo
-  display "-- Installing Ambari server"
+  display "-- Installing Ambari server" $LOG_SUMMARY
 
   # verify java version (note: java not provided by RHS install)
   #NOTE: currently not in use. Using ambari to install correct Java
@@ -438,20 +496,29 @@ function install_mgmt(){
 
 ## ** main ** ##
 echo
-display "$(/bin/date). Begin: prep_node"
+display "$(/bin/date). Begin: prep_node" $LOG_REPORT
 
-[[ -d $DEPLOY_DIR ]] || { display "$NODE: Directory '$DEPLOY_DIR' missing on $(hostname)"; exit -1; }
+if [[ ! -d $DEPLOY_DIR ]] ; then
+  display "$NODE: Directory '$DEPLOY_DIR' missing on $(hostname)" $LOG_FORCE
+  exit -1
+fi
 
 cd $DEPLOY_DIR
 /bin/ls >/dev/null
-(( $? == 0 )) || { display "$NODE: No files found in $DEPLOY_DIR"; exit -1; }
+if (( $? != 0 )) ; then
+  display "$NODE: No files found in $DEPLOY_DIR" $LOG_FORCE 
+  exit -1
+fi
+
+# remove special logfile, start "clean" each time script is invoked
+rm -f $PREP_LOG
 
 install_common
 
 [[ $STORAGE_INSTALL == true ]] && install_storage
 [[ $MGMT_INSTALL == true    ]] && install_mgmt
 
-display "$(/bin/date). End: prep_node"
+display "$(/bin/date). End: prep_node" $LOG_REPORT
 
 [[ -n "$REBOOT_REQUIRED" ]] && exit 99 # tell install.sh a reboot is needed
 exit 0
