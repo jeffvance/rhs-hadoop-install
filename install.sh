@@ -167,15 +167,15 @@ EOF
                        --verbose is supplied with no value verbosity is set to
                        1(info).  0=debug, 1=info, 2=summary, 3=report-only.
                        Note: all output is still written to the logfile.
+  --debug            : maximum output. Internally sets verbose=0.
+  -q|--quiet         : suppress all output including the final summary report.
+                       Internally sets verbose=9. Note: all output is still
+                       written to the logfile.
   --old-deploy       : Use if this is an existing deployment. The default
                        is a new ("greenfield") RHS customer installation. Not
                        currently supported.
   -v|--version       : current version string.
   -h|--help          : help text (this).
-  -q|--quiet         : suppress all output including the final summary report.
-                       Internally sets verbose=9. Note: all output is still
-                       written to the logfile.
-  --debug            : maximum output. Internally sets verbose=0.
 
 EOF
   
@@ -287,6 +287,7 @@ function parse_cmd(){
       exit -1
     fi
   fi
+
   # --logfile, if relative pathname make absolute
   # note: needed if scripts change cwd
   if [[ $(dirname "$LOGFILE") == '.' ]] ; then
