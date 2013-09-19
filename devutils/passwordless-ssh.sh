@@ -267,14 +267,19 @@ function setup_passwordless_ssh {
 
    # set up passwordless-ssh from 1st host in the hosts file to all the other
    # hosts in that file.
-   host=${HOSTS[0]}
-   display "Last, set up passwordless-ssh from $host to all other nodes"
+   firstHost=${HOSTS[0]}
+   display "Last, set up passwordless-ssh from $firstHost to all other nodes"
    display "in the hosts file"
-   bugout "---> with 'scp ~/.ssh/id_* $KNOWN_HOSTS root@$host:/root/.ssh'"
-   scp ~/.ssh/id_* $KNOWN_HOSTS root@$host:/root/.ssh
+   bugout "---> with 'scp ~/.ssh/id_* $KNOWN_HOSTS root@$firstHost:/root/.ssh'"
+   scp ~/.ssh/id_* $KNOWN_HOSTS root@$firstHost:/root/.ssh
    for (( i=1; i<$NUMNODES; i++ )); do
-	bugout "---> with 'ssh root@$host ssh-copy-id -i ~/.ssh/id_rsa.pub root@${HOSTS[$i]}'"
-	ssh root@$host "ssh-copy-id -i ~/.ssh/id_rsa.pub root@${HOSTS[$i]}"
+	ip=${HOST_IPS[$i]}; host=${HOSTS[$i]}
+	# append ip/host to first-node's /etc/hosts file
+	bugout "---> with 'ssh root@$firstHost echo \"$ip $host\" >>/etc/hosts'"
+	ssh root@$firstHost "echo '$ip $host' >>/etc/hosts"
+	# copy id
+	bugout "---> with 'ssh root@$firstHost ssh-copy-id -i ~/.ssh/id_rsa.pub root@$host'"
+	ssh root@$firstHost "ssh-copy-id -i ~/.ssh/id_rsa.pub root@$host"
    done
 }
 
