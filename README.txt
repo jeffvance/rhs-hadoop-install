@@ -20,7 +20,7 @@
   described below.
  
   The RHS tarball contains the following:
-   - install.sh: this script, executed by the root user.
+   - install.sh: the main install script, executed by the root user.
    - README.txt: this file.
    - hosts.example: sample "hosts" config file.
    - data/: directory containing:
