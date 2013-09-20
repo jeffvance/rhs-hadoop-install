@@ -195,32 +195,11 @@ Ambari Installation Instructions:
 == Addendum ==
 
 1) Setting up password-less SSH 
-  
-   This provides information on how to setup password-less SSH from the Ambari 
-   Management Server to all the servers in your RHS Cluster.
-
-	On the Ambari Management Server, run the following command:
-
-	ssh-keygen 
-
-	(Hit Enter to accept all of the defaults)
-
-	On the Ambari Management Server, run the following command for each server. 
-
-	ssh-copy-id -i ~/.ssh/id_rsa.pub root@<hostname>
-
-	For example, if you had four servers in your cluster with the hostnames svr1, 
-        svr2, svr3 and svr4 and svr1 is your Ambari Management Server, then you would 
-        run the following commands from svr1 after you had run ssh-keygen:
-
-	ssh-copy-id -i ~/.ssh/id_rsa.pub root@svr1
-	ssh-copy-id -i ~/.ssh/id_rsa.pub root@svr2
-	ssh-copy-id -i ~/.ssh/id_rsa.pub root@svr3
-	ssh-copy-id -i ~/.ssh/id_rsa.pub root@svr4
-	
-	Lastly, verify you can ssh from the Ambari Management Server to all the other 
-        servers without being prompted for a password.
-
+ 
+   There is a utility script (devutils/passwordless-ssh.sh) which will set up
+   password-less SSH from localhost (or wherever you run the script from) to 
+   all hosts defined in the local "hosts" file. Use --help for more info.
+ 
 2) Installing Red Hat Storage 2.0.5
 
    The “Red Hat Storage 2.0 Installation Guide” describes the prerequisites and provides 
