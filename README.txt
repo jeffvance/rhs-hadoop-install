@@ -91,9 +91,9 @@ Instructions:
     For example: ./install.sh /dev/sdb
 
     Output is displayed on STDOUT and is also written to a logfile, default is
-    /var/log/RHS-install. The --logfile option allows for a different logfile.
-    Even when a less verbose setting is used the logfile will contain all 
-    messages.
+    /var/log/RHS-install.log. The --logfile option allows for a different 
+    logfile.  Even when a less verbose setting is used the logfile will contain
+    all messages.
  4) The script should complete at which point the rest of the installation 
     process is completed via the browser using the Ambari Installation 
     Instructions below.
