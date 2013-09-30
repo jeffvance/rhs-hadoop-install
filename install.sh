@@ -206,8 +206,8 @@ function parse_cmd(){
   LOGFILE='/var/log/RHS-install.log'
   VERBOSE=$LOG_SUMMARY
 
+  # note: $? *not* set for invalid option errors!
   local args=$(getopt -n "$SCRIPT" -o $OPTIONS --long $LONG_OPTS -- $@)
-  (( $? == 0 )) || { echo "$SCRIPT syntax error"; exit -1; }
 
   eval set -- "$args" # set up $1... positional args
   while true ; do
@@ -262,21 +262,17 @@ function parse_cmd(){
 	--)  # no more args to parse
 	    shift; break
 	;;
-	*) echo "Error: Unknown option: \"$1\""; exit -1
-	;;
       esac
   done
 
   eval set -- "$@" # move arg pointer so $1 points to next arg past last opt
+  (( $# == 0 )) && {
+        echo "Brick device parameter is required"; short_usage; exit -1; }
+  (( $# > 1 )) && {
+        echo "Too many parameters: $@"; short_usage; exit -1; }
 
   # the brick dev is the only required parameter
   BRICK_DEV="$1"
-  if [[ -z "$BRICK_DEV" ]] ; then
-    echo "Syntax error: \"brick-dev\" is required"
-    /bin/sleep 1
-    short_usage
-    exit -1
-  fi
 
   # --rhn-user and --rhn-pass, validate potentially supplied options
   if [[ -n "$RHN_USER" ]] ; then
