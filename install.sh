@@ -210,6 +210,7 @@ function parse_cmd(){
   local args=$(getopt -n "$SCRIPT" -o $OPTIONS --long $LONG_OPTS -- $@)
 
   eval set -- "$args" # set up $1... positional args
+
   while true ; do
       case "$1" in
 	-h|--help)
