@@ -59,7 +59,7 @@
 
   Red Hat Network Registering (RHN):
   install.sh will automatically register each node in the "hosts" file with the
-  Red Hat Network (RHN) when the --rhn-user and --rhn-pw options are used. RHN
+  Red Hat Network (RHN) when the --rhn-user and --rhn-pass options are used. RHN
   registration is required for the Ambari installation. If the --rhn-* options
   are not specified, it is assumed that the servers have been manually registered
   prior to running install.sh. If not, the installation will fail.
