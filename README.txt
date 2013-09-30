@@ -186,10 +186,10 @@ Ambari Installation Instructions:
     su mapred
 
     Submit a TeraGen Hadoop job test
-    bin/hadoop jar hadoop-examples-1.2.0.1.3.2.0-111.jar teragen 1000 in-dir
+    bin/hadoop jar hadoop-examples-1.2.0.1.3.2.0-112.jar teragen 1000 in-dir
 	
     Submit a TeraSort Hadoop job test
-    bin/hadoop jar hadoop-examples-1.2.0.1.3.2.0-111.jar terasort in-dir out-dir
+    bin/hadoop jar hadoop-examples-1.2.0.1.3.2.0-112.jar terasort in-dir out-dir
 
 
 == Addendum ==
