@@ -457,7 +457,7 @@ function cleanup(){
           if /bin/grep -qs $GLUSTER_MNT /proc/mounts ; then
             /bin/umount $GLUSTER_MNT
           fi")
-      display "$node: $out" $LOG_DEBUG
+      display "$node: umount: $out" $LOG_DEBUG
   done
 
   # 2) stop vol on a single node, if started
@@ -475,7 +475,7 @@ function cleanup(){
         gluster --mode=script volume delete $VOLNAME 2>&1
       fi
   ")
-  display "$out" $LOG_DEBUG
+  display "vol stop/delete: $out" $LOG_DEBUG
 
   # 4) detach nodes if trusted pool created, on all but first node
   # note: peer probe hostname cannot be self node
@@ -490,7 +490,7 @@ function cleanup(){
       out+="\n"
     done
   fi
-  display "$out" $LOG_DEBUG
+  display "peer detach: $out" $LOG_DEBUG
 
   # 5) rm vol_mnt on every node
   # 6) unmount brick_mnt on every node, if xfs mounted
@@ -511,7 +511,7 @@ function cleanup(){
       ")
       out+="\n"
   done
-  display "$out" $LOG_DEBUG
+  display "umount brick, rm brick/scratch: $out" $LOG_DEBUG
 }
 
 # verify_pool_create: there are timing windows when using ssh and the gluster
@@ -607,10 +607,10 @@ function create_trusted_pool(){
       out+=$(ssh root@$firstNode "gluster peer probe ${HOSTS[$i]} 2>&1")
       out+="\n"
   done
-  display "$out" $LOG_DEBUG
+  display "pool create: $out" $LOG_DEBUG
 
   out=$(ssh root@$firstNode 'gluster peer status 2>&1')
-  display "$out" $LOG_DEBUG
+  display "peer status: $out" $LOG_DEBUG
 }
 
 # setup:
@@ -692,14 +692,14 @@ function setup(){
   out=$(ssh root@$firstNode "
 	gluster volume create $VOLNAME replica $REPLICA_CNT $bricks 2>&1
   ")
-  display "$out" $LOG_DEBUG
+  display "vol create: $out" $LOG_DEBUG
   verify_vol_created
 
   # start vol
   out=$(ssh root@$firstNode "
 	gluster --mode=script volume start $VOLNAME 2>&1
   ")
-  display "$out" $LOG_DEBUG
+  display "vol start: $out" $LOG_DEBUG
   verify_vol_started
 
   # 9) mount vol on every node
@@ -791,7 +791,7 @@ function install_nodes(){
 	/bin/mkdir -p $REMOTE_INSTALL_DIR"
     display "-- Copying RHS-Ambari install files..." $LOG_INFO
     out=$(script -q -c "scp -r $DATA_DIR root@$ip:$REMOTE_INSTALL_DIR")
-    display "$out" $LOG_DEBUG
+    display "vol create & perms: $out" $LOG_DEBUG
 
     # prep_node.sh may apply the FUSE patch on storage node in which case the
     # node will need to be rebooted.
@@ -907,7 +907,7 @@ function perf_config(){
 	gluster volume set $VOLNAME cluster.eager-lock on 2>&1
 	gluster volume set $VOLNAME performance.stat-prefetch off 2>&1
   ")
-  display "$out" $LOG_DEBUG
+  display "perf config: $out" $LOG_DEBUG
 }
 
 # cleanup_logfile: the ambari-server yum install depends on Oracle JDK which
