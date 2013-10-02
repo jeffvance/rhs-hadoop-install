@@ -731,10 +731,10 @@ function setup(){
 	 /bin/mkdir -p $MAPRED_SYSTEM_DIR 2>&1
 
 	 # create mapred scratch dir and gluster mnt owner and group
-       	 if ! /bin/grep -qsi \"^$GROUP\" /etc/group ; then
+       	 if ! /bin/grep -qsi \"^$GROUP:\" /etc/group ; then
 	   groupadd $GROUP 2>&1 # note: no password, no explicit GID!
        	 fi
-       	 if ! /bin/grep -qsi \"^$OWNER\" /etc/passwd ; then
+       	 if ! /bin/grep -qsi \"^$OWNER:\" /etc/passwd ; then
            # user added with no password and no hard-coded UID
            useradd --system -g $GROUP $OWNER 2>&1
        	 fi
