@@ -723,6 +723,7 @@ function setup(){
   out=''
   for node in "${HOSTS[@]}"; do
       #can't mount via fstab in pre-RHS 2.1 releases...
+      out+="$node: "
       out+=$(ssh root@$node "
 	 ##/bin/mount $GLUSTER_MNT # from fstab (UNCOMMENT this for rhs 2.1)
 	 glusterfs --attribute-timeout=0 --entry-timeout=0 --volfile-id=/$VOLNAME --volfile-server=$node $GLUSTER_MNT 2>&1 # (DELETE this for rhs 2.1)
