@@ -110,14 +110,19 @@ function install_plugin(){
   out=$(/bin/cp -uf $jar $USR_JAVA_DIR 2>&1)
   err=$?
   display "plugin cp: $out" $LOG_DEBUG
-  if (( $err != 0 )) ; then
+  if (( err != 0 )) ; then
     display "ERROR: plugin copy error $err" $LOG_FORCE
     exit 5
   fi
 
   rm -f $HADOOP_JAVA_DIR/$jar
   out=$(ln -s $USR_JAVA_DIR/$jar $HADOOP_JAVA_DIR/$jar 2>&1)
-  display "plugin symlink: $out" $LOG_DEBUG
+  err=$?
+  display "plugin symlink $out" $LOG_DEBUG
+  if (( err != 0 )) ; then
+    display "ERROR: plugin symlink error $err" $LOG_FORCE
+    exit 7
+  fi
 
   display "   ... Gluster-Hadoop plug-in install successful" $LOG_SUMMARY
 }
@@ -126,16 +131,22 @@ function install_plugin(){
 #
 function copy_ambari_repo(){
  
-  local REPO='ambari.repo'; local REPO_DIR='/etc/yum.repos.d'; local out
+  local REPO='ambari.repo'; local REPO_DIR='/etc/yum.repos.d'
+  local out; local err
 
   if [[ ! -f $REPO ]] ; then
     display "ERROR: \"$REPO\" file missing" $LOG_FORCE
-    exit 7
+    exit 8
   fi
   [[ -d $REPO_DIR ]] || /bin/mkdir -p $REPO_DIR
 
   out=$(/bin/cp $REPO $REPO_DIR 2>&1)
+  err=$?
   display "ambari repo cp: $out" $LOG_DEBUG
+  if (( err != 0 )) ; then
+    display "ERROR: ambari repo copy $err" $LOG_FORCE
+    exit 12
+  fi
 }
 
 # install_epel: install the epel rpm. Note: epel package is not part of the
@@ -149,10 +160,10 @@ function install_epel(){
  
   out=$(yum -y install epel-release 2>&1)
   err=$?
-  display "epel install: $out" $LOG_DEBUG
+  display "install epel: $out" $LOG_DEBUG
   if (( err != 0 )) ; then
-    display "ERROR: epel install error $err" $LOG_FORCE
-    exit 8
+    display "ERROR: yum install epel-release error $err" $LOG_FORCE
+    exit 14
   fi
 }
 
@@ -172,10 +183,10 @@ function install_ambari_agent(){
   # extract ambari rpms
   out=$(/bin/tar -C $AMBARI_TMPDIR -xzf ambari-*.tar.gz 2>&1)
   err=$?
-  display "untar ambari rpm: $out" $LOG_DEBUG
-  if (( $err != 0 )) ; then
-    display "ERROR: untar ambari rpm error $err" $LOG_FORCE
-    exit 10
+  display "untar ambari RPMs: $out" $LOG_DEBUG
+  if (( err != 0 )) ; then
+    display "ERROR: untar ambari RPMs $err" $LOG_FORCE
+    exit 16
   fi
 
   pushd $AMBARI_TMPDIR > /dev/null
@@ -185,10 +196,9 @@ function install_ambari_agent(){
     display "   stopping ambari-agent" $LOG_INFO
     out=$(ambari-agent stop 2>&1)
     err=$?
-    display "agent stop: $out" $LOG_DEBUG
-    if (( $err != 0 )) ; then
-      display "ERROR: untar agent stop error $err" $LOG_FORCE
-      exit 12
+    display "ambari-agent stop: $out" $LOG_DEBUG
+    if (( err != 0 )) ; then
+      display "WARN: couldn't stop ambari agent" $LOG_FORCE
     fi
   fi
 
@@ -196,15 +206,16 @@ function install_ambari_agent(){
   agent_rpm=$(ls ambari-agent-*.rpm)
   if [[ -z "$agent_rpm" ]] ; then
     display "ERROR: Ambari agent RPM missing" $LOG_FORCE
-    exit 14
+    exit 18
   fi
   out=$(yum -y install $agent_rpm 2>&1)
   err=$?
-  display "agent install: $out" $LOG_DEBUG
-  if (( err != 0 )) ; then
-    display "ERROR: agent install error $err" $LOG_FORCE
-    exit 16
+  display "ambari-agent install: $out" $LOG_DEBUG
+  if (( err != 0 && err != 1 )) ; then # 1--> nothing-to-do
+    display "ERROR: ambari-agent install error $err" $LOG_FORCE
+    exit 20
   fi
+
   popd > /dev/null
 
   # modify the agent's .ini file's server hostname value
@@ -214,15 +225,15 @@ function install_ambari_agent(){
   # start the agent
   out=$(ambari-agent start 2>&1)
   err=$?
-  display "agent start: $out" $LOG_DEBUG
+  display "ambari-agent start: $out" $LOG_DEBUG
   if (( err != 0 )) ; then
-    display "ERROR: agent start error $err" $LOG_FORCE
-    exit 18
+    display "ERROR: ambari-agent start error $err" $LOG_FORCE
+    exit 22
   fi
 
   # start agent after reboot
   out=$(chkconfig ambari-agent on 2>&1)
-  display "agent chkconfig $out" $LOG_DEBUG
+  display "ambari-agent chkconfig on: $out" $LOG_DEBUG
 }
 
 # install_ambari_server: yum install the ambari server rpm, setup start the
@@ -237,10 +248,10 @@ function install_ambari_server(){
   # extract ambari rpms
   out=$(/bin/tar -C $AMBARI_TMPDIR -xzf ambari-*.tar.gz 2>&1)
   err=$?
-  display "untar server: $out" $LOG_DEBUG
-  if (( $err == 0 )) ; then
-    display "ERROR: untar server error $err" $LOG_FORCE
-    exit 20
+  display "untar ambari RPMs: $out" $LOG_DEBUG
+  if (( err != 0 )) ; then
+    display "ERROR: untar ambari RPMs error $err" $LOG_FORCE
+    exit 24
   fi
 
   pushd $AMBARI_TMPDIR > /dev/null
@@ -250,19 +261,23 @@ function install_ambari_server(){
     display "   stopping ambari-server" $LOG_INFO
     out=$(ambari-server stop 2>&1)
     err=$?
-    display "server stop: $out" $LOG_DEBUG
-    (( $err == 0 )) || display "WARN: server stop error $err" $LOG_FORCE
+    display "ambari-server stop: $out" $LOG_DEBUG
+    if (( err != 0 )) ; then
+      display "WARN: couldn't stop ambari server" $LOG_FORCE
+    fi
     out=$(ambari-server reset -s 2>&1)
     err=$?
-    display "server reset: $out" $LOG_DEBUG
-    (( $err == 0 )) || display "WARN: server reset error $err" $LOG_FORCE
+    display "ambari-server reset: $out" $LOG_DEBUG
+    if (( err != 0 )) ; then
+      display "WARN: couldn't reset ambari server" $LOG_FORCE
+    fi
   fi
 
   # install server rpm
   server_rpm=$(ls ambari-server-*.rpm)
   if [[ -z "$server_rpm" ]] ; then
     display "ERROR: Ambari server RPM missing" $LOG_FORCE
-    exit 22
+    exit 26
   fi
   # Note: the Oracle Java install takes a fair amount of time and yum does
   # thousands of progress updates. On a terminal this is fine but when output
@@ -270,10 +285,10 @@ function install_ambari_server(){
   # delete this one very long record in order to make the logfile more usable.
   out=$(yum -y install $server_rpm 2>&1)
   err=$?
-  display "server install: $out" $LOG_DEBUG
-  if (( err != 0 )) ; then
-    display "ERROR: server install error $err" $LOG_FORCE
-    exit 24
+  display "ambari-server install: $out" $LOG_DEBUG
+  if (( err != 0 && err != 1 )) ; then # 1--> nothing-to-do
+    display "ERROR: ambari server install error $err" $LOG_FORCE
+    exit 28
   fi
 
   popd > /dev/null
@@ -282,24 +297,24 @@ function install_ambari_server(){
   # note: -s accepts all defaults with no prompting
   out=$(ambari-server setup -s 2>&1)
   err=$?
-  display "server setup: $out" $LOG_DEBUG
-  if (( $err == 0 )) ; then
-    display "ERROR: server setup error $err" $LOG_FORCE
-    exit 26
+  display "ambari-server setup: $out" $LOG_DEBUG
+  if (( err != 0 )) ; then
+    display "ERROR: ambari server isetup error $err" $LOG_FORCE
+    exit 30
   fi
 
   # start the server
   out=$(ambari-server start 2>&1)
   err=$?
-  display "server start: $out" $LOG_DEBUG
-  if (( $err == 0 )) ; then
-    display "ERROR: server start error $err" $LOG_FORCE
-    exit 28
+  display "ambari-server start: $out" $LOG_DEBUG
+  if (( err != 0 )) ; then
+    display "ERROR: ambari-server start error $err" $LOG_FORCE
+    exit 32
   fi
 
   # start the server after a reboot
   out=$(chkconfig ambari-server on 2>&1)
-  display "server chkconfig: $out" $LOG_DEBUG
+  display "ambari-server chkconfig on: $out" $LOG_DEBUG
 }
 
 # verify_java: verify the version of Java on NODE. Fatal errors exit script.
@@ -344,10 +359,10 @@ function verify_ntp(){
     elif (( $err == 1 )) ; then
       display "   NTP is NOT synchronized..." $LOG_INFO
     else
-      display "   WARNING: NTP state is indeterminant..." $LOG_FORCE
+      display "   WARN: NTP state is indeterminant..." $LOG_FORCE
     fi
   else
-    display "   WARNING: NTP does not appear to be installed..." $LOG_FORCE
+    display "   WARN: NTP does not appear to be installed..." $LOG_FORCE
   fi
 }
 
@@ -365,7 +380,7 @@ function rhn_register(){
     err=$?
     display "rhn_register: $out" $LOG_DEBUG
     if (( err != 0 )) ; then
-      display "ERROR: RHN register error $err" $LOG_FORCE
+      display "ERROR: rhn_register error $err" $LOG_FORCE
       exit 38
     fi
   fi
@@ -386,38 +401,41 @@ function verify_fuse(){
 
   if [[ -f "$FUSE_INSTALLED" ]]; then # file exists, assume installed
     display "   ... verified" $LOG_DEBUG
-  else
-    display "-- Installing FUSE patch which may take more than a few seconds..." $LOG_INFO
-    echo
-    /bin/rm -rf fusetmp  # scratch dir
-    /bin/mkdir fusetmp
-    if (( $(ls $FUSE_TARBALL|wc -l) != 1 )) ; then
-      display "ERROR: missing or extra FUSE tarball" $LOG_FORCE
-      exit 40
-    fi
-
-    out=$(/bin/tar -C fusetmp/ -xzf $FUSE_TARBALL 2>&1)
-    display "untar fuse: $out" $LOG_DEBUG
-    if (( $? != 0 )) ; then
-      display "ERROR: untar fuse error $err" $LOG_FORCE
-      exit 42
-    fi
-
-    out=$(yum -y install fusetmp/*.rpm 2>&1)
-    err=$?
-    display "fuse install: $out" $LOG_DEBUG
-    if (( err != 0 )) ; then
-      display "ERROR: fuse install error $err" $LOG_FORCE
-      exit 44
-    fi
-
-    # create kludgy fuse-has-been-installed file
-    touch $FUSE_INSTALLED
-    display "   A reboot of $NODE is required and will be done automatically" \
-	$LOG_INFO
-    echo
-    REBOOT_REQUIRED=true
+    return
   fi
+
+  display "-- Installing FUSE patch which may take more than a few seconds..." \
+	$LOG_INFO
+  echo
+  /bin/rm -rf fusetmp  # scratch dir
+  /bin/mkdir fusetmp
+  if (( $(ls $FUSE_TARBALL|wc -l) != 1 )) ; then
+    display "ERROR: missing or extra FUSE tarball" $LOG_FORCE
+    exit 40
+  fi
+
+  out=$(/bin/tar -C fusetmp/ -xzf $FUSE_TARBALL 2>&1)
+  err=$?
+  display "untar fuse: $out" $LOG_DEBUG
+  if (( err != 0 )) ; then
+    display "ERROR: untar fuse error $err" $LOG_FORCE
+    exit 42
+  fi
+
+  out=$(yum -y install fusetmp/*.rpm 2>&1)
+  err=$?
+  display "fuse install: $out" $LOG_DEBUG
+  if (( err != 0 )) ; then
+    display "ERROR: fuse install error $err" $LOG_FORCE
+    exit 44
+  fi
+
+  # create kludgy fuse-has-been-installed file
+  touch $FUSE_INSTALLED
+  display "   A reboot of $NODE is required and will be done automatically" \
+	$LOG_INFO
+  echo
+  REBOOT_REQUIRED=true
 }
 
 # sudoers: create the /etc/sudoers.d/20_gluster file if not present, add the
@@ -432,7 +450,7 @@ function sudoers(){
   local mapred='mapred'; local yarn='yarn'
   local MAPRED_SUDOER="$mapred $SUDOER_ACC"
   local YARN_SUDOER="$yarn $SUDOER_ACC"
-  local out
+  local out; local err
 
   echo
   display "-- Prepping $SUDOER_PATH for user access exceptions..." $LOG_SUMMARY
@@ -452,7 +470,27 @@ function sudoers(){
   fi
 
   out=$(/bin/chmod $SUDOER_PERM $SUDOER_PATH 2>&1)
-  display "sudoers: $out" $LOG_DEBUG
+  err=$?
+  display "sudoer chmod: $out" $LOG_DEBUG
+  if (( err != 0 )) ; then
+    display "ERROR: sudoers chmod error $err" $LOG_FORCE
+    exit 47
+  fi
+}
+
+# apply_tuned: apply the tuned-adm peformance tuning for RHS.
+#
+function apply_tuned(){
+
+  local out; local err
+
+  out=$(tuned-adm profile rhs-high-throughput 2>&1)
+  err=$?
+  display "tuned-adm: $out" $LOG_DEBUG
+  if (( err != 0 )) ; then
+    display "ERROR: tuned-adm error $err" $LOG_FORCE
+    exit 50
+  fi
 }
 
 # install_common: perform node installation steps independent of whether or not
@@ -522,14 +560,14 @@ function install_storage(){
   echo
   display "-- Applying the rhs-high-throughput profile using tuned-adm" \
 	$LOG_SUMMARY
-  out=$(tuned-adm profile rhs-high-throughput 2>&1)
-  display "tuned $out" $LOG_DEBUG
+  apply_tuned
 }
 
 # install_mgmt: perform the installations steps needed when the node is the
 # ambari server.
 #
 function install_mgmt(){
+
   echo
   display "-- Installing Ambari server" $LOG_SUMMARY
 

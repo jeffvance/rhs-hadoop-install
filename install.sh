@@ -65,7 +65,7 @@
 
 # set global variables
 SCRIPT=$(/bin/basename $0)
-INSTALL_VER='0.24'   # self version
+INSTALL_VER='0.26'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/RHS-Ambari-install/" # on each node
@@ -512,7 +512,7 @@ function cleanup(){
       ")
       out+="\n"
   done
-  display "umount brick, rm brick/scratch: $out" $LOG_DEBUG
+  display "rm vol_mnt, umount brick, rm brick: $out" $LOG_DEBUG
 }
 
 # verify_pool_create: there are timing windows when using ssh and the gluster
@@ -608,7 +608,7 @@ function create_trusted_pool(){
       out+=$(ssh root@$firstNode "gluster peer probe ${HOSTS[$i]} 2>&1")
       out+="\n"
   done
-  display "pool create: $out" $LOG_DEBUG
+  display "peer probe: $out" $LOG_DEBUG
 
   out=$(ssh root@$firstNode 'gluster peer status 2>&1')
   display "peer status: $out" $LOG_DEBUG
@@ -677,7 +677,7 @@ function setup(){
       ")
       out+="\n"
   done
-  display "$out" $LOG_DEBUG
+  display "xfs, brick mnt: $out" $LOG_DEBUG
 
   # 6) create trusted pool from first node
   # 7) create vol on a single node
@@ -746,7 +746,7 @@ function setup(){
       ")
       out+="\n"
   done
-  display "$out" $LOG_DEBUG
+  display "vol mount and perms: $out" $LOG_DEBUG
 }
 
 # install_nodes: for each node in the hosts file copy the "data" sub-directory
@@ -792,7 +792,12 @@ function install_nodes(){
 	/bin/mkdir -p $REMOTE_INSTALL_DIR"
     display "-- Copying RHS-Ambari install files..." $LOG_INFO
     out=$(script -q -c "scp -r $DATA_DIR root@$ip:$REMOTE_INSTALL_DIR")
-    display "vol create & perms: $out" $LOG_DEBUG
+    err=$?
+    display "copy install files: $out" $LOG_DEBUG
+    if (( err != 0 )) ; then
+      display "ERROR: scp install files error $err" $LOG_FORCE
+      exit 17
+    fi
 
     # prep_node.sh may apply the FUSE patch on storage node in which case the
     # node will need to be rebooted.
@@ -901,14 +906,18 @@ function reboot_nodes(){
 #
 function perf_config(){
 
-  local out
+  local out; local err
 
   out=$(ssh root@$firstNode "
 	gluster volume set $VOLNAME quick-read off 2>&1
 	gluster volume set $VOLNAME cluster.eager-lock on 2>&1
 	gluster volume set $VOLNAME performance.stat-prefetch off 2>&1
   ")
-  display "perf config: $out" $LOG_DEBUG
+  err=$?
+  display "gluster perf: $out" $LOG_DEBUG
+  if (( err != 0 )) ; then
+    display "WARN: gluster performance config error $err" $LOG_FORCE
+  fi
 }
 
 # cleanup_logfile: the ambari-server yum install depends on Oracle JDK which
