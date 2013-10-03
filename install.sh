@@ -65,7 +65,7 @@
 
 # set global variables
 SCRIPT=$(/bin/basename $0)
-INSTALL_VER='0.26'   # self version
+INSTALL_VER='0.27'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/RHS-Ambari-install/" # on each node
@@ -458,7 +458,7 @@ function cleanup(){
           if /bin/grep -qs $GLUSTER_MNT /proc/mounts ; then
             /bin/umount $GLUSTER_MNT
           fi")
-      display "$node: umount: $out" $LOG_DEBUG
+      [[ -n "$out" ]] && display "$node: umount: $out" $LOG_DEBUG
   done
 
   # 2) stop vol on a single node, if started
@@ -636,7 +636,7 @@ function create_trusted_pool(){
 #
 function setup(){
 
-  local i=0; local node=''; local ip=''; local out
+  local i=0; local node=''; local ip=''; local out; local tmpout
   local PERMISSIONS='777' # for now until we learn how to reduce this...
   local OWNER='mapred'; local GROUP='hadoop'
   local BRICK_MNT_OPTS="noatime,inode64"
@@ -723,8 +723,7 @@ function setup(){
   out=''
   for node in "${HOSTS[@]}"; do
       #can't mount via fstab in pre-RHS 2.1 releases...
-      out+="$node: "
-      out+=$(ssh root@$node "
+      tmpout+=$(ssh root@$node "
 	 ##/bin/mount $GLUSTER_MNT # from fstab (UNCOMMENT this for rhs 2.1)
 	 glusterfs --attribute-timeout=0 --entry-timeout=0 --volfile-id=/$VOLNAME --volfile-server=$node $GLUSTER_MNT 2>&1 # (DELETE this for rhs 2.1)
 
@@ -745,9 +744,14 @@ function setup(){
 		    $MAPRED_SYSTEM_DIR 2>&1
 	 /bin/chmod g+s $GLUSTER_MNT 2>&1 # set s-bit so subdirs inherit group
       ")
+      if [[ -n "$tmpout" ]] ; then
+        out+="$node: "
+        out+="$tmpout"
+        out+="\n"
+      fi
       out+="\n"
   done
-  display "vol mount and perms: $out" $LOG_DEBUG
+  [[ -n "$out" ]] && display "$out" $LOG_DEBUG
 }
 
 # install_nodes: for each node in the hosts file copy the "data" sub-directory
