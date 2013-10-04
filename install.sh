@@ -112,12 +112,14 @@ Syntax:
 
 $SCRIPT [-v|--version] | [-h|--help]
 
-$SCRIPT [--brick-mnt <path>] [--vol-name <name>] [--vol-mnt <path>]
-           [--replica <num>]    [--hosts <path>]    [--mgmt-node <node>]
-           [--rhn-user <name>]  [--rhn-pass <value>]
-           [--logfile <path>]   [--verbose [num] ]
-           [-q|--quiet]         [--debug]           [--old-deploy]
+$SCRIPT [--brick-mnt <path>] [--vol-name <name>]  [--vol-mnt <path>]
+           [--replica <num>]    [--hosts <path>]     [--mgmt-node <node>]
+           [--rhn-user <name>]  [--rhn-pass <value>] [--logfile <path>]
+           [--verbose [num] ]   [-q|--quiet]         [--debug]
+           [-y]                 [-h|--help]          [--old-deploy*]
            brick-dev
+
+* not implemented
 
 EOF
 }
@@ -163,6 +165,8 @@ EOF
   --rhn-pass <value> : RHN password for rhn-user. Default is to not register
                        the storage nodes.
   --logfile   <path> : logfile name. Default is "/var/log/RHS-install.log".
+  -y                 : suppress prompts and auto-answer "yes". Default is to
+                       prompt the user.
   --verbose   [=num] : set the verbosity level to a value of 0, 1, 2, 3. If
                        --verbose is omitted the default value is 2(summary). If
                        --verbose is supplied with no value verbosity is set to
@@ -190,7 +194,7 @@ EOF
 #
 function parse_cmd(){
 
-  local OPTIONS='vhq'
+  local OPTIONS='vhqy'
   local LONG_OPTS='brick-mnt:,vol-name:,vol-mnt:,replica:,hosts:,mgmt-node:,rhn-user:,rhn-pass:,logfile:,verbose::,old-deploy,help,version,quiet,debug'
 
   # defaults (global variables)
@@ -206,6 +210,7 @@ function parse_cmd(){
   RHN_PASS=''
   LOGFILE='/var/log/RHS-install.log'
   VERBOSE=$LOG_SUMMARY
+  ANS_YES='n'
 
   # note: $? *not* set for invalid option errors!
   local args=$(getopt -n "$SCRIPT" -o $OPTIONS --long $LONG_OPTS -- $@)
@@ -251,6 +256,9 @@ function parse_cmd(){
 	    VERBOSE=$2 # may be "" if not supplied
             [[ -z "$VERBOSE" ]] && VERBOSE=$LOG_INFO # default
 	    shift 2; continue
+	;;
+	-y)
+	    ANS_YES='y'; shift; continue
 	;;
 	-q|--quiet)
 	    VERBOSE=$LOG_QUIET; shift; continue
@@ -429,11 +437,12 @@ function report_deploy_values(){
   display "  Log file:           $LOGFILE"          $LOG_REPORT
   display    "_______________________________________" $LOG_REPORT
 
-  (( VERBOSE < LOG_QUIET )) && read -p "Continue? [y|N] " ans
+  [[ $VERBOSE < $LOG_QUIET && "$ANS_YES" == 'n' ]] && {
+	read -p "Continue? [y|N] " ans; }
   case $ans in
-    y|yes|Y|YES|Yes ) # ok, do nothing
+    y|yes|Y|YES|Yes) # ok, do nothing
     ;;
-    * ) exit 0
+    *) exit 0
   esac
 }
 
@@ -943,16 +952,20 @@ function cleanup_logfile(){
 # reboot_self: invoked when the install-from node (self) is also one of the
 # storage nodes. In this case the reboot of the storage node (needed to 
 # complete the FUSE patch installation) has been deferred -- until now.
-# The user is prompted to confirm the reboot of their node.
+# The user may be prompted to confirm the reboot of their node.
 #
 function reboot_self(){
 
-  local ans=''
+  local ans='y'
 
   echo "*** Your system ($(hostname -s)) needs to be rebooted to complete the"
   echo "    installation of the FUSE patch."
-  read -p "    Reboot now? [y|N] " ans
-  [[ "$ans" == 'Y' || "$ans" == 'y' ]] && reboot # bye!
+  [[ "$ANS_YES" == 'n' ]] && read -p "    Reboot now? [y|N] " ans
+  case $ans in
+    y|yes|Y|YES|Yes) reboot
+    ;;
+    *) exit 0
+  esac
   echo "No reboot! You must reboot your system prior to running Hadoop jobs."
 }
 
