@@ -23,11 +23,12 @@
 #  - README.txt: readme file to be read first
 #  - hosts.example: sample "hosts" config file
 #  - data/: directory containing:
-#    - prep_node.sh: companion script, not to be executed directly
-#    - gluster-hadoop-<version>.jar: Gluster-Hadoop plug-in
-#    - fuse-patch.tar.gz: FUSE patch RPMs
 #    - ambari.repo: repo file needed to install ambari
 #    - ambari-<version>.rpms.tar.gz: Ambari server and agent RPMs
+#    - fuse-patch.tar.gz: FUSE patch RPMs
+#    - gluster-hadoop-<version>.jar: Gluster-Hadoop plug-in
+#    - ktune.sh: optimized RHEL 2.0.5 tuned-adm high-throughput script
+#    - prep_node.sh: companion script, not to be executed directly
 #
 # install.sh is the main script and should be run as the root user. It installs
 # the files in the data/ directory to each node contained in the "hosts" file.
@@ -65,7 +66,7 @@
 
 # set global variables
 SCRIPT=$(/bin/basename $0)
-INSTALL_VER='0.27'   # self version
+INSTALL_VER='0.28'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/RHS-Ambari-install/" # on each node

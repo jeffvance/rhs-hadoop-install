@@ -8,11 +8,12 @@
 #  - hosts.example
 #  - Ambari_Configuration_Guide.pdf (not .odt version)
 #  - data/: directory containing:
-#    - prep_node.sh
-#    - gluster-hadoop-<version>.jar
-#    - fuse-patch.tar.gz
 #    - ambari.repo
 #    - ambari-<version>.rpms.tar.gz
+#    - fuse-patch.tar.gz
+#    - gluster-hadoop-<version>.jar
+#    - ktune.sh: optimized RHEL 2.0.5 tuned-adm high-throughput script
+#    - prep_node.sh
 #
 # The Ambari_Configuration_Guide.pdf file is exported from the git
 # Ambari_Installation_Guide.odt file prior to creating the tarball.
@@ -142,7 +143,7 @@ function create_tarball(){
   local TARBALL="$TARBALL_PREFIX.tar.gz"
   local TARBALL_DIR="$TARBALL_PREFIX" # scratch dir not TARGET dir
   local TARBALL_PATH="$TARBALL_DIR/$TARBALL"
-  local FILES_TO_TAR=(install.sh README.txt hosts.example '*.pdf' data/)
+  local FILES_TO_TAR=(*.sh README.* hosts.example '*.pdf' data/)
   local f
 
   echo -e "\n  - Creating $TARBALL tarball in $TARGET"

@@ -299,7 +299,7 @@ function install_ambari_server(){
   err=$?
   display "ambari-server setup: $out" $LOG_DEBUG
   if (( err != 0 )) ; then
-    display "ERROR: ambari server isetup error $err" $LOG_FORCE
+    display "ERROR: ambari server setup error $err" $LOG_FORCE
     exit 30
   fi
 
@@ -425,7 +425,7 @@ function verify_fuse(){
   out=$(yum -y install fusetmp/*.rpm 2>&1)
   err=$?
   display "fuse install: $out" $LOG_DEBUG
-  if (( err != 0 )) ; then
+  if (( err != 0 && err != 1 )) ; then # 1--> nothing to do
     display "ERROR: fuse install error $err" $LOG_FORCE
     exit 44
   fi
@@ -474,7 +474,7 @@ function sudoers(){
   display "sudoer chmod: $out" $LOG_DEBUG
   if (( err != 0 )) ; then
     display "ERROR: sudoers chmod error $err" $LOG_FORCE
-    exit 47
+    exit 46
   fi
 }
 
@@ -483,8 +483,26 @@ function sudoers(){
 function apply_tuned(){
 
   local out; local err
+  local TUNE_PROFILE='rhs-high-throughput'
+  local TUNE_DIR="/etc/tune-profiles/$TUNE_PROFILE"
+  local TUNE_FILE='ktune.sh'
+  local TUNE_PATH="$TUNE_DIR/$TUNE_FILE"
+  local TUNE_PATH_BAK="$TUNE_PATH.orig"
+  local TUNE_PERMS=755 # rwxr-xr-x
 
-  out=$(tuned-adm profile rhs-high-throughput 2>&1)
+  # replace ktune.sh
+  [[ -f $TUNE_PATH_BAK ]] || mv $TUNE_PATH $TUNE_PATH_BAK
+  out=$(/bin/cp -f $TUNE_FILE $TUNE_PATH)
+  err=$?
+  display "$TUNE_FILE cp: $out" $LOG_DEBUG
+  if [[ ! -f $TUNE_PATH ]] ; then
+    display "ERROR: cp of $TUNE_FILE to $TUNE_DIR error $err" $LOG_FORCE
+    exit 48 
+  fi
+  /bin/chmod $TUNE_PERMS $TUNE_PATH
+
+  # run profile
+  out=$(tuned-adm profile $TUNE_PROFILE 2>&1)
   err=$?
   display "tuned-adm: $out" $LOG_DEBUG
   if (( err != 0 )) ; then
@@ -541,6 +559,7 @@ function install_storage(){
   IP=${HOST_IPS[$i]}
 
   # report Gluster version 
+  echo
   display "-- Gluster version: $(gluster --version | head -n 1)" $LOG_SUMMARY
 
   # install Gluster-Hadoop plug-in on agent nodes
