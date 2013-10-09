@@ -66,7 +66,7 @@
 
 # set global variables
 SCRIPT=$(/bin/basename $0)
-INSTALL_VER='0.28'   # self version
+INSTALL_VER='0.29'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/RHS-Ambari-install/" # on each node
@@ -276,13 +276,18 @@ function parse_cmd(){
   done
 
   eval set -- "$@" # move arg pointer so $1 points to next arg past last opt
+
+  # validate one and only 1 arg (brick dev)
   (( $# == 0 )) && {
         echo "Brick device parameter is required"; short_usage; exit -1; }
   (( $# > 1 )) && {
         echo "Too many parameters: $@"; short_usage; exit -1; }
-
   # the brick dev is the only required parameter
   BRICK_DEV="$1"
+
+  # validate replica cnt for RHS
+  (( REPLICA_CNT != 2 )) && {
+	echo "replica = 2 is the only supported value"; exit -1; } 
 
   # --rhn-user and --rhn-pass, validate potentially supplied options
   if [[ -n "$RHN_USER" ]] ; then
@@ -414,7 +419,21 @@ function verify_local_deploy_setup(){
 function report_deploy_values(){
 
   local ans='y'
+  local RHEL_RELEASE='/etc/redhat-release'
+  local RHS_RELEASE='/etc/redhat-storage-release'
+  local OS; local RHS;
 
+  # assume 1st node is representative
+  OS="$(ssh root@$firstNode cat $RHEL_RELEASE)"
+  if [[ -f $RHS_RELEASE ]] ; then
+    RHS="$(ssh root@$firstNode cat $RHS_RELEASE)"
+  else
+    RHS='2.0.x'
+  fi
+
+  display
+  display "OS:                   $OS" $LOG_REPORT
+  display "RHS:                  $RHS" $LOG_REPORT
   display
   display "__________ Deployment Values __________" $LOG_REPORT
   display "  Install-from dir:   $INSTALL_DIR"      $LOG_REPORT
@@ -432,7 +451,6 @@ function report_deploy_values(){
   display "  XFS brick dir:      $BRICK_DIR"        $LOG_REPORT
   display "  XFS brick mount:    $BRICK_MNT"        $LOG_REPORT
   display "  M/R scratch dir:    $MAPRED_SCRATCH_DIR"  $LOG_REPORT
-  display "  New install:        $NEW_DEPLOY"       $LOG_REPORT
   display "  Verbose:            $VERBOSE"          $LOG_REPORT
   display "  Log file:           $LOGFILE"          $LOG_REPORT
   display    "_______________________________________" $LOG_REPORT
