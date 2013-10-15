@@ -8,8 +8,8 @@
 BUILD_LOCATION=/var/lib/jenkins/workspace/Ambari
 REPO=/root/archivainstall/apache-archiva-1.3.6/data/repositories/internal
 SOURCE=$(pwd) #expected to be a git directory
-S3='s3://rhbd/rhs-ambari-install'
-TARBALL_PREFIX='rhs-ambari-install-'
+S3='s3://rhbd/rhs-hadoop-install'
+TARBALL_PREFIX='rhs-hadoop-install-'
 TARBALL_SUFFIX='.tar.gz'
 
 ####### BUILD THE TAR/GZ FILE ~ THIS SHOULD RUN IN JENKINS (future) ####### 
@@ -48,7 +48,7 @@ fi
 #First deploy into s3: This is the preferred (but new) place where we store binaries:
 
 # Now, we deploy into archiva.
-#TARBALL=$(ls -Rt $BUILD_LOCATION/rhs-ambari-*.tar.gz | head -1 | cut -f 9 -d' ')
+#TARBALL=$(ls -Rt $BUILD_LOCATION/rhs-hadoop-*.tar.gz | head -1 | cut -f 9 -d' ')
 #TARBALL=$(basename $TARBALL) #<-- doesnt work out of the box on some linux
 
 echo
@@ -69,11 +69,11 @@ exit
 #-Dfile=$BUILD_LOCATION/$TARBALL \
 #-Durl=file:$REPO \
 #-DgroupId=rhbd \
-#-DartifactId=rhs-ambari-install \
+#-DartifactId=rhs-hadoop-install \
 #-Dversion=$TAGNAME 
 
 #The artifact has been created here: (after stripping tar.gz extension)
-#BASEARTIFACT=$REPO/rhbd/rhs-ambari-install/$TAGNAME/${TARBALL//.tar.gz/}
+#BASEARTIFACT=$REPO/rhbd/rhs-hadoop-install/$TAGNAME/${TARBALL//.tar.gz/}
 #BASEARTIFACT=${BASEARTIFACT//_/.} # change version "_" back to "."
 
 #But since maven doesnt support the tar.gz, we must move it to be a tar.gz file
@@ -82,5 +82,5 @@ exit
 #sudo ls -altrh $BASEARTIFACT
 ########################################
 
-#echo "Done ! The file will now be in archiva at http://23.23.239.119/archiva/repository/internal/rhbd/rhs-ambari-install/"
+#echo "Done ! The file will now be in archiva at http://23.23.239.119/archiva/repository/internal/rhbd/rhs-hadoop-install/"
 
