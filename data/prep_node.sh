@@ -16,6 +16,8 @@
 #    in arguments.
 #  - installs the FUSE patch if it has not already been installed.
 #
+# Please read the README.txt file.
+#
 # Arguments (all positional):
 #   $1=self hostname*, $2=install storage flag*, $3=install mgmt server flag*,
 #   $4=HOSTS(array)*, $5=HOST IP-addrs(array)*, $6=management server hostname*,
@@ -35,7 +37,7 @@ HOST_IPS=($5)
 MGMT_NODE="$6" # note: this node can be inside or outside the storage cluster
 VERBOSE=$7
 PREP_LOG=$8
-DEPLOY_DIR=${9:-/tmp/RHS-Ambari-install/data/}
+DEPLOY_DIR=${9:-/tmp/rhs-hadoop-install/data/}
 RHN_USER=${10:-}
 RHN_PASS=${11:-}
 #echo -e "*** $(basename $0)\n 1=$NODE, 2=$STORAGE_INSTALL, 3=$MGMT_INSTALL, 4=${HOSTS[@]}, 5=${HOST_IPS[@]}, 6=$MGMT_NODE, 7=$VERBOSE, 8=$PREP_LOG, 9=$DEPLOY_DIR, 10=$RHN_USER, 11=$RHN_PASS"

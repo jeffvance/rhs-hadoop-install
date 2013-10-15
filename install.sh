@@ -5,53 +5,8 @@
 # Author: Jeff Vance <jvance@redhat.com>
 #
 # This script (and the companion prep_node.sh script) helps to set up Gluster
-# (RHS) for Hadoop workloads. It is expected that the Red Hat Storage 
-# installation guide was followed to setup up RHS. The storage (brick) 
-# partition should be configured as RAID 6. This script does not enforce any
-# aspects of the RHS installation procedures.
-#
-# A tarball named "rhs-ambari-<version>.tar.gz" is downloaded to one of the
-# cluster nodes (more common) or to the user's localhost (less common). The
-# download location is arbitrary, though installing from the same node as will
-# become the management node will reduce password-less ssh set up. Password-
-# less ssh is needed from the node hosting the rhs install tarball to all nodes
-# in the cluster. Password-less ssh is not necessary to and from all nodes
-# within the cluster.
-#
-# The rhs tarball contains the following:
-#  - install.sh: this script, executed by the root user
-#  - README.txt: readme file to be read first
-#  - hosts.example: sample "hosts" config file
-#  - data/: directory containing:
-#    - ambari.repo: repo file needed to install ambari
-#    - ambari-<version>.rpms.tar.gz: Ambari server and agent RPMs
-#    - fuse-patch.tar.gz: FUSE patch RPMs
-#    - gluster-hadoop-<version>.jar: Gluster-Hadoop plug-in
-#    - ktune.sh: optimized RHEL 2.0.5 tuned-adm high-throughput script
-#    - prep_node.sh: companion script, not to be executed directly
-#
-# install.sh is the main script and should be run as the root user. It installs
-# the files in the data/ directory to each node contained in the "hosts" file.
-#
-# The "hosts" file must be created by the user. It is not part of the tarball
-# but an example hosts file is provided. The "hosts" file is expected to be
-# created in the same location where the tarball has been downloaded. If a
-# different location is required the --hosts option can be used to specify the
-# "hosts" file path. The "hosts" file contains a list of IP address and
-# hostname pairs, one pair per line. Each line represents one node in the
-# storage cluster (gluster trusted pool). Example:
-#    ip-for-node-1 node-1
-#    ip-for-node-3 node-3
-#    ip-for-node-2 node-2
-#    ip-for-node-4 node-4
-#
-# IMPORTANT: the node order in the hosts file is critical. Assuming the gluster
-#   volume is created with replica 2 (which is the only config tested for RHS)
-#   then each pair of lines in hosts represents replica pairs. For example, the
-#   first 2 lines in hosts are replica pairs, as are the next two lines, etc.
-# IMPORTANT: unless the --mgmt-node option is specified, the first host in the
-#   hosts file is assumed to be the Ambari server node (and it is also a
-#   storage node).
+# (RHS) for Hadoop workloads. Please read the README.txt file. This script does
+# not verify/enforce any aspects of the RHS installation procedures.
 #
 # Assumptions:
 #  - passwordless SSH is setup between the installation node and each storage
@@ -69,8 +24,8 @@ SCRIPT=$(basename $0)
 INSTALL_VER='0.30'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
-REMOTE_INSTALL_DIR="/tmp/RHS-Ambari-install/" # on each node
-DATA_DIR='data/'     # subdir in rhs-ambari install dir
+REMOTE_INSTALL_DIR="/tmp/rhs-hadoop-install/" # on each node
+DATA_DIR='data/'     # subdir in rhs-hadoop install dir
 # companion install script name
 PREP_SH="$REMOTE_INSTALL_DIR${DATA_DIR}prep_node.sh" # full path
 NUMNODES=0           # number of nodes in hosts file (= trusted pool size)
@@ -164,7 +119,7 @@ EOF
                        the storage nodes.
   --rhn-pass <value> : RHN password for rhn-user. Default is to not register
                        the storage nodes.
-  --logfile   <path> : logfile name. Default is "/var/log/RHS-install.log".
+  --logfile   <path> : logfile name. Default is /var/log/rhs-hadoo-install.log.
   -y                 : suppress prompts and auto-answer "yes". Default is to
                        prompt the user.
   --verbose   [=num] : set the verbosity level to a value of 0, 1, 2, 3. If
@@ -208,7 +163,7 @@ function parse_cmd(){
   MGMT_NODE=''
   RHN_USER=''
   RHN_PASS=''
-  LOGFILE='/var/log/RHS-install.log'
+  LOGFILE='/var/log/rhs-hadoop-install.log'
   VERBOSE=$LOG_SUMMARY
   ANS_YES='n'
 
@@ -858,7 +813,7 @@ function install_nodes(){
     ssh root@$ip "
 	rm -rf $REMOTE_INSTALL_DIR
 	mkdir -p $REMOTE_INSTALL_DIR"
-    display "-- Copying RHS-Ambari install files..." $LOG_INFO
+    display "-- Copying rhs-hadoop install files..." $LOG_INFO
     out=$(script -q -c "scp -r $DATA_DIR root@$ip:$REMOTE_INSTALL_DIR")
     err=$?
     display "copy install files: $out" $LOG_DEBUG

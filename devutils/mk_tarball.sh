@@ -2,7 +2,7 @@
 #
 # This script creates the install tarball package. Currently this includes the
 # following files:
-#  * rhs-ambari-install-<verison> directory whicn contains:
+#  * rhs-hadoop-install-<verison> directory whicn contains:
 #  - install.sh
 #  - README.txt
 #  - hosts.example
@@ -30,23 +30,26 @@
 #
 function usage(){
 
-  echo -e "\nThis script converts the install guide .odt document file to pdf (if the"
-  echo "doc file is present) and creates the RHS-Ambari install tarball package. There"
-  echo "are no required parameters."
-  echo
-  echo "SYNTAX:"
-  echo
-  echo "  --source     : the directory containing the source files used to create the"
-  echo "                 tarball (including the .odt doc file). It is expected that a"
-  echo "                 git clone or git pull has been done into the SOURCE directory."
-  echo "                 Default is the current working directory."
-  echo "  --target-dir : the produced tarball will reside in this directory. Default is"
-  echo "                 the SOURCE directory."
-  echo "  --odt-doc    : the name of the  install guide .odt doc file. Default is"
-  echo "                 \"Ambari_Configuration_Guide\""
-  echo "  --pkg-version: the version string to be used as part of the tarball filename."
-  echo "                 Default is the most recent git version in the SOURCE dir."
-  echo
+  cat <<EOF
+
+  This script converts the install guide .odt document file to pdf (if the
+  doc file is present) and creates the rhs-hadoop-install tarball package.
+  There are no required parameters.
+  
+  SYNTAX:
+  
+  --source     : the directory containing the source files used to create the
+                 tarball (including the .odt doc file). It is expected that a
+                 git clone or git pull has been done into the SOURCE directory.
+                 Default is the current working directory.
+  --target-dir : the produced tarball will reside in this directory. Default is
+                 the SOURCE directory.
+  --odt-doc    : the name of the  install guide .odt doc file. Default is"
+                 "Ambari_Configuration_Guide"
+  --pkg-version: the version string to be used as part of the tarball filename.
+                 Default is the most recent git version in the SOURCE dir.
+ 
+EOF
 }
 
 # parse_cmd: getopt used to do general parsing. See usage function for syntax.
@@ -137,9 +140,9 @@ function convert_odt_2_pdf(){
 #
 function create_tarball(){
 
-  # tarball contains the rhs-ambari-install-<version> dir, thus we have to copy
+  # tarball contains the rhs-hadoop-install-<version> dir, thus we have to copy
   # target files under this dir, create the tarball and then rm the dir
-  local TARBALL_PREFIX="rhs-ambari-install-$PKG_VERSION"
+  local TARBALL_PREFIX="rhs-hadoop-install-$PKG_VERSION"
   local TARBALL="$TARBALL_PREFIX.tar.gz"
   local TARBALL_DIR="$TARBALL_PREFIX" # scratch dir not TARGET dir
   local TARBALL_PATH="$TARBALL_DIR/$TARBALL"

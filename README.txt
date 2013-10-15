@@ -1,13 +1,19 @@
-		RHS-Ambari Installation Script 
+		RHS-Hadoop Installation Script 
 
 == Overview ==
 
   The install.sh script (and the companion data/prep_node.sh script) sets up
-  Red Hat Storage (RHS) for Hadoop workloads. It is expected that the Red Hat
-  Storage installation guide was followed to set up RHS. The storage (brick)
-  partition (sometimes /dev/sdb) should be configured as RAID 6.
+  Red Hat Storage (RHS) for Hadoop workloads. Ambari is used to install the
+  Hortonworks HDP Hadoop distro and the management/install tool. It is expected
+  that the Red Hat Storage installation guide was followed to set up RHS. The
+  storage (brick) partition (e.g. /dev/sdb) should be configured as RAID 6.
+
+  Ambari is an Apache project targetting Hadoop management, monotoring and
+  installation. After install.sh readies the RHS environment for Hadoop, the
+  final installation steps will be performed, manually, via the Ambari install
+  wizard.
  
-  A tarball named "rhs-ambari-install-<version>.tar.gz" is downloaded to one of
+  A tarball named "rhs-hadoop-install-<version>.tar.gz" is downloaded to one of
   the cluster nodes or to the user's localhost. The download directory is
   arbitrary. install.sh requires password-less ssh from the node hosting the
   rhs install tarball (the "install-from" node) to all nodes in the cluster. In
@@ -20,7 +26,7 @@
   node if the default is not suitable. The default Ambari server (management)
   node is the first host defined in the local "hosts" file, described below.
  
-  The RHS tarball contains the following:
+  The rhs-hadoop-install tarball contains the following:
    - hosts.example: sample "hosts" config file.
    - install.sh: the main install script, executed by the root user.
    - README.txt: this file.
@@ -82,13 +88,13 @@
 == Installation ==
 
 Instructions:
- 0) upload rhs-ambari-install-<version> tarball to the deployment directory on
+ 0) upload rhs-hadoop-install-<version> tarball to the deployment directory on
     the "install-from" node. It is usually convenient if the "install-from"
     node is also the Ambari server (management) node, but this is not required
  1) extract tarball to the local directory:
-    $ tar xvzf rhs-ambari-install-<version>.tar.gz
- 2) cd to the extracted rhs-ambari-install directory:
-    $ cd rhs-ambari-install-<version>
+    $ tar xvzf rhs-hadoop-install-<version>.tar.gz
+ 2) cd to the extracted rhs-hadoop-install directory:
+    $ cd rhs-hadoop-install-<version>
  3) execute "install.sh" from the install directory:
     $ ./install.sh [options (see --help)] <brick-dev> (note: brick_dev is 
                                                        required)
@@ -124,7 +130,7 @@ Ambari Installation Instructions:
  
     Note: If you wish to see a visual guide which includes screenshots for this 
     process, please refer to the Ambari_Configuration_Guide.pdf that was
-    packaged with the rhs-ambari-install-<version> tar ball.
+    packaged with the rhs-hadoop-install-<version> tar ball.
 
     Open a web browser and point the URL to the ambari-server hostname in the 
     following format
