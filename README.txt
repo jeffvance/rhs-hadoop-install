@@ -5,24 +5,25 @@
   The install.sh script (and the companion data/prep_node.sh script) sets up
   Red Hat Storage (RHS) for Hadoop workloads. It is expected that the Red Hat
   Storage installation guide was followed to set up RHS. The storage (brick)
-  partition(usually /dev/sdb) should be configured as RAID 6.
+  partition (sometimes /dev/sdb) should be configured as RAID 6.
  
   A tarball named "rhs-ambari-install-<version>.tar.gz" is downloaded to one of
   the cluster nodes or to the user's localhost. The download directory is
   arbitrary. install.sh requires password-less ssh from the node hosting the
   rhs install tarball (the "install-from" node) to all nodes in the cluster. In
-  addition, Ambari requires password-less ssh from the Ambari server
-  "management node" to all storage/agent nodes in the cluster. To simplify
+  addition, Ambari requires password-less ssh from the Ambari server-
+  "management node" to all storage-agent nodes in the cluster. To simplify
   password-less ssh set up, the install-from node can be the same as the Ambari
-  management node. The --mgmt-node option is available to specify the Ambari
-  management node if the default is not suitable. The default Ambari server
-  (management) node is the first host defined in the local "hosts" file,
-  described below.
+  management node. There is also a utility script, devutils/passwordless-ssh.sh,
+  to set up password-less SSH based on the nodes listed in the "hosts" file. 
+  Also, the --mgmt-node option is available to specify the Ambari management 
+  node if the default is not suitable. The default Ambari server (management)
+  node is the first host defined in the local "hosts" file, described below.
  
   The RHS tarball contains the following:
+   - hosts.example: sample "hosts" config file.
    - install.sh: the main install script, executed by the root user.
    - README.txt: this file.
-   - hosts.example: sample "hosts" config file.
    - data/: directory containing:
      - ambari-<version>.rpms.tar.gz: Ambari server and agent RPMs.
      - ambari.repo: Ambari's repo file.
@@ -36,13 +37,14 @@
  
 == Before you begin ==
 
-  The "hosts" file must be created by the user. It is not part of the tarball
-  but an example hosts file is provided. The "hosts" file is expected to be
-  created in the same directory where the tarball has been downloaded. If a
-  different location is required the "--hosts" option can be used to specify
-  the "hosts" file path. The "hosts" file contains a list of IP adress followed
-  by hostname (same format as /etc/hosts), one pair per line. Each line
-  represents one node in the storage cluster (gluster trusted pool). Example:
+  The "hosts" file must be created by the user doing the install. It is not
+  part of the tarball, but an example hosts file is provided. The "hosts" file
+  is expected to be created in the same directory where the tarball has been 
+  downloaded. If a different location is required the "--hosts" option can be 
+  used to specify the "hosts" file path. The "hosts" file contains a list of IP
+  adress followed by hostname (same format as /etc/hosts), one pair per line.
+  Each line represents one node in the storage cluster (gluster trusted pool).
+  Example:
      ip-for-node-1 hostname-for-node-1
      ip-for-node-3 hostname-for-node-3
      ip-for-node-2 hostname-for-node-2
@@ -50,9 +52,9 @@
  
   IMPORTANT: the node order in the hosts file is critical for two reasons:
   1) Assuming the RHS volume is created with replica 2 (which is the only
-     configuration supported for RHS) then each pair of lines in hosts
-     represents replica pairs. For example, the first 2 lines in hosts are
-     replica pairs, as are the next two lines, etc.
+     value supported for RHS) then each pair of lines in hosts represents
+     replica pairs. For example, the first 2 lines in hosts are replica pairs,
+     as are the next two lines, etc.
   2) If the --mgmt-node option is not specified then the default Ambari server
      "management" node is the *first* hostname listed in the "hosts" file. In
      this case the first node in the hosts file is both a storge node and the
@@ -62,18 +64,19 @@
   install.sh will automatically register each node in the "hosts" file with the
   Red Hat Network (RHN) when the --rhn-user and --rhn-pass options are used. RHN
   registration is required for the Ambari installation. If the --rhn-* options
-  are not specified, it is assumed that the servers have been manually registered
-  prior to running install.sh. If not, the installation will fail.
+  are not specified, it is assumed that the servers have been manually
+  registered prior to running install.sh. If not, the installation will fail.
 
   Also:
   - passwordless SSH is required between the installation node and each storage
     node. See the Addendum at the end of this document if you would like to see 
     instructions on how to do this.
   - the correct version of RHS has been installed on each node per RHS
-    guidelines. Essentially, the RHS 2.0.5 ISO just needs to be installed with the  
-    hostname configured with a static IP address. Do not create a gluster volume.
-  - a RAID 6 data partition has been created for use as the storage brick within 
-    gluster. This is usually created as /dev/sdb
+    guidelines. Essentially, the RHS 2.0.5 ISO just needs to be installed with
+    the  hostname configured with a static IP address. Do not create a gluster
+    volume.
+  - a RAID 6 data partition has been created for use as the storage brick
+    within gluster. This is usually created as /dev/sdb
   - the order of the nodes in the "hosts" file is in replica order
 
 == Installation ==
@@ -165,18 +168,22 @@ Ambari Installation Instructions:
     Step 7: Assign Slaves and Clients: Chose which components you want on each 
     hosts. Select the check box to put the HCFS client on all the nodes.
 
-    Step 8: Customize Services: For the HCFS tab you can accept the defaults. 
-    If you have chosen to install Nagios you will need to enter a password and 
-    email for alerts.  Under the MapReduce tab, remove the current values for 
-    mapred.local.dir and set it to /mnt/brick1/mapredlocal.  Select Next to continue.
+    Step 8: Customize Services: For the HCFS tab you can accept the defaults.
+    If you have chosen to install Nagios you will need to enter a password and
+    email for alerts.  Under the MapReduce tab, remove the current values for
+    "MapReduce local directories" and set it to /mnt/brick1/mapredlocal.
+     Select Next to continue.
 
-    Step 9: Review: Make sure the services are what you selected in the previous 
-    steps. Select Deploy to continue.  Hadoop is successfully deployed and configured 
-   once the process completes!
+    Step 9: Review: Make sure the services are what you selected in the
+    previous steps. Select Deploy to continue. Hadoop is successfully deployed
+    and configured once the process completes!
 
-    Step 10: Set the permissions in RHS for the mapped user
-             Change directory to the /mnt/glusters: cd /mnt/glusterfs
-             Set the permissions: chown -R mapred:hadoop user/
+    Step 10: Change directory to the /mnt/glusterfs:
+         # cd /mnt/glusterfs
+
+         Set the permissions:
+         # chown -R mapred:hadoop user/
+
 
  3) Validate the Installation
 

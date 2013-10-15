@@ -65,8 +65,8 @@
 # See the usage() function for arguments and their definitions.
 
 # set global variables
-SCRIPT=$(/bin/basename $0)
-INSTALL_VER='0.29'   # self version
+SCRIPT=$(basename $0)
+INSTALL_VER='0.30'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/RHS-Ambari-install/" # on each node
@@ -276,12 +276,11 @@ function parse_cmd(){
   done
 
   eval set -- "$@" # move arg pointer so $1 points to next arg past last opt
-
-  # validate one and only 1 arg (brick dev)
   (( $# == 0 )) && {
         echo "Brick device parameter is required"; short_usage; exit -1; }
   (( $# > 1 )) && {
         echo "Too many parameters: $@"; short_usage; exit -1; }
+
   # the brick dev is the only required parameter
   BRICK_DEV="$1"
 
@@ -293,7 +292,7 @@ function parse_cmd(){
   if [[ -n "$RHN_USER" ]] ; then
     if [[ -z "$RHN_PASS" ]] ; then 
       echo "Syntax error: rhn password required when rhn user specified"
-      /bin/sleep 1
+      sleep 1
       short_usage
       exit -1
     fi
@@ -483,8 +482,8 @@ function cleanup(){
   display "  -- un-mounting $GLUSTER_MNT on all nodes..." $LOG_INFO
   for node in "${HOSTS[@]}"; do
       out=$(ssh root@$node "
-          if /bin/grep -qs $GLUSTER_MNT /proc/mounts ; then
-            /bin/umount $GLUSTER_MNT
+          if grep -qs $GLUSTER_MNT /proc/mounts ; then
+            umount $GLUSTER_MNT
           fi")
       [[ -n "$out" ]] && display "$node: umount: $out" $LOG_DEBUG
   done
@@ -532,8 +531,8 @@ function cleanup(){
   for node in "${HOSTS[@]}"; do
       out+=$(ssh root@$node "
           rm -rf $GLUSTER_MNT 2>&1
-          if /bin/grep -qs $BRICK_DIR /proc/mounts ; then
-            /bin/umount $BRICK_DIR 2>&1
+          if grep -qs $BRICK_DIR /proc/mounts ; then
+            umount $BRICK_DIR 2>&1
           fi
           rm -rf $BRICK_DIR 2>&1
           rm -rf $MAPRED_SCRATCH_DIR 2>&1
@@ -564,7 +563,7 @@ function verify_pool_created(){
     display "   Trusted pool formed..." $LOG_DEBUG
   else
     display "   FATAL ERROR: Trusted pool NOT formed..." $LOG_FORCE
-    exit 5
+    exit 3
   fi
 }
 
@@ -587,7 +586,7 @@ function verify_vol_created(){
     display "   Volume \"$VOLNAME\" created..." $LOG_DEBUG
   else
     display "   FATAL ERROR: Volume \"$VOLNAME\" creation failed..." $LOG_FORCE
-    exit 10
+    exit 5
   fi
 }
 
@@ -606,8 +605,8 @@ function verify_vol_started(){
       # grep for Online status != Y
       rtn=$(ssh root@$firstNode "
 	gluster volume status $VOLNAME detail 2>/dev/null |
-	 	/bin/grep $FILTER |
-		/bin/grep -v '$ONLINE' |
+	 	grep $FILTER |
+		grep -v '$ONLINE' |
 		wc -l
 	")
       (( rtn == 0 )) && break # exit loop
@@ -619,7 +618,7 @@ function verify_vol_started(){
     display "   Volume \"$VOLNAME\" started..." $LOG_DEBUG
   else
     display "   FATAL ERROR: Volume \"$VOLNAME\" NOT started...\nTry gluster volume status $VOLNAME" $LOG_FORCE
-    exit 15
+    exit 7
   fi
 }
 
@@ -664,7 +663,7 @@ function create_trusted_pool(){
 #
 function setup(){
 
-  local i=0; local node=''; local ip=''; local out; local tmpout
+  local i=0; local node=''; local ip=''; local out
   local PERMISSIONS='777' # for now until we learn how to reduce this...
   local OWNER='mapred'; local GROUP='hadoop'
   local BRICK_MNT_OPTS="noatime,inode64"
@@ -685,27 +684,50 @@ function setup(){
   for (( i=0; i<$NUMNODES; i++ )); do
       node="${HOSTS[$i]}"
       ip="${HOST_IPS[$i]}"
-      out+=$(ssh root@$node "
-	/sbin/mkfs -t xfs -i size=512 -f $BRICK_DEV 2>&1
-	/bin/mkdir -p $BRICK_MNT 2>&1 # volname dir under brick by convention
-	/bin/mkdir -p $GLUSTER_MNT 2>&1
-	# append brick and gluster mounts to fstab
-	if ! /bin/grep -qs $BRICK_DIR /etc/fstab ; then
+      out="$(ssh root@$node "mkfs -t xfs -i size=512 -f $BRICK_DEV 2>&1")"
+      (( $? != 0 )) && {
+        display "ERROR: $node: mkfs.xfs: $out" $LOG_FORCE; exit 9; }
+      display "mkfs.xfs: $out" $LOG_DEBUG
+
+      # volname dir under brick by convention
+      out="$(ssh root@$node "mkdir -p $BRICK_MNT 2>&1")"
+      (( $? != 0 )) && {
+        display "ERROR: $node: mkdir $BRICK_MNT: $out" $LOG_FORCE; exit 11; }
+      display "mkdir $BRICK_MNT: $out" $LOG_DEBUG
+
+      out="$(ssh root@$node "mkdir -p $GLUSTER_MNT 2>&1")"
+      (( $? != 0 )) && {
+        display "ERROR: $node: mkdir $GLUSTER_MNT: $out" $LOG_FORCE; exit 13; }
+      display "mkdir $GLUSTER_MNT: $out" $LOG_DEBUG
+
+      # append brick and gluster mounts to fstab
+      out="$(ssh root@$node "
+        if ! grep -qs $BRICK_DIR /etc/fstab ; then
           echo '$BRICK_DEV $BRICK_DIR xfs  $BRICK_MNT_OPTS  0 0' >>/etc/fstab
-	fi
-	if ! /bin/grep -qs $GLUSTER_MNT /etc/fstab ; then
-	  echo '$ip:/$VOLNAME  $GLUSTER_MNT  glusterfs  $GLUSTER_MNT_OPTS  0 0' >>/etc/fstab
-	fi
-	# Note: mapred scratch dir must be created *after* the brick is
-	# mounted; otherwise, mapred dir will be "hidden" by the mount.
-	# Also, permissions and owner must be set *after* the gluster dir 
-	# is mounted for the same reason -- see below.
-       	/bin/mount $BRICK_DIR 2>&1 # mount via fstab
-       	/bin/mkdir -p $MAPRED_SCRATCH_DIR 2>&1
-      ")
-      out+="\n"
+        fi
+        if ! grep -qs $GLUSTER_MNT /etc/fstab ; then
+          echo '$ip:/$VOLNAME  $GLUSTER_MNT  glusterfs  $GLUSTER_MNT_OPTS  0 0'\
+                >>/etc/fstab
+        fi")"
+      (( $? != 0 )) && {
+        display "ERROR: $node: append fstab: $out" $LOG_FORCE; exit 15; }
+      display "append fstab: $out" $LOG_DEBUG
+
+      # Note: mapred scratch dir must be created *after* the brick is
+      # mounted; otherwise, mapred dir will be "hidden" by the mount.
+      # Also, permissions and owner must be set *after* the gluster dir 
+      # is mounted for the same reason -- see below.
+      out="$(ssh root@$node "mount $BRICK_DIR 2>&1")" # mount via fstab
+      (( $? != 0 )) && {
+        display "ERROR: $node: mount $BRICK_DIR: $out" $LOG_FORCE; exit 17; }
+      display "append fstab: $out" $LOG_DEBUG
+
+      out="$(ssh root@$node "mkdir -p $MAPRED_SCRATCH_DIR 2>&1")"
+      (( $? != 0 )) && {
+        display "ERROR: $node: mkdir $MAPRED_SCRATCH_DIR: $out" $LOG_FORCE;
+        exit 19; }
+      display "mkdir $MAPRED_SCRATCH_DIR: $out" $LOG_DEBUG
   done
-  display "xfs, brick mnt: $out" $LOG_DEBUG
 
   # 6) create trusted pool from first node
   # 7) create vol on a single node
@@ -748,38 +770,51 @@ function setup(){
    #the mount so whenever a data node reboots the gluster mount is lost! When
    #we support RHS 2.1+ then the 1st mount below can be uncommented and the
    #glusterfs mount below should be deleted.
-  out=''
   for node in "${HOSTS[@]}"; do
       #can't mount via fstab in pre-RHS 2.1 releases...
-      tmpout+=$(ssh root@$node "
-	 ##/bin/mount $GLUSTER_MNT # from fstab (UNCOMMENT this for rhs 2.1)
-	 glusterfs --attribute-timeout=0 --entry-timeout=0 --volfile-id=/$VOLNAME --volfile-server=$node $GLUSTER_MNT 2>&1 # (DELETE this for rhs 2.1)
+      out="$(ssh root@$node "glusterfs --attribute-timeout=0 \
+		--entry-timeout=0 --volfile-id=/$VOLNAME \
+		--volfile-server=$node $GLUSTER_MNT 2>&1")"
+      (( $? != 0 )) && {
+        display "ERROR: $node: mount $GLUSTER_MNT: $out" $LOG_FORCE; exit 21; }
+      display "mount $GLUSTER_MNT: $out" $LOG_DEBUG
 
-	 # create mapred/system dir
-	 /bin/mkdir -p $MAPRED_SYSTEM_DIR 2>&1
+      out="$(ssh root@$node "mkdir -p $MAPRED_SYSTEM_DIR 2>&1")"
+      (( $? != 0 )) && {
+        display "ERROR: $node: mkdir $MAPRED_SYSTEM_DIR: $out" $LOG_FORCE;
+        exit 23; }
+      display "mkdir $MAPRED_SYSTEM_DIR: $out" $LOG_DEBUG
 
-	 # create mapred scratch dir and gluster mnt owner and group
-       	 if ! /bin/grep -qsi \"^$GROUP:\" /etc/group ; then
-	   groupadd $GROUP 2>&1 # note: no password, no explicit GID!
-       	 fi
-       	 if ! /bin/grep -qsi \"^$OWNER:\" /etc/passwd ; then
-           # user added with no password and no hard-coded UID
-           useradd --system -g $GROUP $OWNER 2>&1
-       	 fi
+      # create mapred scratch dir and gluster mnt owner and group
+      out="$(ssh root@$node "
+        if ! grep -qsi ^$GROUP: /etc/group ; then
+          groupadd $GROUP 2>&1 # note: no password, no explicit GID!
+        fi")"
+      (( $? != 0 )) && {
+        display "ERROR: $node: groupadd $GROUP: $out" $LOG_FORCE; exit 25; }
+      display "groupadd $GROUP: $out" $LOG_DEBUG
 
-	 /bin/chown -R $OWNER:$GROUP $GLUSTER_MNT $MAPRED_SCRATCH_DIR 2>&1
-	 /bin/chmod $PERMISSIONS $GLUSTER_MNT $MAPRED_SCRATCH_DIR \
-		    $MAPRED_SYSTEM_DIR 2>&1
-	 /bin/chmod g+s $GLUSTER_MNT 2>&1 # set s-bit so subdirs inherit group
-      ")
-      if [[ -n "$tmpout" ]] ; then
-        out+="$node: "
-        out+="$tmpout"
-        out+="\n"
-      fi
-      out+="\n"
+      out="$(ssh root@$node "
+        if ! grep -qsi ^$OWNER: /etc/passwd ; then
+          # add user but with no password and no hard-coded UID
+          useradd --system -g $GROUP $OWNER 2>&1
+        fi")"
+      (( $? != 0 )) && {
+        display "ERROR: $node: useradd $OWNER: $out" $LOG_FORCE; exit 27; }
+      display "useradd $OWNER: $out" $LOG_DEBUG
+
+      out="$(ssh root@$node "chown -R $OWNER:$GROUP $GLUSTER_MNT \
+        $MAPRED_SCRATCH_DIR 2>&1")"
+      (( $? != 0 )) && {
+        display "ERROR: $node: chown $OWNER:$GROUP: $out" $LOG_FORCE; exit 30; }
+      display "chown $OWNER:$GROUP: $out" $LOG_DEBUG
+
+      out="$(ssh root@$node "chmod -R $PERMISSIONS  $GLUSTER_MNT \
+        $MAPRED_SCRATCH_DIR 2>&1")"
+      (( $? != 0 )) && {
+        display "ERROR: $node: chmod $GLUSTER_MNT: $out" $LOG_FORCE; exit 33; }
+      display "chmod $GLUSTER_MNT: $out" $LOG_DEBUG
   done
-  [[ -n "$out" ]] && display "$out" $LOG_DEBUG
 }
 
 # install_nodes: for each node in the hosts file copy the "data" sub-directory
@@ -821,15 +856,15 @@ function install_nodes(){
     # copy the data subdir to each node...
     # use ip rather than node for scp and ssh until /etc/hosts is set up
     ssh root@$ip "
-	/bin/rm -rf $REMOTE_INSTALL_DIR
-	/bin/mkdir -p $REMOTE_INSTALL_DIR"
+	rm -rf $REMOTE_INSTALL_DIR
+	mkdir -p $REMOTE_INSTALL_DIR"
     display "-- Copying RHS-Ambari install files..." $LOG_INFO
     out=$(script -q -c "scp -r $DATA_DIR root@$ip:$REMOTE_INSTALL_DIR")
     err=$?
     display "copy install files: $out" $LOG_DEBUG
     if (( err != 0 )) ; then
       display "ERROR: scp install files error $err" $LOG_FORCE
-      exit 17
+      exit 35
     fi
 
     # prep_node.sh may apply the FUSE patch on storage node in which case the
@@ -858,7 +893,7 @@ function install_nodes(){
     elif (( err != 0 )) ; then # fatal error in install.sh so quit now
       display " *** ERROR! prep_node script exited with error: $err ***" \
 	$LOG_FORCE
-      exit 20
+      exit 37
     fi
   }
 
@@ -905,34 +940,34 @@ function install_nodes(){
 #
 function reboot_nodes(){
 
-  local ip; local i; local msg; local num
+  local ip; local i; local msg
+  local num=${#REBOOT_NODES[@]} # number of nodes to reboot
 
-  num=${#REBOOT_NODES[@]} # number of nodes to reboot
-  if (( num > 0 )) ; then
-    echo
-    msg='node'
-    (( num != 1 )) && msg+='s'
-    display "-- $num $msg will be rebooted..." $LOG_SUMMARY
-    for ip in "${REBOOT_NODES[@]}"; do
-	display "   * rebooting node: $ip..." $LOG_INFO
-	ssh root@$ip reboot -f &  # reboot asynchronously
-    done
+  (( num <= 0 )) && return # no nodes to reboot
 
-    # makes sure all rebooted nodes are back up before returning
-    while true ; do
-	for i in "${!REBOOT_NODES[@]}"; do # array of non-null element indices
-	    ip=${REBOOT_NODES[$i]}         # unset leaves sparse array
-	    # if possible to ssh to ip then unset that array entry
-	    ssh -q -oBatchMode=yes root@$ip exit
-	    if (( $? == 0 )) ; then
-	      display "   * node $ip sucessfully rebooted" $LOG_DEBUG
-	      unset REBOOT_NODES[$i] # null entry in array
-	    fi
-	done
-	(( ${#REBOOT_NODES[@]} == 0 )) && break # exit loop
-	sleep 10
-    done
-  fi
+  echo
+  msg='node'
+  (( num != 1 )) && msg+='s'
+  display "-- $num $msg will be rebooted..." $LOG_SUMMARY
+  for ip in "${REBOOT_NODES[@]}"; do
+      display "   * rebooting node: $ip..." $LOG_INFO
+      ssh root@$ip reboot -f &  # reboot asynchronously
+  done
+
+  # makes sure all rebooted nodes are back up before returning
+  while true ; do
+      for i in "${!REBOOT_NODES[@]}"; do # array of non-null element indices
+	  ip=${REBOOT_NODES[$i]}         # unset leaves sparse array
+	  # if possible to ssh to ip then unset that array entry
+	  ssh -q -oBatchMode=yes root@$ip exit
+	  if (( $? == 0 )) ; then
+	    display "   * node $ip sucessfully rebooted" $LOG_DEBUG
+	    unset REBOOT_NODES[$i] # null entry in array
+	  fi
+      done
+      (( ${#REBOOT_NODES[@]} == 0 )) && break # exit loop
+      sleep 10
+  done
 }
 
 # perf_config: assign the non-default gluster volume attributes below.
@@ -992,7 +1027,7 @@ function reboot_self(){
 echo
 parse_cmd $@
 
-display "$(/bin/date). Begin: $SCRIPT -- version $INSTALL_VER ***" $LOG_REPORT
+display "$(date). Begin: $SCRIPT -- version $INSTALL_VER ***" $LOG_REPORT
 
 # define global variables based on --options and defaults
 # convention is to use the volname as the subdir under the brick as the mnt
@@ -1038,7 +1073,7 @@ cleanup_logfile
 reboot_nodes
 
 echo
-display "$(/bin/date). End: $SCRIPT" $LOG_REPORT
+display "$(date). End: $SCRIPT" $LOG_REPORT
 echo
 
 # if install-from node is one of the data nodes and the fuse patch was
