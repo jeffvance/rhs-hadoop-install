@@ -65,6 +65,7 @@
      "management" node is the *first* hostname listed in the "hosts" file. In
      this case the first node in the hosts file is both a storge node and the
      management node.
+  3) Hostnames are expected to be lower-case.
 
   Red Hat Network Registering (RHN):
   install.sh will automatically register each node in the "hosts" file with the

@@ -264,7 +264,7 @@ function parse_cmd(){
 # place. Collect all detected setup errors together (rather than one at a 
 # time) for better usability. Validate format and size of hosts file.
 # Verify connectivity between localhost and each data/storage node. Assign
-# global HOSTS and HOST_IPS array variables and the MGMT_NODE variable.
+# global HOSTS and HOST_IPS array variables and the MGMT_NODE variable. 
 #
 function verify_local_deploy_setup(){
 
@@ -275,7 +275,7 @@ function verify_local_deploy_setup(){
   # hostnames and ips, and verify password-less ssh connectivity to each node.
   # Comments and empty lines are ignored in the hosts file. The number of nodes
   # represented in the hosts file is enforced to be a multiple of the replica
-  # count.
+  # count. Downcase host names if they are upper case.
   # 
   function read_verify_local_hosts_file(){
 
@@ -284,8 +284,8 @@ function verify_local_deploy_setup(){
     # regular expression to validate ip addresses
     local VALID_IP_RE='^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$'
 
-    # regular expression to validate hostnames
-    local VALID_HOSTNAME_RE='^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$'
+    # regular expression to validate hostnames (host is down-cased)
+    local VALID_HOSTNAME_RE='^(([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])\.)*([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])$'
 
     # read hosts file, skip comments and blank lines, parse out hostname and ip
     read -a hosts_ary <<< $(sed '/^ *#/d;/^ *$/d;s/#.*//' $HOSTS_FILE)
@@ -307,6 +307,11 @@ function verify_local_deploy_setup(){
 	# hostname:
 	((i++))
 	host=${hosts_ary[$i]}
+        # down-case if any upper-case letters in host
+	if [[ "$host" =~ [A-Z]+ ]] ; then
+	  display "   ...down-casing $host" $LOG_DEBUG
+	  host=${host,,} # down-case
+	fi
         # set MGMT_NODE to first node unless --mgmt-node specified
 	if [[ -z "$MGMT_NODE" && $i == 1 ]] ; then # 1st hosts file record
 	  MGMT_NODE="$host"
