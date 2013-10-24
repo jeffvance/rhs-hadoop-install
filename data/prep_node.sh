@@ -9,7 +9,6 @@
 #
 # This script is a companion script to install.sh and runs on a remote node. It
 # does the following:
-#  - reports the gluster version,
 #  - installs the gluster-hadoop plug-in,
 #  - checks if NTP is running and synchronized,
 #  - yum installs the ambai agent and/or ambari-server rpms depending on passed
@@ -574,10 +573,6 @@ function install_storage(){
 	[[ $NODE == ${HOSTS[$i]} ]] && break
   done
   IP=${HOST_IPS[$i]}
-
-  # report Gluster version 
-  echo
-  display "-- Gluster version: $(gluster --version | head -n 1)" $LOG_SUMMARY
 
   # install Gluster-Hadoop plug-in on agent nodes
   install_plugin

@@ -1,4 +1,4 @@
-#! /bin/bash
+! /bin/bash
 #
 # Copyright (c) 2013 Red Hat, Inc.
 # License: Apache License v2.0
@@ -21,7 +21,7 @@
 
 # set global variables
 SCRIPT=$(basename $0)
-INSTALL_VER='0.32'   # self version
+INSTALL_VER='0.34'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/rhs-hadoop-install/" # on each node
@@ -381,8 +381,47 @@ function report_deploy_values(){
   local RHEL_RELEASE='/etc/redhat-release'
   local RHS_RELEASE='/etc/redhat-storage-release'
   local OS; local RHS;
+  local node_vers=()
 
-  # assume 1st node is representative
+  # report_gluster_versions: sub-function to list the main gluster version
+  # and all nodes not on the main (most common) version.
+  #
+  function report_gluster_versions(){
+
+    local i; local node
+    local uniq_vers=($(echo "${node_vers[@]}"|tr ' ' "\n"|sort|uniq)) # array
+
+    (( ${#uniq_vers[@]} == 1 )) && {
+      display "Gluster:              ${uniq_vers[0]} (same on all nodes)" \
+	$LOG_REPORT;
+      return; }
+    # display each node and version
+    display "  WARNING! some nodes have the different gluster versions!" \
+	$LOG_REPORT
+    for (( i=0; i<$NUMNODES; i++ )); do
+	node="${HOSTS[$i]}"
+	vers="${node_vers[$i]}"
+        display "  $node: $vers" $LOG_REPORT
+    done
+  }
+
+  # get_gluster_versions: sub-function to return associative arrays of nodes
+  # and gluster versions......xxx
+  #
+  function get_gluster_versions(){
+
+    local i; local vers=''
+
+    for (( i=0; i<$NUMNODES; i++ )); do
+	node="${HOSTS[$i]}"
+	vers="$(ssh root@$node 'gluster --version|head -n 1')"
+	vers=${vers#glusterfs} # strip glusterfs from beginning
+	vers=${vers%%rhs*}     # strip all trailing char from end to rhs
+	node_vers[$i]=$vers
+    done
+  }
+
+  # assume 1st node is representative of OS version for cluster
   OS="$(ssh -oStrictHostKeyChecking=no root@$firstNode cat $RHEL_RELEASE)"
   if [[ -f $RHS_RELEASE ]] ; then
     RHS="$(ssh -oStrictHostKeyChecking=no root@$firstNode cat $RHS_RELEASE)"
@@ -390,9 +429,14 @@ function report_deploy_values(){
     RHS='2.0.x'
   fi
 
+  # get gluster version on all nodes, compare and report differences
+  get_gluster_versions
+
   display
   display "OS:                   $OS" $LOG_REPORT
   display "RHS:                  $RHS" $LOG_REPORT
+  report_gluster_versions
+  
   display
   display "__________ Deployment Values __________" $LOG_REPORT
   display "  Install-from dir:   $INSTALL_DIR"      $LOG_REPORT
