@@ -397,8 +397,7 @@ function report_deploy_values(){
       return; }
 
     # display each node and version
-    display "  WARNING! some nodes have different gluster versions!" \
-	$LOG_REPORT
+    display "  WARNING! some nodes have different gluster versions" $LOG_REPORT
     for (( i=0; i<$NUMNODES; i++ )); do
 	node="${HOSTS[$i]}"
 	vers="${node_vers[$i]}"
