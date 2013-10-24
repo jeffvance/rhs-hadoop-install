@@ -393,16 +393,15 @@ function report_deploy_values(){
     for (( i=0; i<$NUMNODES; i++ )); do
 	node="${HOSTS[$i]}"
 	vers="$(ssh root@$node 'gluster --version|head -n 1')"
-	vers=${vers#glusterfs} # strip glusterfs from beginning
-	vers=${vers%%rhs*}     # strip all trailing char from end to rhs
+	vers=${vers#glusterfs } # strip glusterfs from beginning
+	vers=${vers%%rhs*}      # strip trailing chars from end to "rhs"
 	node_vers[$i]=$vers
     done
 
     uniq_vers=($(echo "${node_vers[@]}"|tr ' ' "\n"|sort|uniq))
 
     (( ${#uniq_vers[@]} == 1 )) && {
-      display "Gluster:              ${uniq_vers[0]} (same on all nodes)" \
-	$LOG_REPORT;
+      display "Gluster:              $vers (same on all nodes)" $LOG_REPORT;
       return; }
 
     # display each node and version
