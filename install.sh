@@ -395,8 +395,9 @@ function report_deploy_values(){
       display "Gluster:              ${uniq_vers[0]} (same on all nodes)" \
 	$LOG_REPORT;
       return; }
+
     # display each node and version
-    display "  WARNING! some nodes have the different gluster versions!" \
+    display "  WARNING! some nodes have different gluster versions!" \
 	$LOG_REPORT
     for (( i=0; i<$NUMNODES; i++ )); do
 	node="${HOSTS[$i]}"
