@@ -353,27 +353,35 @@ function verify_ntp(){
 
   # run ntpd on reboot
   out=$(chkconfig ntpd on 2>&1)
-  display "chkconfig on: $out" $LOG_DEBUG
+  err=$?
+  display "chkconfig ntpd on: $out" $LOG_DEBUG
+  (( err != 0 )) &&  display "WARN: chkconfig ntpd on error $err" $LOG_FORCE
 
-  # start ntpd if not running
+  # stop ntpd so that ntpd -qg can potentially do a large time change
   ps -C ntpd >& /dev/null
-  if (( $? != 0 )) ; then
-    display "   Starting ntpd" $LOG_DEBUG
-    out=$(service ntpd start 2>&1)
-    display "ntpd start: $out" $LOG_DEBUG
-    ps -C ntpd >& /dev/null # see if ntpd is running now...
-    if (( $? != 0 )) ; then
-      display "WARN: ntpd did NOT start" $LOG_FORCE
-      return # no point in doing the rest...
-    fi
+  if (( $? == 0 )) ; then
+    out=$(service ntpd stop 2>&1)
+    display "ntpd stop: $out" $LOG_DEBUG
+    sleep 1
+    ps -C ntpd >& /dev/null # see if ntpd is stopped now...
+    (( $? == 0 )) && display "WARN: ntpd did NOT stop" $LOG_FORCE
   fi
 
   # set time now (ntpdate is being deprecated)
+  # note: ntpd can't be running...
   out=$(ntpd -qg 2>&1)
   err=$?
   display "ntpd -qg: $out" $LOG_DEBUG
   (( err != 0 )) && display "WARN: ntpd -qg (aka ntpdate) error $err" $LOG_FORCE
+
+  # start ntpd
+  out=$(service ntpd start 2>&1)
+  err=$?
+  display "ntpd start: $out" $LOG_DEBUG
+  (( err != 0 )) && display "WARN: ntpd start error $err" $LOG_FORCE
+
   # report ntp synchronization state
+  sleep 2
   ntpstat >& /dev/null
   err=$?
   if (( err == 0 )) ; then 

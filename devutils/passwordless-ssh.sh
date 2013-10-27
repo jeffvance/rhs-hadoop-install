@@ -243,9 +243,9 @@ function setup_passwordless_ssh {
 	host=${HOSTS[$i]}
 	bugout "--> $host ($ip)"
 
-	# remove host from known_hosts file, if present
-	bugout "delete \"$host\" from known_hosts file"
-	[[ -f $KNOWN_HOSTS ]] && sed -i "/^$host/d" $KNOWN_HOSTS
+	# remove host and ip from known_hosts file, if present
+	bugout "delete \"$host\" and/or \"$ip\" from known_hosts file"
+	[[ -f $KNOWN_HOSTS ]] && sed -i "/^$host/d;/^$ip/d" $KNOWN_HOSTS
 
 	display "Copying SSH keyfile to $host"
 	bugout "---> with 'sh-copy-id -i ~/.ssh/id_rsa.pub root@$host' command"
