@@ -380,17 +380,9 @@ function verify_ntp(){
   display "ntpd start: $out" $LOG_DEBUG
   (( err != 0 )) && display "WARN: ntpd start error $err" $LOG_FORCE
 
-  # report ntp synchronization state
-  sleep 2
-  ntpstat >& /dev/null
-  err=$?
-  if (( err == 0 )) ; then 
-    display "   NTP is synchronized..." $LOG_DEBUG
-  elif (( $err == 1 )) ; then
-    display "   NTP is NOT synchronized..." $LOG_INFO
-  else
-    display "   WARNING: NTP state is indeterminant..." $LOG_FORCE
-  fi
+  # used to invoke ntpstat to verify the synchronization state, but error 1 was
+  # always returned if the above ntpd -qg cmd did a large time change. Thus, we
+  # no longer call ntpstat since the node will "realtively" soon sync up.
 }
 
 # rhn_register: rhn register $NODE if a rhn username and password were passed.
