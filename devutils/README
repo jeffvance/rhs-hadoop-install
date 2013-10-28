@@ -1,9 +1,0 @@
-This folder is for development utilities including 
-development and test tools. 
-
-Currently there are 
-
-1) testregex: Example of how to reproduce/demo a bug to maintainer (not useful anymore since hostnames should not have _'s)
-2) shelltest: Example of how to "fail" a shell script after testing : useful for continous delivery with testing of bash scripts. 
-3) build-deploy-rhs-ambari-installer: This was used to deploy version 13 and build tarball.  It will be modularized into a pure build and then jenkins
-will take over the mvn deploy:deploy command part later. 
