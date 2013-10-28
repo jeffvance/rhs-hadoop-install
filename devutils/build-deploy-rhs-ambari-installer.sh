@@ -48,9 +48,6 @@ fi
 #First deploy into s3: This is the preferred (but new) place where we store binaries:
 
 # Now, we deploy into archiva.
-#TARBALL=$(ls -Rt $BUILD_LOCATION/rhs-hadoop-*.tar.gz | head -1 | cut -f 9 -d' ')
-#TARBALL=$(basename $TARBALL) #<-- doesnt work out of the box on some linux
-
 echo
 echo "Press a key to deploy to $TARBALL in $S3."
 echo "Note that you need to run: \"s3cmd --configure\" the first time you do"
