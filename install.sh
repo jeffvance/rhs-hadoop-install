@@ -21,13 +21,13 @@
 
 # set global variables
 SCRIPT=$(basename $0)
-INSTALL_VER='0.35'   # self version
+INSTALL_VER='0.36'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/rhs-hadoop-install/" # on each node
-DATA_DIR='data/'     # subdir in rhs-hadoop install dir
 # companion install script name
-PREP_SH="$REMOTE_INSTALL_DIR${DATA_DIR}prep_node.sh" # full path
+PREP_SH='prep_node.sh' # companion script run on each node
+REMOTE_PREP_SH="$REMOTE_INSTALL_DIR$PREP_SH" # full path
 NUMNODES=0           # number of nodes in hosts file (= trusted pool size)
 bricks=''            # string list of node:/brick-mnts for volume create
 # local logfile on each host, copied from remote host to install-from host
@@ -357,10 +357,6 @@ function verify_local_deploy_setup(){
   else
     # read and verify/validate hosts file format
     read_verify_local_hosts_file
-  fi
-  if [[ ! -d $INSTALL_DIR/data ]] ; then
-    errmsg+=" * \"$INSTALL_DIR/data\" sub-directory is missing.\n"
-    ((errcnt++))
   fi
 
   if (( errcnt > 0 )) ; then
@@ -858,14 +854,16 @@ function install_nodes(){
 
     local node="$1"; local ip="$2"; local install_storage="$3"
     local install_mgmt="$4"; local err
+    local FILES_TO_CP="$PREP_SH "
 
-    # copy the data subdir to each node...
     # use ip rather than node for scp and ssh until /etc/hosts is set up
     ssh -oStrictHostKeyChecking=no root@$ip "
 	rm -rf $REMOTE_INSTALL_DIR
 	mkdir -p $REMOTE_INSTALL_DIR"
     display "-- Copying rhs-hadoop install files..." $LOG_INFO
-    out=$(script -q -c "scp -r $DATA_DIR root@$ip:$REMOTE_INSTALL_DIR")
+#out=$(script -q -c "scp -r $DATA_DIR root@$ip:$REMOTE_INSTALL_DIR")
+    FILES_TO_CP+="$(ls -d */ | tr "\n" ' ')" # include sub-directories
+    out="$(scp -r $FILES_TO_CP root@$ip:$REMOTE_INSTALL_DIR)"
     err=$?
     display "copy install files: $out" $LOG_DEBUG
     if (( err != 0 )) ; then
@@ -875,11 +873,10 @@ function install_nodes(){
 
     # prep_node.sh may apply the FUSE patch on storage node in which case the
     # node will need to be rebooted.
-    out="$(ssh -oStrictHostKeyChecking=no root@$ip \
-	$PREP_SH $node $install_storage $install_mgmt \
-	"\"${HOSTS[@]}\"" "\"${HOST_IPS[@]}\"" $MGMT_NODE $VERBOSE \
-        $PREP_NODE_LOG_PATH $REMOTE_INSTALL_DIR$DATA_DIR "$RHN_USER" \
-	"$RHN_PASS")"
+    out="$(ssh -oStrictHostKeyChecking=no root@$ip $REMOTE_PREP_SH \
+	$node $install_storage $install_mgmt "\"${HOSTS[@]}\"" \
+	"\"${HOST_IPS[@]}\"" $MGMT_NODE $VERBOSE $PREP_NODE_LOG_PATH \
+	$REMOTE_INSTALL_DIR "$RHN_USER" "$RHN_PASS")"
     err=$?
     # prep_node writes all messages to the PREP_NODE_LOG logfile regardless of
     # the verbose setting. However, it outputs (and is captured above) only

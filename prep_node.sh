@@ -36,7 +36,7 @@ HOST_IPS=($5)
 MGMT_NODE="$6" # note: this node can be inside or outside the storage cluster
 VERBOSE=$7
 PREP_LOG=$8
-DEPLOY_DIR=${9:-/tmp/rhs-hadoop-install/data/}
+DEPLOY_DIR=${9:-/tmp/rhs-hadoop-install/}
 RHN_USER=${10:-}
 RHN_PASS=${11:-}
 #echo -e "*** $(basename $0)\n 1=$NODE, 2=$STORAGE_INSTALL, 3=$MGMT_INSTALL, 4=${HOSTS[@]}, 5=${HOST_IPS[@]}, 6=$MGMT_NODE, 7=$VERBOSE, 8=$PREP_LOG, 9=$DEPLOY_DIR, 10=$RHN_USER, 11=$RHN_PASS"
@@ -622,11 +622,12 @@ if [[ ! -d $DEPLOY_DIR ]] ; then
 fi
 
 cd $DEPLOY_DIR
-ls >/dev/null
-if (( $? != 0 )) ; then
+
+if (( $(ls | wc -l) == 0 )) ; then
   display "$NODE: No files found in $DEPLOY_DIR" $LOG_FORCE 
   exit -1
 fi
+[[ -d 'data' ]] && cd data
 
 # remove special logfile, start "clean" each time script is invoked
 rm -f $PREP_LOG
