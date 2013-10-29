@@ -627,7 +627,7 @@ if (( $(ls | wc -l) == 0 )) ; then
   display "$NODE: No files found in $DEPLOY_DIR" $LOG_FORCE 
   exit -1
 fi
-[[ -d 'data' ]] && cd data
+[[ -d 'data' ]] && cd data # backwards compatibility for now...
 
 # remove special logfile, start "clean" each time script is invoked
 rm -f $PREP_LOG

@@ -832,8 +832,8 @@ function setup(){
 # 
 # Since the server(mgmt) node is known all other nodes are assumed to be 
 # storage(agent) nodes. However the management node can also be a storage node.
-# The right Ambari steps are performed depending on whether the target node is
-# a management node, storage node, or both. 
+# Note: in distro-agnostic installs, the prep_node script is passed but may
+#   ignore the management node information.
 #
 function install_nodes(){
 
@@ -861,7 +861,6 @@ function install_nodes(){
 	rm -rf $REMOTE_INSTALL_DIR
 	mkdir -p $REMOTE_INSTALL_DIR"
     display "-- Copying rhs-hadoop install files..." $LOG_INFO
-#out=$(script -q -c "scp -r $DATA_DIR root@$ip:$REMOTE_INSTALL_DIR")
     FILES_TO_CP+="$(ls -d */ | tr "\n" ' ')" # include sub-directories
     out="$(scp -r $FILES_TO_CP root@$ip:$REMOTE_INSTALL_DIR)"
     err=$?
@@ -991,16 +990,15 @@ function perf_config(){
   fi
 }
 
-# cleanup_logfile: the ambari-server yum install depends on Oracle JDK which
-# is large and results in *many* progress updates. When written to disk this
-# results in a *very* long record in the logfile and the user has to forward
-# through hundreds of "pages" to get to the next useful record. So, this one
-# very long record is deleted here.
+# cleanup_logfile: if JDK was installed (and it may not be and will eventually
+# be replaced by OpenJDK) then delete its progress message. When Oracle JDK
+# progress is written to disk it results in a very long record in the logfile
+# and the user has to forward through hundreds of "pages" to get to the next
+# useful record. So, this one long record is deleted here.
 #
 function cleanup_logfile(){
 
-  # yum install string for the ambari-server progress message
-  local DELETE_STR='jdk-'
+  local DELETE_STR='jdk-' # Oracle JDK install progress pattern
 
   sed -i "/$DELETE_STR/d" $LOGFILE
 }
