@@ -68,7 +68,7 @@ Syntax:
 $SCRIPT [-v|--version] | [-h|--help]
 
 $SCRIPT [--brick-mnt <path>] [--vol-name <name>]  [--vol-mnt <path>]
-           [--replica <num>]    [--hosts <path>]     [--mgmt-node <node>]
+           [--replica <num>]    [--hosts <path>]     [--mgmt-node <node>*]
            [--rhn-user <name>]  [--rhn-pass <value>] [--logfile <path>]
            [--verbose [num] ]   [-q|--quiet]         [--debug]
            [-y]                 [-h|--help]          [--old-deploy*]
@@ -97,9 +97,9 @@ sample hosts file for more information.
   
 The required brick-dev argument names the brick device where the XFS file
 system will be mounted. Examples include: /dev/<VGname>/<LVname> or /dev/vdb1,
-etc. The brick-dev names a storage partition dedicated for RHS. Optional
-arguments can specify the RHS volume name and mount point, and the brick mount
-point.
+etc. The brick-dev names a RAID6 storage partition dedicated for RHS. Optional
+arguments can specify the RHS volume name and mount point, brick mount point,
+etc.
 EOF
   short_usage
   cat <<EOF
@@ -115,6 +115,7 @@ EOF
                        Default: "./hosts".
   --mgmt-node <node> : hostname of the node to be used as the management node.
                        Default: the first node appearing in the "hosts" file.
+                       IGNORED FOR NOW.
   --rhn-user  <name> : Red Hat Network user name. Default is to not register
                        the storage nodes.
   --rhn-pass <value> : RHN password for rhn-user. Default is to not register
@@ -132,8 +133,8 @@ EOF
                        Internally sets verbose=9. Note: all output is still
                        written to the logfile.
   --old-deploy       : Use if this is an existing deployment. The default
-                       is a new ("greenfield") RHS customer installation. Not
-                       currently supported.
+                       is a new ("greenfield") RHS customer installation. 
+                       IGNORED FOR NOW.
   -v|--version       : current version string.
   -h|--help          : help text (this).
 
@@ -160,7 +161,7 @@ function parse_cmd(){
   NEW_DEPLOY=true
   # "hosts" file concontains hostname ip-addr for all nodes in cluster
   HOSTS_FILE="$INSTALL_DIR/hosts"
-  MGMT_NODE=''
+  MGMT_NODE='' # ignored for now...
   RHN_USER=''
   RHN_PASS=''
   LOGFILE='/var/log/rhs-hadoop-install.log'
@@ -195,7 +196,7 @@ function parse_cmd(){
 	--hosts)
 	    HOSTS_FILE=$2; shift 2; continue
 	;;
-	--mgmt-node)
+	--mgmt-node) # ignored for now...
 	    MGMT_NODE=$2; shift 2; continue
 	;;
 	--rhn-user)
@@ -433,7 +434,7 @@ function report_deploy_values(){
     display "  RHN user:           $RHN_USER"       $LOG_REPORT
   display "  \"hosts\" file:       $HOSTS_FILE"     $LOG_REPORT
   display "  Number of nodes:    $NUMNODES"         $LOG_REPORT
-  display "  Management node:    $MGMT_NODE"        $LOG_REPORT
+ #display "  Management node:    $MGMT_NODE"        $LOG_REPORT # ignored...
   display "  Volume name:        $VOLNAME"          $LOG_REPORT
   display "  Volume mount:       $GLUSTER_MNT"      $LOG_REPORT
   display "  # of replicas:      $REPLICA_CNT"      $LOG_REPORT
@@ -827,8 +828,8 @@ function setup(){
 #   REBOOT_NODES         = array of IPs for all nodes needing to be rebooted,
 #     except the install-from node which is handled by DEFERRED_REBOOT_NODE
 #
-# A node needs to be rebooted if the FUSE patch is installed. However, the node
-# running the install script is not rebooted unless the users says yes.
+# A node needs may need to be rebooted if a kernel patch is installed. However,
+# the node running the install script is not rebooted unless the users says yes.
 # 
 # Since the server(mgmt) node is known all other nodes are assumed to be 
 # storage(agent) nodes. However the management node can also be a storage node.
@@ -870,8 +871,7 @@ function install_nodes(){
       exit 35
     fi
 
-    # prep_node.sh may apply the FUSE patch on storage node in which case the
-    # node will need to be rebooted.
+    # note: prep_node.sh may apply patches which reqire the node to be rebooted
     out="$(ssh -oStrictHostKeyChecking=no root@$ip $REMOTE_PREP_SH \
 	$node $install_storage $install_mgmt "\"${HOSTS[@]}\"" \
 	"\"${HOST_IPS[@]}\"" $MGMT_NODE $VERBOSE $PREP_NODE_LOG_PATH \
@@ -918,7 +918,7 @@ function install_nodes(){
       install_mgmt_node=false
       [[ -n "$MGMT_NODE_IN_POOL" && "$node" == "$MGMT_NODE" ]] && \
 	install_mgmt_node=true
-      prep_node $node $ip true $install_mgmt_node
+      prep_node $node $ip true false # note: install_mgmt_node ignored for now
 
       display '-------------------------------------------------' $LOG_SUMMARY
       display "-- Done installing on $node ($ip)"                 $LOG_SUMMARY
@@ -931,15 +931,17 @@ function install_nodes(){
   if [[ -z "$MGMT_NODE_IN_POOL" ]] ; then
     echo
     display 'Management node is not a datanode thus mgmt code needs to be installed...' $LOG_INFO
-    display "-- Starting install of management node \"$MGMT_NODE\"" $LOG_DEBUG
-    prep_node $MGMT_NODE $MGMT_NODE false true
+    #display "-- Starting install of management node \"$MGMT_NODE\"" $LOG_DEBUG
+    display "-- management node ignored for now..." $LOG_DEBUG
+    #prep_node $MGMT_NODE $MGMT_NODE false true
   fi
 }
 
-# reboot_nodes: if one or more nodes need to be rebooted, due to installing
-# the FUSE patch, then they are rebooted here. Note: if the "install-from"
-# node also needs to be rebooted that node is not in the REBOOT_NODES array
-# and is handled separately (see the DEFERRED_REBOOT_NODE global variable).
+# reboot_nodes: if one or more nodes needs to be rebooted, perhaps due to
+# installing a kernel level patch, then they are rebooted here. Note: if the
+# "install-from" node also needs to be rebooted that node does not exist in the
+# REBOOT_NODES array, and is handled separately (see the DEFERRED_REBOOT_NODE
+# global variable).
 #
 function reboot_nodes(){
 
@@ -1005,7 +1007,7 @@ function cleanup_logfile(){
 
 # reboot_self: invoked when the install-from node (self) is also one of the
 # storage nodes. In this case the reboot of the storage node (needed to 
-# complete the FUSE patch installation) has been deferred -- until now.
+# complete kernel patch installation) has been deferred -- until now.
 # The user may be prompted to confirm the reboot of their node.
 #
 function reboot_self(){
@@ -1013,7 +1015,7 @@ function reboot_self(){
   local ans='y'
 
   echo "*** Your system ($(hostname -s)) needs to be rebooted to complete the"
-  echo "    installation of the FUSE patch."
+  echo "    installation of one or more kernel patches."
   [[ "$ANS_YES" == 'n' ]] && read -p "    Reboot now? [y|N] " ans
   case $ans in
     y|yes|Y|YES|Yes) reboot
@@ -1070,14 +1072,14 @@ perf_config
 
 cleanup_logfile
 
-# reboot nodes where the FUSE patch was installed
+# reboot nodes where a kernel patch was installed
 reboot_nodes
 
 echo
 display "$(date). End: $SCRIPT" $LOG_REPORT
 echo
 
-# if install-from node is one of the data nodes and the fuse patch was
+# if install-from node is one of the data nodes and a kernel patch was
 # installed on that data node, then the reboot of the node was deferred but
 # can be done now.
 [[ -n "$DEFERRED_REBOOT_NODE" ]] && reboot_self
