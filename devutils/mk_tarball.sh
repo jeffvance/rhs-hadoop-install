@@ -4,16 +4,17 @@
 # following files:
 #  * rhs-hadoop-install-<verison> directory whicn contains:
 #  - install.sh
+#  - prep_node.sh
 #  - README.txt
 #  - hosts.example
-#  - Ambari_Configuration_Guide.pdf (not .odt version)
-#  - data/: directory containing:
+#  - data/: directory containing: ##Note will be renamed later...
+#    - Ambari_Configuration_Guide.pdf (not .odt version)
 #    - ambari.repo
 #    - ambari-<version>.rpms.tar.gz
 #    - fuse-patch.tar.gz
 #    - gluster-hadoop-<version>.jar
 #    - ktune.sh: optimized RHEL 2.0.5 tuned-adm high-throughput script
-#    - prep_node.sh
+#    - prep_node.sh (ambari-specific)
 #
 # The Ambari_Configuration_Guide.pdf file is exported from the git
 # Ambari_Installation_Guide.odt file prior to creating the tarball.
@@ -109,8 +110,8 @@ function parse_cmd(){
 	echo "ERROR: \"$TARGET\" target directory missing."; exit -1; }
 }
 
-# convert_odt_2_pdf: if possible convert the .odt doc file in the user's cwd
-# to a pdf file using libreoffice. Report warning if this can't be done.
+# convert_odt_2_pdf: if possible convert the .odt doc file under the user's
+# cwd to a pdf file using libreoffice. Report warning if this can't be done.
 #
 function convert_odt_2_pdf(){
 
@@ -119,19 +120,24 @@ function convert_odt_2_pdf(){
 
   local ODT_FILE="$ODT_DOC.odt"
   local PDF_FILE="$ODT_DOC.pdf"
-  local f
+  local CD_DONE
 
   echo -e "\n  - Converting \"$ODT_FILE\" to pdf..."
 
-  f=$(ls $ODT_FILE)
-  if [[ -z "$f" ]] ; then
-    echo "WARN: $ODT_FILE file does not exist, skipping this step."
-  else
+  [[ -d data ]] && {
+	cd data; # temporary until data/ renamed...
+	CD_DONE=true; }
+
+  if ls $ODT_FILE ; then
     libreoffice --headless --invisible --convert-to pdf $ODT_FILE	
     if [[ $? != 0 || $(ls $PDF_FILE|wc -l) != 1 ]] ; then
-      echo "WARN: $ODT_FILE not converted to pdf."
+      echo "WARN: $ODT_FILE not converted to pdf"
     fi
+  else
+    echo "WARN: $ODT_FILE file does not exist, skipping this step."
   fi
+
+  [[ -n "$CD_DONE" ]] && cd - # temporary until data/ renamed...
 }
 
 # create_tarball: create a versioned directory in the user's cwd, copy the
@@ -146,8 +152,7 @@ function create_tarball(){
   local TARBALL="$TARBALL_PREFIX.tar.gz"
   local TARBALL_DIR="$TARBALL_PREFIX" # scratch dir not TARGET dir
   local TARBALL_PATH="$TARBALL_DIR/$TARBALL"
-  local FILES_TO_TAR=(*.sh README.* hosts.example *.pdf $(ls -d */|grep -v devutils/))
-  local f
+  local FILES_TO_TAR=(*.sh README.* hosts.example $(ls -d */|grep -v devutils/))
 
   echo -e "\n  - Creating $TARBALL tarball in $TARGET"
   [[ -e $TARBALL ]] && /bin/rm $TARBALL

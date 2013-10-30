@@ -20,6 +20,7 @@
    - prep_node.sh: companion script, not to be executed directly.
    - README.txt: this file.
    - data/: directory containing: (to be pahsed out....)
+     - Ambari_Configuration_Guide.pdf
      - ambari-<version>.rpms.tar.gz: Ambari server and agent RPMs.
      - ambari.repo: Ambari's repo file.
      - fuse-patch.tar.gz: FUSE patch RPMs.
