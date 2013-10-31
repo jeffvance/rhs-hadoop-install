@@ -90,7 +90,7 @@ function fixup_etc_hosts_file(){
 #
 function install_plugin(){
 
-  local PLUGIN_JAR='gluster-hadoop-*.jar'
+  local PLUGIN_JAR='glusterfs-hadoop-*.jar'
   local USR_JAVA_DIR='/usr/share/java'
   local HADOOP_JAVA_DIR='/usr/lib/hadoop/lib/'
   local jar=''; local out; local err; local cnt
@@ -129,7 +129,7 @@ function install_plugin(){
   rm -f $HADOOP_JAVA_DIR/$jar
   out="$(ln -s $USR_JAVA_DIR/$jar $HADOOP_JAVA_DIR/$jar 2>&1)"
   err=$?
-  display "plugin symlink $out" $LOG_DEBUG
+  display "plugin symlink: $out" $LOG_DEBUG
   if (( err != 0 )) ; then
     display "ERROR: plugin symlink error $err" $LOG_FORCE
     exit 7
@@ -314,6 +314,17 @@ function apply_tuned(){
   local TUNE_PATH_BAK="$TUNE_PATH.orig"
   local TUNE_PERMS=755 # rwxr-xr-x
 
+  # just return if there is no "rhsx.y" sub-dir, which means there are no
+  # extra files to install
+  [[ -z "$RHS_DIR" ]] && return
+
+  if ! ls $RHS_DIR$TUNE_FILE ; then
+    display "INFO: $TUNE_FILE file not supplied" $LOG_INFO
+    return
+  fi
+
+  cd $RHS_DIR
+
   # replace ktune.sh
   [[ -f $TUNE_PATH_BAK ]] || mv $TUNE_PATH $TUNE_PATH_BAK
   out="$(cp -f $TUNE_FILE $TUNE_PATH)"
@@ -333,6 +344,7 @@ function apply_tuned(){
     display "ERROR: tuned-adm error $err" $LOG_FORCE
     exit 50
   fi
+  cd -
 }
 
 # install_common: perform node installation steps independent of whether or not
