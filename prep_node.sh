@@ -87,19 +87,30 @@ function fixup_etc_hosts_file(){
 
 # install_plugin: copy the Hadoop-Gluster plug-in from the rhs install files to
 # the appropriate Hadoop directory. Fatal errors exit script.
-#### WHERE WILL THE PLUGIN BE INSTALLED IN RHS 2.1.1? ???? ####
 #
 function install_plugin(){
 
+  local PLUGIN_JAR='gluster-hadoop-*.jar'
   local USR_JAVA_DIR='/usr/share/java'
   local HADOOP_JAVA_DIR='/usr/lib/hadoop/lib/'
-  local jar=''; local out; local err
+  local jar=''; local out; local err; local cnt
 
-  jar=$(ls glusterfs-hadoop*.jar)
-  if [[ -z "$jar" ]] ; then
-    display "  Gluster Hadoop plug-in missing in $DEPLOY_DIR" $LOG_FORCE
+  # just return if there is no "rhsx.y" sub-dir, which means there are no
+  # extra files to install
+  [[ -z "$RHS_DIR" ]] && return
+
+  cnt=$(ls $RHS_DIR$PLUGIN_JAR|wc -l)
+  if (( cnt == 0 )) ; then  # nothing to do...
+    display "INFO: gluster-hadoop plugin not supplied" $LOG_INFO
+    return
+  elif (( cnt > 1 )) ; then
+    display "ERROR: more than 1 gluster-hadoop plug-in in $DEPLOY_DIR$RHS_DIR" $LOG_FORCE
     exit 3
   fi
+
+  cd $RHS_DIR
+
+  jar=$(ls $PLUGIN_JAR)
 
   display "-- Installing Gluster-Hadoop plug-in ($jar)..." $LOG_INFO
   # create target dirs if they does not exist
@@ -125,6 +136,7 @@ function install_plugin(){
   fi
 
   display "   ... Gluster-Hadoop plug-in install successful" $LOG_SUMMARY
+  cd -
 }
 
 # verify_ntp: verify that ntp is installed, running, and synchronized.
@@ -188,6 +200,70 @@ function rhn_register(){
     fi
   fi
 }
+
+# verify_fuse: verify this node has the correct kernel FUSE patch installed. If
+# not then it will be installed and a global variable is set to indicate that
+# this node needs to be rebooted. There is no shell command/utility to report
+# whether or not the FUSE patch has been installed (eg. uname -r doesn't), so
+# a file is used for this test.
+#
+function verify_fuse(){
+
+  local FUSE_TARBALL='fuse-*.tar.gz'; local out; local err; local cnt
+  # if file exists then fuse patch installed
+  local FUSE_INSTALLED='/tmp/FUSE_INSTALLED' # Note: deploy dir is rm'd
+
+  # just return if there is no "rhsx.y" sub-dir, which means there are no
+  # extra files to install
+  [[ -z "$RHS_DIR" ]] && return
+
+  if [[ -f "$FUSE_INSTALLED" ]]; then # file exists, assume installed
+    display "   ... verified" $LOG_DEBUG
+    return
+  fi
+
+  cnt=$(ls $RHS_DIR$FUSE_TARBALL|wc -l)
+  if (( cnt == 0 )) ; then  # nothing to do...
+    display "INFO: FUSE patch not supplied" $LOG_INFO
+    return
+  elif (( cnt > 1 )) ; then
+    display "ERROR: more than 1 FUSE tarball in $DEPLOY_DIR$RHS_DIR" $LOG_FORCE
+    exit 40
+  fi
+
+  cd $RHS_DIR
+
+  display "-- Installing FUSE patch, may take more than a few seconds..." \
+        $LOG_INFO
+  echo
+  rm -rf fusetmp  # scratch dir
+  mkdir fusetmp
+
+  out="$(tar -C fusetmp/ -xzf $FUSE_TARBALL 2>&1)"
+  err=$?
+  display "untar fuse: $out" $LOG_DEBUG
+  if (( err != 0 )) ; then
+    display "ERROR: untar fuse error $err" $LOG_FORCE
+    exit 42
+  fi
+
+  out="$(yum -y install fusetmp/*.rpm 2>&1)"
+  err=$?
+  display "fuse install: $out" $LOG_DEBUG
+  if (( err != 0 && err != 1 )) ; then # 1--> nothing to do
+    display "ERROR: fuse install error $err" $LOG_FORCE
+    exit 44
+  fi
+
+  # create kludgy fuse-has-been-installed file
+  touch $FUSE_INSTALLED
+  display "   A reboot of $NODE is required and will be done automatically" \
+        $LOG_INFO
+  echo
+  REBOOT_REQUIRED=true
+  cd -
+}
+
 
 # sudoers: create the /etc/sudoers.d/20_gluster file, add the mapred and yarn
 # users to it, and set its permissions. Note: this file will be overwritten.
@@ -297,7 +373,12 @@ function install_storage(){
   IP=${HOST_IPS[$i]}
 
   # install Gluster-Hadoop plug-in on agent nodes
-  #install_plugin ## NEED TO KNOW WHERE THE PLUGIN will be installed in RHS???
+  install_plugin
+
+  # verify FUSE patch on data (agent) nodes, if not installed yum install it
+  echo
+  display "-- Verifying FUSE patch installation:" $LOG_SUMMARY
+  verify_fuse
 
   # apply the tuned-admin rhs-high-throughput profile
   echo
@@ -333,7 +414,15 @@ if (( $(ls | wc -l) == 0 )) ; then
   display "$NODE: No files found in $DEPLOY_DIR" $LOG_FORCE 
   exit -1
 fi
-[[ -d 'rhs2.0' ]] && cd rhs2.0 # backwards compatibility for now...
+
+# catpure the rhs sub-dir name for pushd in some of the install functions
+rhs_dir_cnt=$(ls -d rhs*/|wc -l)
+if (( rhs_dir_cnt > 1 )) ; then
+  display "Too many rhs* sub-directories in $DEPLOY_DIR, expecting only one" \
+	$LOG_FORCE
+  exit 55
+fi
+(( rhs_dir_cnt == 1 )) && RHS_DIR=$(ls -d */)
 
 # remove special logfile, start "clean" each time script is invoked
 rm -f $PREP_LOG

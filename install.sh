@@ -853,7 +853,7 @@ function install_nodes(){
 	rm -rf $REMOTE_INSTALL_DIR
 	mkdir -p $REMOTE_INSTALL_DIR"
     display "-- Copying rhs-hadoop install files..." $LOG_INFO
-    FILES_TO_CP+="$(ls -d */ | tr "\n" ' ')" # include sub-directories
+    FILES_TO_CP+="$(ls -d rhs*/ | tr "\n" ' ')" # include rhs sub-directory
     out="$(scp -r $FILES_TO_CP root@$ip:$REMOTE_INSTALL_DIR)"
     err=$?
     display "copy install files: $out" $LOG_DEBUG

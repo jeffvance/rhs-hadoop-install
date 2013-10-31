@@ -50,6 +50,8 @@ function usage(){
   --pkg-version: the version string to be used as part of the tarball filename.
                  Default is the most recent git version in the SOURCE dir.
  
+  --rhsdir     : name of the rhs sub-dir which contains extra rhs-specific
+                 files, e.g. RPMs etc. 
 EOF
 }
 
@@ -58,13 +60,14 @@ EOF
 function parse_cmd(){
 
   local OPTIONS='h'
-  local LONG_OPTS='source:,target-dir:,pkg-version:,odt-doc:,help'
+  local LONG_OPTS='source:,target-dir:,pkg-version:,odt-doc:,rhsdir:,help'
 
   # defaults (global variables)
   SOURCE=$PWD
   TARGET=$SOURCE
   PKG_VERSION=''
   ODT_DOC='Ambari_Configuration_Guide'
+  RHS_DIR=''
 
   local args=$(getopt -n "$(basename $0)" -o $OPTIONS --long $LONG_OPTS -- $@)
   (( $? == 0 )) || { echo "$SCRIPT syntax error"; exit -1; }
@@ -87,6 +90,9 @@ function parse_cmd(){
 	--odt-doc)
 	   ODT_DOC=$2; shift 2; continue
 	;;
+	--rhsdir)
+	   RHS_DIR=$2; shift 2; continue
+	;;
         --)  # no more args to parse
 	   shift; break
         ;;
@@ -103,11 +109,13 @@ function parse_cmd(){
 	echo "ERROR: package version not supplied and no git environment present.";
 	exit -1; }
 
-  # verify source and target dirs
-  [[ -d "$SOURCE" ]] || { \
+  # verify source, target and rhsdir dirs
+  [[ -d "$SOURCE" ]] || {
 	echo "ERROR: \"$SOURCE\" source directory missing."; exit -1; }
-  [[ -d "$TARGET" ]] || { \
+  [[ -d "$TARGET" ]] || {
 	echo "ERROR: \"$TARGET\" target directory missing."; exit -1; }
+  [[ -n "$RHS_DIR" && ! -d $RHS_DIR ]] && {
+	echo "ERROR: rhsdir does not exist or is not a directory"; exit -1; }
 }
 
 # convert_odt_2_pdf: if possible convert the .odt doc file under the user's
@@ -120,13 +128,10 @@ function convert_odt_2_pdf(){
 
   local ODT_FILE="$ODT_DOC.odt"
   local PDF_FILE="$ODT_DOC.pdf"
-  local CD_DONE
 
   echo -e "\n  - Converting \"$ODT_FILE\" to pdf..."
 
-  [[ -d rhs2.0 ]] && {
-	cd rhs2.0; # temporary??
-	CD_DONE=true; }
+  [[ -n "$RHS_DIR" ]] && cd $RHS_DIR
 
   if ls $ODT_FILE ; then
     libreoffice --headless --invisible --convert-to pdf $ODT_FILE	
@@ -137,7 +142,7 @@ function convert_odt_2_pdf(){
     echo "WARN: $ODT_FILE file does not exist, skipping this step."
   fi
 
-  [[ -n "$CD_DONE" ]] && cd - # temporary??
+  [[ -n "$RHS_DIR" ]] && cd -
 }
 
 # create_tarball: create a versioned directory in the user's cwd, copy the
@@ -152,24 +157,24 @@ function create_tarball(){
   local TARBALL="$TARBALL_PREFIX.tar.gz"
   local TARBALL_DIR="$TARBALL_PREFIX" # scratch dir not TARGET dir
   local TARBALL_PATH="$TARBALL_DIR/$TARBALL"
-  local FILES_TO_TAR=(*.sh README.* hosts.example $(ls -d */|grep -v devutils/))
+#local FILES_TO_TAR=(*.sh README.* hosts.example $(ls -d */|grep -v devutils/))
+  local FILES_TO_TAR='*.sh README.* hosts.example'
 
   echo -e "\n  - Creating $TARBALL tarball in $TARGET"
-  [[ -e $TARBALL ]] && /bin/rm $TARBALL
+  rm $TARBALL
 
   # create temp tarball dir and copy subset of content there
-  [[ -d $TARBALL_DIR ]] && /bin/rm -rf $TARBALL_DIR
-  /bin/mkdir $TARBALL_DIR
-  for f in "${FILES_TO_TAR[@]}" ; do
-    /bin/cp -R $f $TARBALL_DIR
-  done
+  rm -rf $TARBALL_DIR
+  mkdir $TARBALL_DIR
+  [[ -n "$RHS_DIR" ]] && FILES_TO_TAR+=" $RHS_DIR"
+  cp -R $FILES_TO_TAR $TARBALL_DIR
 
-  /bin/tar cvzf $TARBALL $TARBALL_DIR
+  tar cvzf $TARBALL $TARBALL_DIR
   if [[ $? != 0 || $(ls $TARBALL|wc -l) != 1 ]] ; then
     echo "ERROR: creation of tarball failed."
     exit 1
   fi
-  /bin/rm -rf $TARBALL_DIR
+  rm -rf $TARBALL_DIR
 
   # move tarball file to TARGET dir
   [[ "$TARGET" == "$PWD" ]] || mv $TARBALL $TARGET
