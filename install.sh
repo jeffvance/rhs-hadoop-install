@@ -618,6 +618,23 @@ function verify_vol_started(){
   fi
 }
 
+# verify_gluster_mnt: given the passed in node, verify that the glusterfs
+# mount succeeded. This mount is important for the subsequent chmod and chown
+# on the gluster mount dir to work.
+function verify_gluster_mnt(){
+
+  local node=$1 # required
+  local out
+
+  out="$(ssh -oStrictHostKeyChecking=no root@$node \
+	"grep $GLUSTER_MNT /proc/mounts 2>&1")"
+  if (( $? != 0 )) ; then
+    display "ERROR: $GLUSTER_MNT *NOT* mounted" $LOG_FORCE
+    exit 8
+  fi
+  display "$GLUSTER_MNT mounted: $out" $LOG_DEBUG
+}
+
 # create_trusted_pool: create the trusted storage pool. No error if the pool
 # already exists.
 #
@@ -766,11 +783,13 @@ function setup(){
   # Note: ownership and permissions must be set *afer* the gluster vol is
   #       mounted.
   for node in "${HOSTS[@]}"; do
+      display "-- $node --" $LOG_INFO
       out="$(ssh -oStrictHostKeyChecking=no root@$node \
 		"mount $GLUSTER_MNT 2>&1")" # from fstab
       (( $? != 0 )) && {
         display "ERROR: $node: mount $GLUSTER_MNT: $out" $LOG_FORCE; exit 21; }
       display "mount $GLUSTER_MNT: $out" $LOG_DEBUG
+      verify_gluster_mnt $node  # important for chmod/chown below
 
       out="$(ssh -oStrictHostKeyChecking=no root@$node \
 	"mkdir -p $MAPRED_SYSTEM_DIR 2>&1")"

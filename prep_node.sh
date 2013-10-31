@@ -318,7 +318,7 @@ function apply_tuned(){
   # extra files to install
   [[ -z "$RHS_DIR" ]] && return
 
-  if ! ls $RHS_DIR$TUNE_FILE ; then
+  if ! ls $RHS_DIR$TUNE_FILE >& /dev/null ; then
     display "INFO: $TUNE_FILE file not supplied" $LOG_INFO
     return
   fi
