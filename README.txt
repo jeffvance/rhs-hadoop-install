@@ -2,7 +2,7 @@
 
 == Overview ==
 
-  The install.sh script (and the companion data/prep_node.sh script) sets up
+  The install.sh script (and the companion prep_node.sh script) sets up
   Red Hat Storage (RHS) for Hadoop workloads.  It is expected that the Red Hat
   Storage installation guide was followed to set up RHS. Note: the storage
   (brick) partition (e.g. /dev/sdb) should be configured as RAID 6.
@@ -19,7 +19,7 @@
    - install.sh: the main install script, executed by the root user.
    - prep_node.sh: companion script, not to be executed directly.
    - README.txt: this file.
-   - data/: directory containing: (to be pahsed out....)
+   - rhs2.0/: directory containing:
      - Ambari_Configuration_Guide.pdf
      - ambari-<version>.rpms.tar.gz: Ambari server and agent RPMs.
      - ambari.repo: Ambari's repo file.
@@ -30,7 +30,7 @@
        directly).
  
   install.sh is the main script and should be run as the root user. It installs
-  the files in the data/ directory to each node contained in the "hosts" file.
+  the files in the rhs2.0/ directory to each node contained in the "hosts" file.
  
 == Before you begin ==
 

@@ -765,18 +765,9 @@ function setup(){
   display "       change owner and permissions..."  $LOG_INFO
   # Note: ownership and permissions must be set *afer* the gluster vol is
   #       mounted.
-   #rhs pre-2.1 does not support the entry-timeout and attribute-timeout
-   #options via shell mount command or via fstab. Thus, we run the gluserfs
-   #command to do the gluster vol mount. However this method does NOT persist
-   #the mount so whenever a data node reboots the gluster mount is lost! When
-   #we support RHS 2.1+ then the 1st mount below can be uncommented and the
-   #glusterfs mount below should be deleted.
   for node in "${HOSTS[@]}"; do
-      #can't mount via fstab in pre-RHS 2.1 releases...
       out="$(ssh -oStrictHostKeyChecking=no root@$node \
-		"glusterfs --attribute-timeout=0 \
-		--entry-timeout=0 --volfile-id=/$VOLNAME \
-		--volfile-server=$node $GLUSTER_MNT 2>&1")"
+		"mount $GLUSTER_MNT 2>&1")" # from fstab
       (( $? != 0 )) && {
         display "ERROR: $node: mount $GLUSTER_MNT: $out" $LOG_FORCE; exit 21; }
       display "mount $GLUSTER_MNT: $out" $LOG_DEBUG
@@ -842,12 +833,12 @@ function install_nodes(){
   local LOCAL_PREP_LOG_DIR='/var/tmp/'; local out
   REBOOT_NODES=() # global
 
-  # prep_node: sub-function which copies the data/ dir from the tarball to the
-  # passed-in node. Then the prep_node.sh script is invoked on the passed-in
-  # node to install these files. If prep.sh returns the "reboot-node" error
-  # code and the node is not the "install-from" node then the global reboot-
-  # needed variable is set. If an unexpected error code is returned then this
-  # function exits.
+  # prep_node: sub-function which copies the prep_node script and all sub-
+  # directories in the tarball to the passed-in node. Then the prep_node.sh
+  # script is invoked on the passed-in node to install these files. If prep.sh
+  # returns the "reboot-node" error code and the node is not the "install-from"
+  # node then the global reboot-needed variable is set. If an unexpected error
+  # code is returned then this function exits.
   # Args: $1=hostname, $2=node's ip (can be hostname if ip is unknown),
   #       $3=flag to install storage node, $4=flag to install the mgmt node.
   #

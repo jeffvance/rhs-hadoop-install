@@ -7,7 +7,7 @@
 #  - prep_node.sh
 #  - README.txt
 #  - hosts.example
-#  - data/: directory containing: ##Note will be renamed later...
+#  - rhs2.0/: directory containing:
 #    - Ambari_Configuration_Guide.pdf (not .odt version)
 #    - ambari.repo
 #    - ambari-<version>.rpms.tar.gz
@@ -124,8 +124,8 @@ function convert_odt_2_pdf(){
 
   echo -e "\n  - Converting \"$ODT_FILE\" to pdf..."
 
-  [[ -d data ]] && {
-	cd data; # temporary until data/ renamed...
+  [[ -d rhs2.0 ]] && {
+	cd rhs2.0; # temporary??
 	CD_DONE=true; }
 
   if ls $ODT_FILE ; then
@@ -137,7 +137,7 @@ function convert_odt_2_pdf(){
     echo "WARN: $ODT_FILE file does not exist, skipping this step."
   fi
 
-  [[ -n "$CD_DONE" ]] && cd - # temporary until data/ renamed...
+  [[ -n "$CD_DONE" ]] && cd - # temporary??
 }
 
 # create_tarball: create a versioned directory in the user's cwd, copy the
