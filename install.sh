@@ -787,7 +787,8 @@ function setup(){
       out="$(ssh -oStrictHostKeyChecking=no root@$node \
 		"mount $GLUSTER_MNT 2>&1")" # from fstab
       (( $? != 0 )) && {
-        display "ERROR: $node: mount $GLUSTER_MNT: $out" $LOG_FORCE; exit 21; }
+        display "ERROR: $node: mount $GLUSTER_MNT: $out" $LOG_FORCE;
+	exit 21; }
       display "mount $GLUSTER_MNT: $out" $LOG_DEBUG
       verify_gluster_mnt $node  # important for chmod/chown below
 
