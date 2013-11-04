@@ -161,7 +161,7 @@ function verify_ntp(){
     (( $? == 0 )) && display "WARN: ntpd did NOT stop" $LOG_FORCE
   fi
 
-  # set time now (ntpdate is being deprecated)
+  # set time to ntp clock time now (ntpdate is being deprecated)
   # note: ntpd can't be running...
   out="$(ntpd -qg 2>&1)"
   err=$?
