@@ -3,18 +3,22 @@
 # This script creates the install tarball package. Currently this includes the
 # following files:
 #  * rhs-hadoop-install-<verison> directory whicn contains:
-#  - install.sh
-#  - prep_node.sh
-#  - README.txt
-#  - hosts.example
-#  - rhs2.0/: directory containing:
-#    - Ambari_Configuration_Guide.pdf (not .odt version)
-#    - ambari.repo
-#    - ambari-<version>.rpms.tar.gz
-#    - fuse-patch.tar.gz
-#    - gluster-hadoop-<version>.jar
-#    - ktune.sh: optimized RHEL 2.0.5 tuned-adm high-throughput script
-#    - prep_node.sh (ambari-specific)
+#   - hosts.example: sample "hosts" config file.
+#   - install.sh: the main install script, executed by the root user.
+#   - prep_node.sh: companion script, not to be executed directly.
+#   - README.txt: this file.
+#   - devutils/: utility directory.
+#
+#   [ optional: use --rhsdir option ]
+#   - rhs2.*/: directory which may contain one or more of the following:
+#     - Ambari_Configuration_Guide.pdf
+#     - ambari-<version>.rpms.tar.gz: Ambari server and agent RPMs.
+#     - ambari.repo: Ambari's repo file.
+#     - fuse-patch.tar.gz: FUSE patch RPMs.
+#     - gluster-hadoop-<version>.jar: Gluster-Hadoop plug-in.
+#     - ktune.sh: optimized RHEL 2.0.5 tuned-adm high-throughput script
+#     - prep_node.sh: Ambari-specific install script (not to be executed
+#       directly).
 #
 # The Ambari_Configuration_Guide.pdf file is exported from the git
 # Ambari_Installation_Guide.odt file prior to creating the tarball.
