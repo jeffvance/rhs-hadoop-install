@@ -21,7 +21,7 @@
 
 # set global variables
 SCRIPT=$(basename $0)
-INSTALL_VER='0.36'   # self version
+INSTALL_VER='0.37'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/rhs-hadoop-install/" # on each node
@@ -261,11 +261,10 @@ function parse_cmd(){
   fi
 }
 
-# verify_local_deploy_setup: make sure the expected deploy files are in
-# place. Collect all detected setup errors together (rather than one at a 
-# time) for better usability. Validate format and size of hosts file.
-# Verify connectivity between localhost and each data/storage node. Assign
-# global HOSTS and HOST_IPS array variables and the MGMT_NODE variable. 
+# verify_local_deploy_setup: make sure the user is root and that the expected 
+# deploy files are in place. Collect all detected setup errors together (rather # than one at a time) for better usability. Validate format and size of hosts 
+# file. Verify connectivity between localhost and each data/storage node. Assign
+# global HOSTS, HOST_IPS, and MGMT_NODE variables.
 #
 function verify_local_deploy_setup(){
 
