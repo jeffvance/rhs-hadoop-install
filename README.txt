@@ -19,7 +19,10 @@
    - install.sh: the main install script, executed by the root user.
    - prep_node.sh: companion script, not to be executed directly.
    - README.txt: this file.
-   - rhs2.0/: directory containing:
+   - devutils/: utility directory.
+
+   [ optional ]
+   - rhs2.*/: directory which may contain one or more of the following:
      - Ambari_Configuration_Guide.pdf
      - ambari-<version>.rpms.tar.gz: Ambari server and agent RPMs.
      - ambari.repo: Ambari's repo file.

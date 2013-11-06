@@ -29,15 +29,18 @@
   The rhs-hadoop-install tarball contains the following:
    - hosts.example: sample "hosts" config file.
    - install.sh: the main install script, executed by the root user.
+   - prep_node.sh: companion script, not to be executed directly.
    - README.txt: this file.
-   - data/: directory containing:
+   - rhs2.0/: directory containing:
+     - Ambari_Configuration_Guide.pdf
      - ambari-<version>.rpms.tar.gz: Ambari server and agent RPMs.
      - ambari.repo: Ambari's repo file.
      - fuse-patch.tar.gz: FUSE patch RPMs.
      - gluster-hadoop-<version>.jar: Gluster-Hadoop plug-in.
      - ktune.sh: optimized RHEL 2.0.5 tuned-adm high-throughput script
-     - prep_node.sh: companion script, not to be executed directly.
- 
+     - prep_node.sh: Ambari-specific install script (not to be executed
+       directly).
+
   install.sh is the main script and should be run as the root user. It installs
   the files in the data/ directory to each node contained in the "hosts" file.
  
