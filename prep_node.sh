@@ -212,6 +212,7 @@ function verify_fuse(){
   local FUSE_TARBALL='fuse-*.tar.gz'; local out; local err; local cnt
   # if file exists then fuse patch installed
   local FUSE_INSTALLED='/tmp/FUSE_INSTALLED' # Note: deploy dir is rm'd
+  local cnt; local out
 
   # just return if there is no "rhsx.y" sub-dir, which means there are no
   # extra files to install
@@ -222,7 +223,7 @@ function verify_fuse(){
     return
   fi
 
-  cnt=$(ls $RHS_DIR$FUSE_TARBALL|wc -l)
+  cnt=$(ls $RHS_DIR$FUSE_TARBALL 2>/dev/null | wc -l) # 0 is no match
   if (( cnt == 0 )) ; then  # nothing to do...
     display "INFO: FUSE patch not supplied" $LOG_INFO
     return

@@ -352,6 +352,12 @@ function verify_local_deploy_setup(){
   }
 
   # main #
+  #      #
+  if (( UID != 0 )) ; then
+    errmsg+=" * Must be root to run this script.\n"
+    ((errcnt++))
+  fi
+
   if [[ ! -f $HOSTS_FILE ]] ; then
     errmsg+=" * \"$HOSTS_FILE\" file is missing.\n   This file contains a list of IP address followed by hostname, one\n   pair per line. Use \"hosts.example\" as an example.\n"
     ((errcnt++))
@@ -411,6 +417,7 @@ function report_deploy_values(){
   }
 
   # main #
+  #      #
   # assume 1st node is representative of OS version for cluster
   OS="$(ssh -oStrictHostKeyChecking=no root@$firstNode cat $RHEL_RELEASE)"
   RHS="$(ssh -oStrictHostKeyChecking=no root@$firstNode "
@@ -911,8 +918,8 @@ function install_nodes(){
     fi
   }
 
-  ## main ##
-
+  # main #
+  #      #
   for (( i=0; i<$NUMNODES; i++ )); do
       node=${HOSTS[$i]}; ip=${HOST_IPS[$i]}
       echo
