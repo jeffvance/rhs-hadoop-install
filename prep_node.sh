@@ -429,13 +429,13 @@ if (( $(ls | wc -l) == 0 )) ; then
 fi
 
 # catpure the rhs sub-dir name for pushd in some of the install functions
-rhs_dir_cnt=$(ls -d rhs*/|wc -l)
+rhs_dir_cnt=$(ls -d rhs*/ 2>/dev/null | wc -l) # 0 if no matches
 if (( rhs_dir_cnt > 1 )) ; then
   display "Too many rhs* sub-directories in $DEPLOY_DIR, expecting only one" \
 	$LOG_FORCE
   exit 55
 fi
-(( rhs_dir_cnt == 1 )) && RHS_DIR=$(ls -d */)
+(( rhs_dir_cnt == 1 )) && RHS_DIR=$(ls -d rhs*/)
 
 # remove special logfile, start "clean" each time script is invoked
 rm -f $PREP_LOG
