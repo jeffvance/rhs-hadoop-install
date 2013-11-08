@@ -85,32 +85,48 @@ function fixup_etc_hosts_file(){
   fi
 }
 
+# get_dir: given the passed-in filename ($1) set the global variables MATCH_DIR
+# and MATCH_FILE to the dirname and basename in SUBDIR_FILES that matches.
+#
+function get_dir(){
+
+  local match="$1" # note: can be wildcarded
+  local f; local dir
+
+  MATCH_DIR=''; MATCH_FILE=''
+
+  for f in "${SUBDIR_FILES[@]}"; do
+      dir="$(dirname $f)"
+      [[ "$dir" == '.' ]]  && continue # skip directories
+      [[ "$f" =~ $match ]] && {
+	 MATCH_DIR=$dir; MATCH_FILE="$(basename $f)"; return;
+      }
+  done
+}
+
 # install_plugin: copy the Hadoop-Gluster plug-in from the rhs install files to
 # the appropriate Hadoop directory. Fatal errors exit script.
 #
 function install_plugin(){
 
-  local PLUGIN_JAR='glusterfs-hadoop-*.jar'
+  local PLUGIN_JAR='glusterfs-hadoop-.*.jar' # note: regexp not glob
   local USR_JAVA_DIR='/usr/share/java'
   local HADOOP_JAVA_DIR='/usr/lib/hadoop/lib/'
-  local jar=''; local out; local err; local cnt
+  local jar=''; local out; local err
 
-  # just return if there is no "rhsx.y" sub-dir, which means there are no
+  # just return if there are no sub-directories, which means there are no
   # extra files to install
-  [[ -z "$RHS_DIR" ]] && return
+  [[ -z "$SUBDIRS" ]] && return
 
-  cnt=$(ls $RHS_DIR$PLUGIN_JAR|wc -l)
-  if (( cnt == 0 )) ; then  # nothing to do...
-    display "INFO: gluster-hadoop plugin not supplied" $LOG_INFO
-    return
-  elif (( cnt > 1 )) ; then
-    display "ERROR: more than 1 gluster-hadoop plug-in in $DEPLOY_DIR$RHS_DIR" $LOG_FORCE
-    exit 3
-  fi
+  get_dir "$PLUGIN_JAR" # sets MATCH_DIR and MATCH_FILE vars if match
+echo "**** dir=$MATCH_DIR"
+  [[ -z "$MATCH_DIR" ]] && {
+	display "INFO: gluster-hadoop plugin not supplied" $LOG_INFO;
+	return; }
 
-  cd $RHS_DIR
+  cd $MATCH_DIR
 
-  jar=$(ls $PLUGIN_JAR)
+  jar="$MATCH_FILE"
 
   display "-- Installing Gluster-Hadoop plug-in ($jar)..." $LOG_INFO
   # create target dirs if they does not exist
@@ -428,14 +444,17 @@ if (( $(ls | wc -l) == 0 )) ; then
   exit -1
 fi
 
-# catpure the rhs sub-dir name for pushd in some of the install functions
-rhs_dir_cnt=$(ls -d rhs*/ 2>/dev/null | wc -l) # 0 if no matches
-if (( rhs_dir_cnt > 1 )) ; then
-  display "Too many rhs* sub-directories in $DEPLOY_DIR, expecting only one" \
-	$LOG_FORCE
-  exit 55
-fi
-(( rhs_dir_cnt == 1 )) && RHS_DIR=$(ls -d rhs*/)
+SUBDIRS=$(ls -d */ 2>/dev/null)
+[[ -n "$SUBDIRS" ]] && 
+	SUBDIR_FILES=($(find $SUBDIRS)) # array, files in all sub-dirs
+
+#rhs_dir_cnt=$(ls -d rhs*/ 2>/dev/null | wc -l) # 0 if no matches
+#if (( rhs_dir_cnt > 1 )) ; then
+  #display "Too many rhs* sub-directories in $DEPLOY_DIR, expecting only one" \
+	#$LOG_FORCE
+  #exit 55
+#fi
+#(( rhs_dir_cnt == 1 )) && RHS_DIR=$(ls -d rhs*/)
 
 # remove special logfile, start "clean" each time script is invoked
 rm -f $PREP_LOG

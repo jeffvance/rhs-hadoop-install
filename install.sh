@@ -21,7 +21,7 @@
 
 # set global variables
 SCRIPT=$(basename $0)
-INSTALL_VER='0.37'   # self version
+INSTALL_VER='0.38'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/rhs-hadoop-install/" # on each node

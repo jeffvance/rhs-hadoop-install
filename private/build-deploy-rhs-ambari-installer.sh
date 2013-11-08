@@ -7,14 +7,17 @@
 # NOTE: this is an intermediate target tarball directory
 BUILD_LOCATION=/var/lib/jenkins/workspace/Ambari
 REPO=/root/archivainstall/apache-archiva-1.3.6/data/repositories/internal
-SOURCE=$(pwd) #expected to be a git directory
+SOURCE=$(pwd) # expected to be a git directory
 S3='s3://rhbd/rhs-hadoop-install'
 TARBALL_PREFIX='rhs-hadoop-install-'
 TARBALL_SUFFIX='.tar.gz'
 
 ####### BUILD THE TAR/GZ FILE ~ THIS SHOULD RUN IN JENKINS (future) ####### 
 cd $SOURCE
-git pull
+git pull # this loads *all* directories in the repo. However, the resulting 
+	 # deployment may include a only the devutils/ dir, meaning the other
+	 # dirs are ignored, or may include a subset of the dirs. Most likely
+	 # all dirs will not be part of the deployment.
 
 TAGNAME="$(git describe --abbrev=0 --tag)"
 TARBALL="$TARBALL_PREFIX${TAGNAME//./_}$TARBALL_SUFFIX" # s/./_/ in tag

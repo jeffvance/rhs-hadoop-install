@@ -9,7 +9,7 @@
 #   - README.txt: this file.
 #   - devutils/: utility directory.
 #
-#   [ optional: use --rhsdir option ]
+#   [ optional: via --dirs option ]
 #   - rhs2.*/: directory which may contain one or more of the following:
 #     - Ambari_Configuration_Guide.pdf
 #     - ambari-<version>.rpms.tar.gz: Ambari server and agent RPMs.
@@ -53,9 +53,9 @@ function usage(){
                  "Ambari_Configuration_Guide"
   --pkg-version: the version string to be used as part of the tarball filename.
                  Default is the most recent git version in the SOURCE dir.
- 
-  --rhsdir     : name of the rhs sub-dir which contains extra rhs-specific
-                 files, e.g. RPMs etc. 
+  --dirs       : list of directory names, separated by only a comma. The
+                 contents of these directories will be included in the tarball
+                 and ultimately installed by the installation scripts.
 EOF
 }
 
@@ -64,14 +64,15 @@ EOF
 function parse_cmd(){
 
   local OPTIONS='h'
-  local LONG_OPTS='source:,target-dir:,pkg-version:,odt-doc:,rhsdir:,help'
+  local LONG_OPTS='source:,target-dir:,pkg-version:,odt-doc:,dirs:,help'
+  local dir; local i
 
   # defaults (global variables)
   SOURCE=$PWD
   TARGET=$SOURCE
   PKG_VERSION=''
   ODT_DOC='Ambari_Configuration_Guide'
-  RHS_DIR=''
+  DIRS=(devutils/) # array, always include contents of devutils/
 
   local args=$(getopt -n "$(basename $0)" -o $OPTIONS --long $LONG_OPTS -- $@)
   (( $? == 0 )) || { echo "$SCRIPT syntax error"; exit -1; }
@@ -94,8 +95,9 @@ function parse_cmd(){
 	--odt-doc)
 	   ODT_DOC=$2; shift 2; continue
 	;;
-	--rhsdir)
-	   RHS_DIR=$2; shift 2; continue
+	--dirs)
+	   DIRS+=(${2//,/ }) # replace comma with space and append to array
+	   shift 2; continue
 	;;
         --)  # no more args to parse
 	   shift; break
@@ -113,13 +115,38 @@ function parse_cmd(){
 	echo "ERROR: package version not supplied and no git environment present.";
 	exit -1; }
 
-  # verify source, target and rhsdir dirs
+  # verify source and target
   [[ -d "$SOURCE" ]] || {
 	echo "ERROR: \"$SOURCE\" source directory missing."; exit -1; }
   [[ -d "$TARGET" ]] || {
 	echo "ERROR: \"$TARGET\" target directory missing."; exit -1; }
-  [[ -n "$RHS_DIR" && ! -d $RHS_DIR ]] && {
-	echo "ERROR: rhsdir does not exist or is not a directory"; exit -1; }
+
+  # verify any extra directories
+  for (( i=1; i<${#DIRS[@]}; i++ )) ; do # skip devutils/ entry
+      dir="${DIRS[$i]}"
+      if [[ ! -d "$dir" ]] ; then
+	echo "ERROR: extra directory \"$dir\" does not exist in $PWD"
+	exit -1
+      fi
+  done
+}
+
+# get_dir: given the passed-in filename ($1) set the global var CD_TO_DIR to
+# the dirname of the file in INCLUDED_FILES if there's a match.
+#
+function get_dir(){
+
+  local match="$1"
+  local f; local dir
+
+  CD_TO_DIR=''
+
+  # get dirname of matching $1 file
+  for f in "${INCLUDED_FILES[@]}"; do
+      dir="$(dirname $f)"
+      [[ "$dir" == '.' ]] && continue # skip directories
+      [[ "$f" =~ "$match" ]] && { CD_TO_DIR=$dir; return; }
+  done
 }
 
 # convert_odt_2_pdf: if possible convert the .odt doc file under the user's
@@ -135,18 +162,19 @@ function convert_odt_2_pdf(){
 
   echo -e "\n  - Converting \"$ODT_FILE\" to pdf..."
 
-  [[ -n "$RHS_DIR" ]] && cd $RHS_DIR
+  # get dirname of odt file and cd to it if match
+  get_dir "$ODT_FILE" # sets CD_TO_DIR var if match
+  [[ -z "$CD_TO_DIR" ]] && {
+    echo "INFO: $ODT_FILE file does not exist, skipping this step.";
+    return; }
 
-  if ls $ODT_FILE ; then
-    libreoffice --headless --invisible --convert-to pdf $ODT_FILE	
-    if [[ $? != 0 || $(ls $PDF_FILE|wc -l) != 1 ]] ; then
-      echo "WARN: $ODT_FILE not converted to pdf"
-    fi
-  else
-    echo "WARN: $ODT_FILE file does not exist, skipping this step."
-  fi
+  cd $CD_TO_DIR
 
-  [[ -n "$RHS_DIR" ]] && cd -
+  libreoffice --headless --invisible --convert-to pdf $ODT_FILE	
+  [[ $? != 0 || $(ls $PDF_FILE|wc -l) != 1 ]] && {
+    echo "WARN: $ODT_FILE not converted to pdf"; }
+
+  cd -
 }
 
 # create_tarball: create a versioned directory in the user's cwd, copy the
@@ -161,7 +189,7 @@ function create_tarball(){
   local TARBALL="$TARBALL_PREFIX.tar.gz"
   local TARBALL_DIR="$TARBALL_PREFIX" # scratch dir not TARGET dir
   local TARBALL_PATH="$TARBALL_DIR/$TARBALL"
-  local FILES_TO_TAR='*.sh README.* hosts.example devutils/'
+  local FILES_TO_TAR="*.sh README.* hosts.example ${DIRS[@]}"
 
   echo -e "\n  - Creating $TARBALL tarball in $TARGET"
   rm $TARBALL
@@ -169,7 +197,6 @@ function create_tarball(){
   # create temp tarball dir and copy subset of content there
   rm -rf $TARBALL_DIR
   mkdir $TARBALL_DIR
-  [[ -n "$RHS_DIR" ]] && FILES_TO_TAR+=" $RHS_DIR"
   cp -R $FILES_TO_TAR $TARBALL_DIR
 
   tar cvzf $TARBALL $TARBALL_DIR
@@ -193,6 +220,9 @@ echo "a tarball containing the install package."
 echo
 echo "  Source dir:  $SOURCE"
 echo "  Target dir:  $TARGET"
+echo "  Extra dirs:  ${DIRS[@]}"
+
+INCLUDED_FILES=($(find ${DIRS[@]})) # all files in all extra sub-dirs
 
 convert_odt_2_pdf
 create_tarball
