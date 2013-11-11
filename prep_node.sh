@@ -8,9 +8,17 @@
 # INSTALL.SH
 #
 # This script is a companion script to install.sh and runs on a remote node. It
-# does the following:
-#  - installs the gluster-hadoop plug-in,
-#  - checks if NTP is running and synchronized,
+# prepares the hosting node for hadoop workloads ontop of red hat storage. 
+# Depending on the contents of the tarball (see devutils/mk_tarball) this
+# script can install the following:
+#  - gluster-hadoop plug-in jar file,
+#  - FUSE kernel patch,
+#  - ktune.sh performance script
+#
+# In addition to the potential installs above, this script does the following:
+#  - modifes /etc/hosts to include all hosts ip/hostname for the cluster
+#  - sets up the sudoers file
+#  - ensures that ntp is running correctly
 #
 # Please read the README file.
 #
@@ -23,6 +31,7 @@
 #
 # Note: as of now the "install mgmt server" flag is ignored! No special code
 #   exists related to a management node.
+#
 # Note on passing arrays: the caller (install.sh) needs to surround the array
 # values with embedded double quotes, eg. "\"${ARRAY[@]}\""
 
@@ -413,7 +422,8 @@ function install_mgmt(){
 }
 
 
-## ** main ** ##
+# ** main ** #
+#            #
 echo
 display "$(date). Begin: prep_node" $LOG_REPORT
 
@@ -429,6 +439,7 @@ if (( $(ls | wc -l) == 0 )) ; then
   exit -1
 fi
 
+# create SUBDIR_FILES variable which contains all files in all sub-dirs
 SUBDIRS=$(ls -d */ 2>/dev/null) # "" if no sub-dirs
 [[ -n "$SUBDIRS" ]] && 
 	SUBDIR_FILES=($(find $SUBDIRS)) # array, files in all sub-dirs
