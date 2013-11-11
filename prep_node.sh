@@ -15,9 +15,11 @@
 #  - FUSE kernel patch,
 #  - ktune.sh performance script
 #
-# In addition to the potential installs above, this script does the following:
+# In addition to the potential installs above, this script does the following 
+# on the host (this) node:
 #  - modifes /etc/hosts to include all hosts ip/hostname for the cluster
 #  - sets up the sudoers file
+#  - registers this node with RHN (red hat support network)
 #  - ensures that ntp is running correctly
 #
 # Please read the README file.
