@@ -20,8 +20,9 @@
 #     - prep_node.sh: Ambari-specific install script (not to be executed
 #       directly).
 #
-# The Ambari_Configuration_Guide.pdf file is exported from the git
-# Ambari_Installation_Guide.odt file prior to creating the tarball.
+# The Ambari_Configuration_Guide.pdf file may be exported from the git
+# Ambari_Installation_Guide.odt file prior to creating the tarball, if present
+# in one of the supplied directories -- see usage().
 #
 # This script is expected to be run from a git repo so that source version
 # info can be used in the tarball filename. The --source and --target-dir
@@ -37,8 +38,10 @@ function usage(){
 
   cat <<EOF
 
-  This script converts the install guide .odt document file to pdf (if the
-  doc file is present) and creates the rhs-hadoop-install tarball package.
+  This script converts the install guide .odt document file to pdf (if the doc
+  file is present in one of the supplied --dirs=) and creates the rhs-hadoop-
+  install tarball package.
+
   There are no required parameters.
   
   SYNTAX:
@@ -140,6 +143,7 @@ function get_dir(){
   local f; local dir
 
   CD_TO_DIR=''
+  [[ -z "$INCLUDED_FILES" ]] && return # nothing to do...
 
   # get dirname of matching $1 file
   for f in "${INCLUDED_FILES[@]}"; do
@@ -160,15 +164,14 @@ function convert_odt_2_pdf(){
   local ODT_FILE="$ODT_DOC.odt"
   local PDF_FILE="$ODT_DOC.pdf"
 
-  echo -e "\n  - Converting \"$ODT_FILE\" to pdf..."
-
   # get dirname of odt file and cd to it if match
   get_dir "$ODT_FILE" # sets CD_TO_DIR var if match
   [[ -z "$CD_TO_DIR" ]] && {
-    echo "INFO: $ODT_FILE file does not exist, skipping this step.";
+    echo "INFO: $ODT_FILE file does not exist, no PDF conversion needed.";
     return; }
 
   cd $CD_TO_DIR
+  echo -e "\n  - Converting \"$ODT_FILE\" to pdf..."
 
   libreoffice --headless --invisible --convert-to pdf $ODT_FILE	
   [[ $? != 0 || $(ls $PDF_FILE|wc -l) != 1 ]] && {
@@ -222,6 +225,8 @@ echo "  Source dir:  $SOURCE"
 echo "  Target dir:  $TARGET"
 echo "  Extra dirs:  ${DIRS[@]}"
 
+# format for INCLUDED_FILES: 
+#   "<dir> <dir1>/<file1> <dir1>/<file2>...<dir2> <dir2/<fileX>..."
 INCLUDED_FILES=($(find ${DIRS[@]})) # all files in all extra sub-dirs
 
 convert_odt_2_pdf

@@ -86,7 +86,8 @@ function fixup_etc_hosts_file(){
 }
 
 # get_dir: given the passed-in filename ($1) set the global variables MATCH_DIR
-# and MATCH_FILE to the dirname and basename in SUBDIR_FILES that matches.
+# and MATCH_FILE to the dirname and basename if $1 matches one of the entries
+# in SUBDIRS_FILES.
 #
 function get_dir(){
 
@@ -94,6 +95,7 @@ function get_dir(){
   local f; local dir
 
   MATCH_DIR=''; MATCH_FILE=''
+  [[ -z "$SUBDIR_FILES" ]] && return # nothing to do...
 
   for f in "${SUBDIR_FILES[@]}"; do
       dir="$(dirname $f)"
@@ -114,18 +116,12 @@ function install_plugin(){
   local HADOOP_JAVA_DIR='/usr/lib/hadoop/lib/'
   local jar=''; local out; local err
 
-  # just return if there are no sub-directories, which means there are no
-  # extra files to install
-  [[ -z "$SUBDIRS" ]] && return
-
   get_dir "$PLUGIN_JAR" # sets MATCH_DIR and MATCH_FILE vars if match
-echo "**** dir=$MATCH_DIR"
   [[ -z "$MATCH_DIR" ]] && {
 	display "INFO: gluster-hadoop plugin not supplied" $LOG_INFO;
 	return; }
 
   cd $MATCH_DIR
-
   jar="$MATCH_FILE"
 
   display "-- Installing Gluster-Hadoop plug-in ($jar)..." $LOG_INFO
@@ -212,7 +208,7 @@ function rhn_register(){
     display "rhn_register: $out" $LOG_DEBUG
     if (( err != 0 )) ; then
       display "ERROR: rhn_register error $err" $LOG_FORCE
-      exit 38
+      exit 10
     fi
   fi
 }
@@ -225,33 +221,26 @@ function rhn_register(){
 #
 function verify_fuse(){
 
-  local FUSE_TARBALL='fuse-*.tar.gz'; local out; local err; local cnt
-  # if file exists then fuse patch installed
+  local FUSE_TARBALL_RE='fuse-.*.tar.gz' # note: regexp not glob
+  local FUSE_TARBALL
+  local out; local err
+  # if below file exists then fuse patch installed
   local FUSE_INSTALLED='/tmp/FUSE_INSTALLED' # Note: deploy dir is rm'd
-  local cnt; local out
-
-  # just return if there is no "rhsx.y" sub-dir, which means there are no
-  # extra files to install
-  [[ -z "$RHS_DIR" ]] && return
 
   if [[ -f "$FUSE_INSTALLED" ]]; then # file exists, assume installed
     display "   ... verified" $LOG_DEBUG
     return
   fi
 
-  cnt=$(ls $RHS_DIR$FUSE_TARBALL 2>/dev/null | wc -l) # 0 is no match
-  if (( cnt == 0 )) ; then  # nothing to do...
-    display "INFO: FUSE patch not supplied" $LOG_INFO
-    return
-  elif (( cnt > 1 )) ; then
-    display "ERROR: more than 1 FUSE tarball in $DEPLOY_DIR$RHS_DIR" $LOG_FORCE
-    exit 40
-  fi
+  get_dir "$FUSE_TARBALL_RE" # sets MATCH_DIR and MATCH_FILE vars if match
+  [[ -z "$MATCH_DIR" ]] && {
+	display "INFO: FUSE patch not supplied" $LOG_INFO;
+	return; }
 
-  cd $RHS_DIR
+  cd $MATCH_DIR
+  FUSE_TARBALL=$MATCH_FILE
 
-  display "-- Installing FUSE patch, may take more than a few seconds..." \
-        $LOG_INFO
+  display "-- Installing FUSE patch via $FUSE_TARBALL ..." $LOG_INFO
   echo
   rm -rf fusetmp  # scratch dir
   mkdir fusetmp
@@ -261,7 +250,7 @@ function verify_fuse(){
   display "untar fuse: $out" $LOG_DEBUG
   if (( err != 0 )) ; then
     display "ERROR: untar fuse error $err" $LOG_FORCE
-    exit 42
+    exit 13
   fi
 
   out="$(yum -y install fusetmp/*.rpm 2>&1)"
@@ -269,7 +258,7 @@ function verify_fuse(){
   display "fuse install: $out" $LOG_DEBUG
   if (( err != 0 && err != 1 )) ; then # 1--> nothing to do
     display "ERROR: fuse install error $err" $LOG_FORCE
-    exit 44
+    exit 16
   fi
 
   # create kludgy fuse-has-been-installed file
@@ -315,7 +304,7 @@ function sudoers(){
   display "sudoer chmod: $out" $LOG_DEBUG
   if (( err != 0 )) ; then
     display "ERROR: sudoers chmod error $err" $LOG_FORCE
-    exit 46
+    exit 20
   fi
 }
 
@@ -331,16 +320,12 @@ function apply_tuned(){
   local TUNE_PATH_BAK="$TUNE_PATH.orig"
   local TUNE_PERMS=755 # rwxr-xr-x
 
-  # just return if there is no "rhsx.y" sub-dir, which means there are no
-  # extra files to install
-  [[ -z "$RHS_DIR" ]] && return
+  get_dir "$TUNE_FILE" # sets MATCH_DIR and MATCH_FILE vars if match
+  [[ -z "$MATCH_DIR" ]] && {
+	display "INFO: $TUNE_FILE file not supplied" $LOG_INFO
+	return; }
 
-  if [[ ! -f "$RHS_DIR$TUNE_FILE" ]] ; then
-    display "INFO: $TUNE_FILE file not supplied" $LOG_INFO
-    return # not an error
-  fi
-
-  cd $RHS_DIR
+  cd $MATCH_DIR
 
   # replace ktune.sh
   [[ -f $TUNE_PATH_BAK ]] || mv $TUNE_PATH $TUNE_PATH_BAK
@@ -349,7 +334,7 @@ function apply_tuned(){
   display "$TUNE_FILE cp: $out" $LOG_DEBUG
   if [[ ! -f $TUNE_PATH ]] ; then
     display "ERROR: cp of $TUNE_FILE to $TUNE_DIR error $err" $LOG_FORCE
-    exit 48 
+    exit 23 
   fi
   chmod $TUNE_PERMS $TUNE_PATH
 
@@ -359,7 +344,7 @@ function apply_tuned(){
   display "tuned-adm: $out" $LOG_DEBUG
   if (( err != 0 )) ; then
     display "ERROR: tuned-adm error $err" $LOG_FORCE
-    exit 50
+    exit 25
   fi
   cd -
 }
@@ -444,17 +429,9 @@ if (( $(ls | wc -l) == 0 )) ; then
   exit -1
 fi
 
-SUBDIRS=$(ls -d */ 2>/dev/null)
+SUBDIRS=$(ls -d */ 2>/dev/null) # "" if no sub-dirs
 [[ -n "$SUBDIRS" ]] && 
 	SUBDIR_FILES=($(find $SUBDIRS)) # array, files in all sub-dirs
-
-#rhs_dir_cnt=$(ls -d rhs*/ 2>/dev/null | wc -l) # 0 if no matches
-#if (( rhs_dir_cnt > 1 )) ; then
-  #display "Too many rhs* sub-directories in $DEPLOY_DIR, expecting only one" \
-	#$LOG_FORCE
-  #exit 55
-#fi
-#(( rhs_dir_cnt == 1 )) && RHS_DIR=$(ls -d rhs*/)
 
 # remove special logfile, start "clean" each time script is invoked
 rm -f $PREP_LOG
