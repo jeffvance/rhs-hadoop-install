@@ -227,6 +227,7 @@ echo "  Extra dirs:  ${DIRS[@]}"
 
 # format for INCLUDED_FILES: 
 #   "<dir> <dir1>/<file1> <dir1>/<file2>...<dir2> <dir2/<fileX>..."
+# note: DIRS always contains at least the devutils dir
 INCLUDED_FILES=($(find ${DIRS[@]})) # all files in all extra sub-dirs
 
 convert_odt_2_pdf
