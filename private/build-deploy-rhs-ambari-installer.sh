@@ -17,18 +17,22 @@ TARBALL_SUFFIX='.tar.gz'
 #
 function parse_cmd(){
 
+  local OPTIONS='D:'
   local LONG_OPTS='dirs:'
 
   # defaults (global variables)
   DIRS=''
 
-  local args=$(getopt --long $LONG_OPTS -- $@)
+  # note: there seems to be a bug in getopt whereby it won't parse correctly
+  #   unless short options are also provided. Using --long only causes --dirs
+  #   to be skipped.
+  local args=$(getopt -n "$(basename $0)" -o $OPTIONS --long $LONG_OPTS -- $@)
 
   eval set -- "$args" # set up $1... positional args
 
   while true ; do
       case "$1" in
-        --dirs)
+        -D|--dirs)
             DIRS=$2; shift 2; continue
         ;;
         --)  # no more args to parse
@@ -52,12 +56,12 @@ TAGNAME="$(git describe --abbrev=0 --tag)"
 TARBALL="$TARBALL_PREFIX${TAGNAME//./_}$TARBALL_SUFFIX" # s/./_/ in tag
 
 # parse cmdline options
-parse_cmd
+parse_cmd $@
 
 # potentially convert .odt to .pdf, always create tarball
 $SOURCE/devutils/mk_tarball.sh \
 	--target-dir="$BUILD_LOCATION" \
-	--pkg-version="$TAGNAME"
+	--pkg-version="$TAGNAME" \
 	--dirs=$DIRS
 
 # git archive HEAD | gzip > $BUILD_LOCATION
