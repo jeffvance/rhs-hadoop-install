@@ -403,7 +403,7 @@ function report_deploy_values(){
     uniq_vers=($(echo "${node_vers[@]}"|tr ' ' "\n"|sort|uniq))
 
     (( ${#uniq_vers[@]} == 1 )) && {
-      display "Gluster:              $vers (same on all nodes)" $LOG_REPORT;
+      display "GlusterFS:            $vers (same on all nodes)" $LOG_REPORT;
       return; }
 
     # display each node and version

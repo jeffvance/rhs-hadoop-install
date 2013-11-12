@@ -12,6 +12,35 @@ S3='s3://rhbd/rhs-hadoop-install'
 TARBALL_PREFIX='rhs-hadoop-install-'
 TARBALL_SUFFIX='.tar.gz'
 
+# parse_cmd: use getop. Optional list of one or more directories must be
+# separated only by a comma (no spaces).
+#
+function parse_cmd(){
+
+  local LONG_OPTS='dirs:'
+
+  # defaults (global variables)
+  DIRS=''
+
+  local args=$(getopt --long $LONG_OPTS -- $@)
+
+  eval set -- "$args" # set up $1... positional args
+
+  while true ; do
+      case "$1" in
+        --dirs)
+            DIRS=$2; shift 2; continue
+        ;;
+        --)  # no more args to parse
+            shift; break
+        ;;
+      esac
+  done
+}
+
+# main #
+#      #
+
 ####### BUILD THE TAR/GZ FILE ~ THIS SHOULD RUN IN JENKINS (future) ####### 
 cd $SOURCE
 git pull # this loads *all* directories in the repo. However, the resulting 
@@ -22,10 +51,14 @@ git pull # this loads *all* directories in the repo. However, the resulting
 TAGNAME="$(git describe --abbrev=0 --tag)"
 TARBALL="$TARBALL_PREFIX${TAGNAME//./_}$TARBALL_SUFFIX" # s/./_/ in tag
 
-# convert .odt to .pdf and create tarball
+# parse cmdline options
+parse_cmd
+
+# potentially convert .odt to .pdf, always create tarball
 $SOURCE/devutils/mk_tarball.sh \
 	--target-dir="$BUILD_LOCATION" \
 	--pkg-version="$TAGNAME"
+	--dirs=$DIRS
 
 # git archive HEAD | gzip > $BUILD_LOCATION
 cd /opt/JEFF/  ##why??

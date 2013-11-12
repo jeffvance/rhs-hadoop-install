@@ -398,6 +398,8 @@ function install_storage(){
   IP=${HOST_IPS[$i]}
 
   # install Gluster-Hadoop plug-in on agent nodes
+  echo
+  display "-- Verifying RHS-GlusterFS installation:" $LOG_SUMMARY
   install_plugin
 
   # verify FUSE patch on data (agent) nodes, if not installed yum install it
