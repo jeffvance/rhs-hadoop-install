@@ -21,7 +21,7 @@
 
 # set global variables
 SCRIPT=$(basename $0)
-INSTALL_VER='0.38'   # self version
+INSTALL_VER='0.39'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/rhs-hadoop-install/" # on each node
@@ -872,15 +872,14 @@ function install_nodes(){
 
     local node="$1"; local ip="$2"; local install_storage="$3"
     local install_mgmt="$4"; local err
-    local FILES_TO_CP="$PREP_SH "
+    # copy prep_node + all subdirs (if any)
+    local FILES_TO_CP="$PREP_SH $(ls -d */ 2>/dev/null)"
 
     # use ip rather than node for scp and ssh until /etc/hosts is set up
     ssh -oStrictHostKeyChecking=no root@$ip "
 	rm -rf $REMOTE_INSTALL_DIR
 	mkdir -p $REMOTE_INSTALL_DIR"
     display "-- Copying rhs-hadoop install files..." $LOG_INFO
-    ls rhs*/ >& /dev/null && \
-	FILES_TO_CP+="$(ls -d rhs*/ | tr "\n" ' ')" # include rhs sub-directory
     out="$(scp -r $FILES_TO_CP root@$ip:$REMOTE_INSTALL_DIR)"
     err=$?
     display "copy install files: $out" $LOG_DEBUG

@@ -9,18 +9,27 @@
 #
 # This script is a companion script to install.sh and runs on a remote node. It
 # prepares the hosting node for hadoop workloads ontop of red hat storage. 
-# Depending on the contents of the tarball (see devutils/mk_tarball) this
-# script can install the following:
-#  - gluster-hadoop plug-in jar file,
-#  - FUSE kernel patch,
-#  - ktune.sh performance script
 #
-# In addition to the potential installs above, this script does the following 
-# on the host (this) node:
+# This script does the following on the host (this) node:
 #  - modifes /etc/hosts to include all hosts ip/hostname for the cluster
 #  - sets up the sudoers file
 #  - registers this node with RHN (red hat support network)
 #  - ensures that ntp is running correctly
+#
+# Additionally, depending on the contents of the tarball (see devutils/
+# mk_tarball), this script may install the following:
+#  - gluster-hadoop plug-in jar file,
+#  - FUSE kernel patch,
+#  - ktune.sh performance script
+#
+# Lastly, if there are any executable files (expected to be shell scripts)
+# within any sub-directories found under the deployment dir, they are 
+# executed (and passed the same args as prep_node.sh).
+# Note: executables are invoked after all tasks above are completed.
+# Note: the order of execution is alphabetical based on 1) sub-dir name and 
+#   2) shell script name.
+# Note: sub-dir naming such as 001-foo and 002-bar can force the desired
+#    execution order.
 #
 # Please read the README file.
 #
@@ -98,22 +107,23 @@ function fixup_etc_hosts_file(){
 
 # get_dir: given the passed-in filename ($1) set the global variables MATCH_DIR
 # and MATCH_FILE to the dirname and basename if $1 matches one of the entries
-# in SUBDIRS_FILES.
+# in SUBDIR_FILES.
 #
 function get_dir(){
 
-  local match="$1" # note: can be wildcarded
+  # note: $1 can be wildcarded but must be a regexp not a glob
+  local match="$1"
   local f; local dir
 
   MATCH_DIR=''; MATCH_FILE=''
   [[ -z "$SUBDIR_FILES" ]] && return # nothing to do...
 
-  for f in "${SUBDIR_FILES[@]}"; do
-      dir="$(dirname $f)"
-      [[ "$dir" == '.' ]]  && continue # skip directories
-      [[ "$f" =~ $match ]] && {
-	 MATCH_DIR=$dir; MATCH_FILE="$(basename $f)"; return;
-      }
+  for dir in "${!SUBDIR_FILES[@]}"; do
+      for f in "${SUBDIR_FILES[$dir]}"; do
+          [[ "$f" =~ $match ]] && {
+	     MATCH_DIR=$dir; MATCH_FILE="$f"; return;
+	  }
+      done
   done
 }
 
@@ -425,6 +435,26 @@ function install_mgmt(){
   # nothing to do yet...
 }
 
+# execute_extra_scripts: if there are any scripts within the extra sub-dirs
+# then execute them now. All prep_node args are passed to the script.
+# Note: script errors are ignored and do not stop the next script from
+#    executing. This may need to be changed later...
+#
+function execute_extra_scripts(){
+
+  local f
+
+  if [[ -n "$SUBDIR_XFILES" ]] ; then # at least 1 executable exists
+    display " --  Executing scripts in sub-directories..." $LOG_SUMMARY
+    for f in $SUBDIR_XFILES ; do
+        display "Executing: $f" $LOG_INFO
+        ./$f $@ # pass all args to script
+    done
+  else
+    display "No additional executable scripts found" $LOG_INFO
+  fi
+}
+
 
 # ** main ** #
 #            #
@@ -444,9 +474,18 @@ if (( $(ls | wc -l) == 0 )) ; then
 fi
 
 # create SUBDIR_FILES variable which contains all files in all sub-dirs
-SUBDIRS=$(ls -d */ 2>/dev/null) # "" if no sub-dirs
-[[ -n "$SUBDIRS" ]] && 
-	SUBDIR_FILES=($(find $SUBDIRS)) # array, files in all sub-dirs
+# Note: there can be 0 or more sub-dirs.
+# Note: shell scripts in any/all of the sub-dirs will be executed in alphabetic
+#   order based on 1) subdir-name and 2) filename.
+# SUBDIR_FILES fmt: (dir1-> "file1 file2 ...", dir2-> "file1 file2 ..." ...)
+declare -A SUBDIR_FILES # associative array
+# SUBDIR_XFILES fmt: "dir/x-file1 dir/x-file2 dir2/x-file3 ..." 
+SUBDIR_XFILES='' # string of executable files
+for dir in $(ls -d */ 2>/dev/null) ; do # empty if no sub-dirs
+    SUBDIR_FILES["$dir"]="$(ls $dir 2>/dev/null)"
+    [[ "$dir" == 'devutils/' ]] && continue # skip devutils/
+    SUBDIR_XFILES+="$(find ${dir}* -executable -type f -name '*.sh') "
+done
 
 # remove special logfile, start "clean" each time script is invoked
 rm -f $PREP_LOG
@@ -454,8 +493,12 @@ rm -f $PREP_LOG
 install_common
 
 [[ $STORAGE_INSTALL == true ]] && install_storage
-[[ $MGMT_INSTALL == true    ]] && install_mgmt
+[[ $MGMT_INSTALL    == true ]] && install_mgmt
 
+# execute all shell scripts within sub-dirs, if any
+execute_extra_scripts $@
+
+echo
 display "$(date). End: prep_node" $LOG_REPORT
 
 [[ -n "$REBOOT_REQUIRED" ]] && exit 99 # tell install.sh a reboot is needed
