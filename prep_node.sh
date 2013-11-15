@@ -487,14 +487,15 @@ if (( $(ls | wc -l) == 0 )) ; then
   exit -1
 fi
 
-# create SUBDIR_FILES variable which contains all files in all sub-dirs
-# Note: there can be 0 or more sub-dirs.
-# Note: shell scripts in any/all of the sub-dirs will be executed in alphabetic
-#   order based on 1) subdir-name and 2) filename.
+# Create SUBDIR_FILES variable which contains all files in all sub-dirs.
+# There can be 1 or more sub-dirs (devutils/ is always present).
 # SUBDIR_FILES fmt: (dir1-> "file1 file2 ...", dir2-> "file1 file2 ..." ...)
 declare -A SUBDIR_FILES # associative array
+# SUBDIR_XFILES is a string of executable files (shell scripts)
 # SUBDIR_XFILES fmt: "dir/x-file1 dir/x-file2 dir2/x-file3 ..." 
-SUBDIR_XFILES='' # string of executable files
+# Note: shell scripts in all sub-dirs (except devutils/) will be executed in
+#   alphabetic order based on: 1) subdir-name and 2) filename.
+SUBDIR_XFILES=''
 for dir in $(ls -d */ 2>/dev/null) ; do # empty if no sub-dirs
     SUBDIR_FILES["$dir"]="$(ls $dir 2>/dev/null)"
     [[ "$dir" == 'devutils/' ]] && continue # skip devutils/
