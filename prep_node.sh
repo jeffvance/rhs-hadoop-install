@@ -5,7 +5,7 @@
 # Author: Jeff Vance <jvance@redhat.com>
 #
 # THIS SCRIPT IS NOT MEANT TO BE RUN STAND-ALONE. IT IS A COMPANION SCRIPT TO
-# INSTALL.SH
+# install.sh.
 #
 # This script is a companion script to install.sh and runs on a remote node. It
 # prepares the hosting node for hadoop workloads ontop of red hat storage. 
@@ -24,7 +24,7 @@
 #
 # Lastly, if there are any executable files (expected to be shell scripts)
 # within any sub-directories found under the deployment dir, they are 
-# executed (and passed the same args as prep_node.sh).
+# executed (and passed the same args as prep_node in the same order).
 # Note: executables are invoked after all tasks above are completed.
 # Note: the order of execution is alphabetical based on 1) sub-dir name and 
 #   2) shell script name.
@@ -40,11 +40,12 @@
 #   $11=rhn user password
 # '*' means required argument, others are optional.
 #
-# Note: as of now the "install mgmt server" flag is ignored! No special code
-#   exists related to a management node.
+# Note: as of now, in prep_node.sh, the "install mgmt server" flag is ignored.
+#   However, supporting scripts executed by prep_node are passed this flag and
+#   may act upon its setting.
 #
 # Note on passing arrays: the caller (install.sh) needs to surround the array
-# values with embedded double quotes, eg. "\"${ARRAY[@]}\""
+#   values with embedded double quotes, eg. "\"${ARRAY[@]}\""
 
 # constants and args
 NODE=$1
@@ -436,19 +437,32 @@ function install_mgmt(){
 }
 
 # execute_extra_scripts: if there are any scripts within the extra sub-dirs
-# then execute them now. All prep_node args are passed to the script.
+# then execute them now. All prep_node args are passed to the script; however,
+# unfortunately, $@ cannot be used since the arrays are lost. Therefore, each
+# arg is passed individually.
 # Note: script errors are ignored and do not stop the next script from
 #    executing. This may need to be changed later...
+# Note: for an unknown reason, the 2 arrays need to be converted to strings
+#   then passed to the script. This is not necessary when passing the same
+#   arrays from install.sh to prep_node.sh but seems to be required here...
 #
 function execute_extra_scripts(){
 
-  local f
+  local f; local dir
 
   if [[ -n "$SUBDIR_XFILES" ]] ; then # at least 1 executable exists
     display " --  Executing scripts in sub-directories..." $LOG_SUMMARY
+    local tmp1="${HOSTS[@]}"    # convert array -> string
+    local tmp2="${HOST_IPS[@]}"
+
     for f in $SUBDIR_XFILES ; do
         display "Executing: $f" $LOG_INFO
-        ./$f $@ # pass all args to script
+	dir="$(dirname $f)"; f="$(basename $f)"
+	cd $dir
+        ./$f $NODE $STORAGE_INSTALL $MGMT_INSTALL "$tmp1" "$tmp2" \
+ 		$MGMT_NODE $VERBOSE $PREP_LOG $DEPLOY_DIR "$RHN_USER" \
+		"$RHN_PASS"
+        cd -
     done
   else
     display "No additional executable scripts found" $LOG_INFO
@@ -496,7 +510,7 @@ install_common
 [[ $MGMT_INSTALL    == true ]] && install_mgmt
 
 # execute all shell scripts within sub-dirs, if any
-execute_extra_scripts $@
+execute_extra_scripts
 
 echo
 display "$(date). End: prep_node" $LOG_REPORT

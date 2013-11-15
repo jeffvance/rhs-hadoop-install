@@ -21,7 +21,7 @@
 
 # set global variables
 SCRIPT=$(basename $0)
-INSTALL_VER='0.39'   # self version
+INSTALL_VER='0.40'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/rhs-hadoop-install/" # on each node
@@ -1009,19 +1009,6 @@ function perf_config(){
   fi
 }
 
-# cleanup_logfile: if JDK was installed (and it may not be and will eventually
-# be replaced by OpenJDK) then delete its progress message. When Oracle JDK
-# progress is written to disk it results in a very long record in the logfile
-# and the user has to forward through hundreds of "pages" to get to the next
-# useful record. So, this one long record is deleted here.
-#
-function cleanup_logfile(){
-
-  local DELETE_STR='jdk-' # Oracle JDK install progress pattern
-
-  sed -i "/$DELETE_STR/d" $LOGFILE
-}
-
 # reboot_self: invoked when the install-from node (self) is also one of the
 # storage nodes. In this case the reboot of the storage node (needed to 
 # complete kernel patch installation) has been deferred -- until now.
@@ -1086,8 +1073,6 @@ setup
 echo
 display "-- Performance config --" $LOG_SUMMARY
 perf_config
-
-cleanup_logfile
 
 # reboot nodes where a kernel patch was installed
 reboot_nodes
