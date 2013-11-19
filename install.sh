@@ -21,7 +21,7 @@
 
 # set global variables
 SCRIPT=$(basename $0)
-INSTALL_VER='0.40'   # self version
+INSTALL_VER='0.41'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/rhs-hadoop-install/" # on each node
@@ -688,7 +688,7 @@ function setup(){
   local PERMISSIONS='777' # for now until we learn how to reduce this...
   local OWNER='mapred'; local GROUP='hadoop'
   local BRICK_MNT_OPTS="noatime,inode64"
-  local GLUSTER_MNT_OPTS="entry-timeout=0,attribute-timeout=0,_netdev"
+  local GLUSTER_MNT_OPTS="entry-timeout=0,attribute-timeout=0,use-readdirp=no,_netdev"
 
   # 1) mkfs.xfs brick_dev on every node
   # 2) mkdir brick_dir and vol_mnt on every node
