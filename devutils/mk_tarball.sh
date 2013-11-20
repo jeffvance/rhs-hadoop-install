@@ -31,6 +31,8 @@
 # There are no required command line args. All options are described in the
 # usage() function.
 
+# source common constants and functions
+. ../functions
 
 # usage: echo the standard usage text with supported options.
 #
@@ -134,25 +136,6 @@ function parse_cmd(){
   done
 }
 
-# get_dir: given the passed-in filename ($1) set the global var CD_TO_DIR to
-# the dirname of the file in INCLUDED_FILES if there's a match.
-#
-function get_dir(){
-
-  local match="$1"
-  local f; local dir
-
-  CD_TO_DIR=''
-  [[ -z "$INCLUDED_FILES" ]] && return # nothing to do...
-
-  # get dirname of matching $1 file
-  for f in "${INCLUDED_FILES[@]}"; do
-      dir="$(dirname $f)"
-      [[ "$dir" == '.' ]] && continue # skip directories
-      [[ "$f" =~ "$match" ]] && { CD_TO_DIR=$dir; return; }
-  done
-}
-
 # convert_odt_2_pdf: if possible convert the .odt doc file under the user's
 # cwd to a pdf file using libreoffice. Report warning if this can't be done.
 #
@@ -165,12 +148,12 @@ function convert_odt_2_pdf(){
   local PDF_FILE="$ODT_DOC.pdf"
 
   # get dirname of odt file and cd to it if match
-  get_dir "$ODT_FILE" # sets CD_TO_DIR var if match
-  [[ -z "$CD_TO_DIR" ]] && {
+  match_dir "$ODT_FILE" # sets MATCH_DIR var if match
+  [[ -z "$MATCH_DIR" ]] && {
     echo "INFO: $ODT_FILE file does not exist, no PDF conversion needed.";
     return; }
 
-  cd $CD_TO_DIR
+  cd $MATCH_DIR
   echo -e "\n  - Converting \"$ODT_FILE\" to pdf..."
 
   libreoffice --headless --invisible --convert-to pdf $ODT_FILE	
@@ -225,10 +208,9 @@ echo "  Source dir:  $SOURCE"
 echo "  Target dir:  $TARGET"
 echo "  Extra dirs:  ${DIRS[@]}"
 
-# format for INCLUDED_FILES: 
-#   "<dir> <dir1>/<file1> <dir1>/<file2>...<dir2> <dir2/<fileX>..."
+# format for SUBDIR_FILES: "dir1/file1 dir1/file2...dir2/fileN ..."
 # note: DIRS always contains at least the devutils dir
-INCLUDED_FILES=($(find ${DIRS[@]})) # all files in all extra sub-dirs
+SUBDIR_FILES=$(find ${DIRS[@]} -type f) # all files in all extra sub-dirs
 
 convert_odt_2_pdf
 create_tarball

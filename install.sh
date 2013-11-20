@@ -242,119 +242,6 @@ function parse_cmd(){
   fi
 }
 
-# verify_local_deploy_setup: make sure the user is root and that the expected 
-# deploy files are in place. Collect all detected setup errors together (rather # than one at a time) for better usability. Validate format and size of hosts 
-# file. Verify connectivity between localhost and each data/storage node. Assign
-# global HOSTS, HOST_IPS, and MGMT_NODE variables.
-#
-function verify_local_deploy_setup(){
-
-  local errmsg=''; local errcnt=0
-
-  # read_verify_local_hosts_file: sub-function to read the deploy "hosts"
-  # file, split it into the HOSTS and HOST_IPS global array variables, validate
-  # hostnames and ips, and verify password-less ssh connectivity to each node.
-  # Comments and empty lines are ignored in the hosts file. The number of nodes
-  # represented in the hosts file is enforced to be a multiple of the replica
-  # count. Downcase host names if they are upper case.
-  # 
-  function read_verify_local_hosts_file(){
-
-    local i; local host=''; local ip=''; local hosts_ary; local numTokens
-
-    # regular expression to validate ip addresses
-    local VALID_IP_RE='^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$'
-
-    # regular expression to validate hostnames (host is down-cased)
-    local VALID_HOSTNAME_RE='^(([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])\.)*([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])$'
-
-    # read hosts file, skip comments and blank lines, parse out hostname and ip
-    read -a hosts_ary <<< $(sed '/^ *#/d;/^ *$/d;s/#.*//' $HOSTS_FILE)
-    numTokens=${#hosts_ary[@]}
-    HOSTS=(); HOST_IPS=() # global vars
-
-    # hosts file format: ip-address  hostname  # one pair per line
-    for (( i=0; i<$numTokens; i++ )); do
-	# IP address:
-	ip=${hosts_ary[$i]}
-	# validate basic ip-addr syntax
-	if [[ ! $ip =~ $VALID_IP_RE ]] ; then
-	  errmsg+=" * $HOSTS_FILE record $((i/2)):\n   Unexpected IP address syntax for \"$ip\"\n"
-	  ((errcnt++))
-	  break # exit loop
-	fi
-	HOST_IPS+=($ip)
-
-	# hostname:
-	((i++))
-	host=${hosts_ary[$i]}
-        # down-case if any upper-case letters in host
-	if [[ "$host" =~ [A-Z]+ ]] ; then
-	  display "   ...down-casing $host" $LOG_DEBUG
-	  host=${host,,} # down-case
-	fi
-        # set MGMT_NODE to first node unless --mgmt-node specified
-	if [[ -z "$MGMT_NODE" && $i == 1 ]] ; then # 1st hosts file record
-	  MGMT_NODE="$host"
-          MGMT_NODE_IN_POOL=true
-	elif [[ -n "$MGMT_NODE" && "$MGMT_NODE" == "$host" ]] ; then
-          MGMT_NODE_IN_POOL=true
-        fi
-	# validate basic hostname syntax
- 	if [[ ! $host =~ $VALID_HOSTNAME_RE ]] ; then
-	  errmsg+=" * $HOSTS_FILE record $((i/2)):\n   Unexpected hostname syntax for \"$host\"\n"
-	  ((errcnt++))
-	  break # exit loop
-        fi
-	HOSTS+=($host)
-
-        # verify connectivity from localhost to data node. Note: ip used since
-	# /etc/hosts may not be set up to map ip to hostname
-	ssh -q -oBatchMode=yes -oStrictHostKeyChecking=no root@$ip exit
-        if (( $? != 0 )) ; then
-	  errmsg+=" * $HOSTS_FILE record $((i/2)):\n   Cannot connect via password-less ssh to \"$host\"\n"
-	  ((errcnt++))
-	  break # exit loop
-	fi
-    done
-
-    (( errcnt != 0 )) && return # errors in hosts checking loop are fatal
-
-    # validate the number of nodes in the hosts file
-    NUMNODES=${#HOSTS[@]}
-    if (( NUMNODES < REPLICA_CNT )) ; then
-      errmsg+=" * The $HOSTS_FILE file must contain at least $REPLICA_CNT nodes (replica count)\n"
-      ((errcnt++))
-    elif (( NUMNODES % REPLICA_CNT != 0 )) ; then
-      errmsg+=" * The number of nodes in the $HOSTS_FILE file must be a multiple of the\n   replica count ($REPLICA_CNT)\n"
-      ((errcnt++))
-    fi
-  }
-
-  # main #
-  #      #
-  if (( UID != 0 )) ; then
-    errmsg+=" * Must be root to run this script.\n"
-    ((errcnt++))
-  fi
-
-  if [[ ! -f $HOSTS_FILE ]] ; then
-    errmsg+=" * \"$HOSTS_FILE\" file is missing.\n   This file contains a list of IP address followed by hostname, one\n   pair per line. Use \"hosts.example\" as an example.\n"
-    ((errcnt++))
-  else
-    # read and verify/validate hosts file format
-    read_verify_local_hosts_file
-  fi
-
-  if (( errcnt > 0 )) ; then
-    local plural='s'
-    (( errcnt == 1 )) && plural=''
-    display "$errcnt error$plural:\n$errmsg" $LOG_FORCE
-    exit 1
-  fi
-  display "   ...verified" $LOG_DEBUG
-}
-
 # report_deploy_values: write out args and default values to be used in this
 # deploy/installation. Prompts to continue the script.
 #
@@ -854,7 +741,8 @@ function install_nodes(){
     local node="$1"; local ip="$2"; local install_storage="$3"
     local install_mgmt="$4"; local err
     # copy prep_node + all subdirs (if any)
-    local FILES_TO_CP="$PREP_SH functions $(ls -d */ 2>/dev/null)"
+    local subdirs="$(ls -d */ | grep -v devutils/)" # exclude devutils
+    local FILES_TO_CP="$PREP_SH functions $subdirs"
 
     # use ip rather than node for scp and ssh until /etc/hosts is set up
     ssh -oStrictHostKeyChecking=no root@$ip "
@@ -1025,7 +913,7 @@ MAPRED_SYSTEM_DIR="$GLUSTER_MNT/mapred/system" # distributed, not local
 
 echo
 display "-- Verifying the deploy environment, including the \"hosts\" file format:" $LOG_INFO
-verify_local_deploy_setup
+verify_local_deploy_setup true
 firstNode=${HOSTS[0]}
 
 report_deploy_values
