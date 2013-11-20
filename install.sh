@@ -21,7 +21,7 @@
 
 # set global variables
 SCRIPT=$(basename $0)
-INSTALL_VER='0.41'   # self version
+INSTALL_VER='0.42'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/rhs-hadoop-install/" # on each node
@@ -34,27 +34,8 @@ bricks=''            # string list of node:/brick-mnts for volume create
 PREP_NODE_LOG='prep_node.log'
 PREP_NODE_LOG_PATH="${REMOTE_INSTALL_DIR}$PREP_NODE_LOG"
 
-# log threshold values
-LOG_DEBUG=0
-LOG_INFO=1    # default for --verbose
-LOG_SUMMARY=2 # default
-LOG_REPORT=3  # suppress all output, other than final reporting
-LOG_QUIET=9   # value for --quiet = suppress all output
-LOG_FORCE=99  # force write regardless of VERBOSE setting
-
-
-# display: append the passed-in message to localhost's logfile, and potentially
-# write the message to stdout, depending on the value of the passed-in priority
-# setting.
-# $1=msg, $2=msg prioriy (optional, default=summary)
-#
-function display(){  
-
-  local pri=${2:-$LOG_SUMMARY}
-
-  echo "$1" >> $LOGFILE
-  (( pri >= VERBOSE )) && echo -e "$1"
-}
+# source common constants and functions
+. $INSTALL_DIR/functions
 
 
 # short_usage: write short usage to stdout.
@@ -873,7 +854,7 @@ function install_nodes(){
     local node="$1"; local ip="$2"; local install_storage="$3"
     local install_mgmt="$4"; local err
     # copy prep_node + all subdirs (if any)
-    local FILES_TO_CP="$PREP_SH $(ls -d */ 2>/dev/null)"
+    local FILES_TO_CP="$PREP_SH functions $(ls -d */ 2>/dev/null)"
 
     # use ip rather than node for scp and ssh until /etc/hosts is set up
     ssh -oStrictHostKeyChecking=no root@$ip "

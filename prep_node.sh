@@ -55,33 +55,17 @@ HOSTS=($4)
 HOST_IPS=($5)
 MGMT_NODE="$6" # note: this node can be inside or outside the storage cluster
 VERBOSE=$7
-PREP_LOG=$8
+LOGFILE=$8
 DEPLOY_DIR=${9:-/tmp/rhs-hadoop-install/}
 RHN_USER=${10:-}
 RHN_PASS=${11:-}
-#echo -e "*** $(basename $0)\n 1=$NODE, 2=$STORAGE_INSTALL, 3=$MGMT_INSTALL, 4=${HOSTS[@]}, 5=${HOST_IPS[@]}, 6=$MGMT_NODE, 7=$VERBOSE, 8=$PREP_LOG, 9=$DEPLOY_DIR, 10=$RHN_USER, 11=$RHN_PASS"
+#echo -e "*** $(basename $0)\n 1=$NODE, 2=$STORAGE_INSTALL, 3=$MGMT_INSTALL, 4=${HOSTS[@]}, 5=${HOST_IPS[@]}, 6=$MGMT_NODE, 7=$VERBOSE, 8=$LOGFILE, 9=$DEPLOY_DIR, 10=$RHN_USER, 11=$RHN_PASS"
 
 NUMNODES=${#HOSTS[@]}
-# log threshold values (copied from install.sh)
-LOG_DEBUG=0
-LOG_INFO=1    # default for --verbose
-LOG_SUMMARY=2 # default
-LOG_REPORT=3  # suppress all output, other than final reporting
-LOG_QUIET=9   # value for --quiet = suppress all output
-LOG_FORCE=99  # force write regardless of VERBOSE setting
 
+# source common constants and functions
+. ${DEPLOY_DIR}functions
 
-# display: write all messages to the special logfile which will be copied to 
-# the "install-from" host, and potentially write the message to stdout. 
-# $1=msg, $2=msg prioriy (optional, default=summary)
-#
-function display(){
-
-  local pri=${2:-$LOG_SUMMARY} 
-
-  echo "$1" >> $PREP_LOG
-  (( pri >= VERBOSE )) && echo -e "$1"
-}
 
 # fixup_etc_host_file: append all ips + hostnames to /etc/hosts, unless the
 # hostnames already exist.
@@ -450,23 +434,25 @@ function execute_extra_scripts(){
 
   local f; local dir
 
-  if [[ -n "$SUBDIR_XFILES" ]] ; then # at least 1 executable exists
-    display " --  Executing scripts in sub-directories..." $LOG_SUMMARY
-    local tmp1="${HOSTS[@]}"    # convert array -> string
-    local tmp2="${HOST_IPS[@]}"
+  [[ -z "$SUBDIR_XFILES" ]] && {
+	display "No additional executable scripts found" $LOG_INFO;
+	return; }
 
-    for f in $SUBDIR_XFILES ; do
-        display "Executing: $f" $LOG_INFO
-	dir="$(dirname $f)"; f="$(basename $f)"
-	cd $dir
-        ./$f $NODE $STORAGE_INSTALL $MGMT_INSTALL "$tmp1" "$tmp2" \
- 		$MGMT_NODE $VERBOSE $PREP_LOG $DEPLOY_DIR "$RHN_USER" \
-		"$RHN_PASS"
-        cd -
-    done
-  else
-    display "No additional executable scripts found" $LOG_INFO
-  fi
+  display " --  Executing scripts in sub-directories..." $LOG_SUMMARY
+  local tmp1="${HOSTS[@]}"    # convert array -> string
+  local tmp2="${HOST_IPS[@]}"
+
+  for f in $SUBDIR_XFILES ; do
+      display "Begin executing: $f ..." $LOG_INFO
+      dir="$(dirname $f)"; f="$(basename $f)"
+      cd $dir
+      ./$f $NODE $STORAGE_INSTALL $MGMT_INSTALL "$tmp1" "$tmp2" $MGMT_NODE \
+	   $VERBOSE $LOGFILE $DEPLOY_DIR "$RHN_USER" "$RHN_PASS"
+      cd -
+      display "Done executing: $f" $LOG_INFO
+      display '-----------------------' $LOG_INFO
+      echo
+  done
 }
 
 
@@ -503,7 +489,7 @@ for dir in $(ls -d */ 2>/dev/null) ; do # empty if no sub-dirs
 done
 
 # remove special logfile, start "clean" each time script is invoked
-rm -f $PREP_LOG
+rm -f $LOGFILE
 
 install_common
 

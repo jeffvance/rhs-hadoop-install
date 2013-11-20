@@ -1,0 +1,30 @@
+# Common constants and functions shared by the install related scripts.
+
+## constants ##
+
+# log threshold values
+LOG_DEBUG=0
+LOG_INFO=1    # default for --verbose
+LOG_SUMMARY=2 # default
+LOG_REPORT=3  # suppress all output, other than final reporting
+LOG_QUIET=9   # value for --quiet = suppress all output
+LOG_FORCE=99  # force write regardless of VERBOSE setting
+
+## functions ##
+
+# display: append the passed-in message to localhost's logfile, and potentially
+# write the message to stdout, depending on the value of the passed-in priority
+# setting. NOTE: $LOGFILE should be defined if logging is desired.
+#   $1=msg,
+#   $2=msg prioriy, optional, default=$LOG_SUMMARY,
+#   $3=logfile,     optional, default=$LOGFILE which can be empty.
+#
+function display(){
+
+  local pri=${2:-$LOG_SUMMARY}
+  local log=${3:-$LOGFILE}
+
+  [[ -n "$log" ]] && echo "$1" >> $log
+  (( pri >= VERBOSE )) && echo -e "$1"
+}
+

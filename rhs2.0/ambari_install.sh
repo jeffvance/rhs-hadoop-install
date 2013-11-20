@@ -23,35 +23,17 @@ HOSTS=($4)
 HOST_IPS=($5)
 MGMT_NODE="$6" # note: this node can be inside or outside the storage cluster
 VERBOSE=$7
-PREP_LOG=$8
+LOGFILE=$8
 DEPLOY_DIR=${9:-/tmp/rhs-hadoop-install/}
 RHN_USER=${10:-}
 RHN_PASS=${11:-}
-#echo -e "*** $(basename $0)\n 1=$NODE, 2=$STORAGE_INSTALL, 3=$MGMT_INSTALL, 4=${HOSTS[@]}, 5=${HOST_IPS[@]}, 6=$MGMT_NODE, 7=$VERBOSE, 8=$PREP_LOG, 9=$DEPLOY_DIR, 10=$RHN_USER, 11=$RHN_PASS"
 
 AMBARI_TMPDIR=${DEPLOY_DIR}tmpAmbari
 AMBARI_TARBALL_GLOB='ambari-*.tar.gz'
 
-# log threshold values (copied from install.sh)
-LOG_DEBUG=0
-LOG_INFO=1    # default for --verbose
-LOG_SUMMARY=2 # default
-LOG_REPORT=3  # suppress all output, other than final reporting
-LOG_QUIET=9   # value for --quiet = suppress all output
-LOG_FORCE=99  # force write regardless of VERBOSE setting
+# source common constants and functions
+. ${DEPLOY_DIR}functions
 
-
-# display: write all messages to the special logfile which will be copied to 
-# the "install-from" host, and potentially write the message to stdout. 
-# $1=msg, $2=msg prioriy (optional, default=summary)
-#
-function display(){
-
-  local pri=${2:-$LOG_SUMMARY} 
-
-  echo "$1" >> $PREP_LOG
-  (( pri >= VERBOSE )) && echo -e "$1"
-}
 
 # copy_ambari_repo: copy the ambari.repo file to the correct location.
 #
@@ -286,7 +268,7 @@ function cleanup_logfile(){
 
   local DELETE_STR='jdk-' # Oracle JDK install progress pattern
 
-  sed -i "/$DELETE_STR/d" $PREP_LOG
+  sed -i "/$DELETE_STR/d" $LOGFILE
 }
 
 
