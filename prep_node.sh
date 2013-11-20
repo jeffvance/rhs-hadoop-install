@@ -429,15 +429,15 @@ if (( $(ls | wc -l) == 0 )) ; then
   exit -1
 fi
 
-# Create SUBDIR_FILES variable which contains all files in all sub-dirs, except
-# for in devutils/. There can be 0 or more sub-dirs.
-DIRS="$(ls -d */ | grep -v devutils/)" 
+# create SUBDIR_FILES variable which contains all files in all sub-dirs. There 
+# can be 0 or more sub-dirs. Note: devutils/ is not copied to each node.
+DIRS="$(ls -d */)" 
 # format for SUBDIR_FILES:  "dir1/file1 dir1/file2...dir2/fileN ..."
 # format for SUBDIR_XFILES: "dir/x-file1 dir/x-file2 dir2/x-file3 ..." 
 if [[ -n "$DIRS" ]] ; then
    SUBDIR_FILES="$(find $DIRS -type f)";
-   [[ -n "$SUBDIR_FILES" ]] && {
-	SUBDIR_XFILES="$(find $SUBDIR_FILES -executable -name '*.sh')"; }
+   [[ -n "$SUBDIR_FILES" ]] &&
+	SUBDIR_XFILES="$(find $SUBDIR_FILES -executable -name '*.sh')"
 fi
 
 # remove special logfile, start "clean" each time script is invoked
