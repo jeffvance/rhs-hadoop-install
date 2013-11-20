@@ -1,25 +1,15 @@
 #! /bin/bash
 #
-# Assumptions:
-#
+# Set up password-less SSH based on contents of the local hosts file.
 # See the usage() function for arguments and their definitions.
 
 # set global variables
 SCRIPT=$(/bin/basename $0)
-SCRIPT_VERS='0.2' # self version
-INSTALL_DIR=$PWD  # name of deployment (install-from) dir
-INSTALL_FROM_IP=$(hostname -i)
-LOGFILE='/var/log/pwdless-ssh.log'
+SCRIPT_VERS='0.3'  # self version
+INSTALL_DIR="$PWD" # name of deployment (install-from) dir
 
 
-# display: Write the message to stdlist and append it to localhost's logfile.
-#
-function display(){  # $1 is the message
-  echo "$1" >> $LOGFILE
-  echo -e "$1"
-}
-
-# bugout: Write out a debugging message
+# bugout: Write out a debugging message.
 #
 function bugout (){ # $1 is the message
    
@@ -27,51 +17,46 @@ function bugout (){ # $1 is the message
 
   if [[ $DEBUG == true ]] ; then 
     output_string+=$1
-    display "$output_string"
+    echo "$output_string"
   fi
 }
 
-# short_usage: write short usage to stdout.
-#
-function short_usage(){
-
-  echo -e "Syntax:\n"
-  echo "$SCRIPT [-v|--version] | [-h|--help]"
-  echo "$SCRIPT [--hosts <path>]"
-  echo "        [--sethostname | [--noset|--nosethostname]"
-  echo "        [--verbose]"
-  echo
-}
-
-# usage: write full usage/help text to stdout.
+# usage: write usage/help text to stdout.
 #
 function usage(){
 
-  echo
-  echo -e "$SCRIPT (version $SCRIPT_VERS)  Usage:\n"
-  echo "Sets up password-less SSH as required for the RHS cluster. A local \"hosts\""
-  echo "file of ip-address<space>hostname pairs contains the list of hosts for which"
-  echo "password-less SSH is configured. Additionally, the first host in this file"
-  echo "will be able to password-less SSH to all other hosts in the file. Thus,"
-  echo "after running this script the user will be able to password-less SSH from"
-  echo "localhost to all hosts in the hosts file, and from the first host to all"
-  echo "other hosts defined in the file."
-  echo
-  echo "\"host\" file format:"
-  echo "   IP-address   simple-hostname"
-  echo "   IP-address   simple-hostname ..."
-  echo
-  echo "Syntax:"
-  echo "-------"
-  echo "  --hosts     <path> : path to \"hosts\" file. This file contains a list of"
-  echo "                       \"IP-addr hostname\" pairs for each node in the cluster."
-  echo "                       Default: \"./hosts\""
-  echo "  -v|--version       : Version of the script"
-  echo "  -h|--help          : help text (this)"
-  echo "  --sethostname      : sethostname=hostname on each node (default)"
-  echo "  --noset|nosethostname : do not set the hostname on each node (override default)"
-  echo "  --verbose          : causes more output. Default is semi-quiet"
-  echo
+  cat <<EOF
+
+Version $SCRIPT_VERS.  Usage:
+
+Syntax:
+
+  $SCRIPT [options]
+
+Sets up password-less SSH as required for the RHS cluster. A local "hosts"
+file of "ip-address hostname" pairs contains the list of hosts for which
+password-less SSH is configured. Additionally, the first host in this file
+will be able to password-less SSH to all other hosts in the file. Thus,
+after running this script the user will be able to password-less SSH from
+localhost to all hosts in the hosts file, and from the first host to all
+other hosts defined in the file.
+
+"host" file format:
+   IP-address   simple-hostname
+   IP-address   simple-hostname ...
+
+Options:
+
+   --hosts     <path> : path to "hosts" file. This file contains a list of
+                        "IP-addr hostname" pairs for each node in the cluster.
+                        Default: "./hosts".
+   -v|--version       : Version of the script.
+   -h|--help          : help text (this).
+   --sethostname      : sethostname=hostname on each node (default).
+   --noset|nosethostname : do not set the hostname on each node (override
+                        default).
+   --verbose          : causes more output. Default is semi-quiet.
+EOF
 }
 
 # parse_cmd: getopt used to do general parsing. The brick-dev arg is required.
@@ -125,7 +110,7 @@ function parse_cmd(){
   eval set -- "$@" # move arg pointer so $1 points to next arg past last opt
 
   if [[ $DEBUG == true ]] ; then 
-     display "DEBUGGING ON"
+     echo "DEBUGGING ON"
   fi
 }
 
@@ -230,15 +215,15 @@ function setup_passwordless_ssh {
    local PRIVATE_KEY_FILE=~/.ssh/id_rsa # note: cannot quote value!
 
    if [[ ! -f $PRIVATE_KEY_FILE ]] ; then # on localhost...
-     display "Generating key: ssh-keygen -q -t rsa -f $PRIVATE_KEY_FILE -N ''"
+     echo "Generating key: ssh-keygen -q -t rsa -f $PRIVATE_KEY_FILE -N ''"
      ssh-keygen -q -t rsa -f $PRIVATE_KEY_FILE -N ""
    fi
 
    # add hosts "hosts" file to local /etc/hosts if not already there
-   display "Potentially update /etc/hosts with hostnames..."
+   echo "Potentially update /etc/hosts with hostnames..."
    fixup_etc_hosts_file
 
-   display "Copying keys to each node..."
+   echo "Copying keys to each node..."
    for (( i=0; i<$NUMNODES; i++ )); do
 	ip=${HOST_IPS[$i]}
 	host=${HOSTS[$i]}
@@ -248,35 +233,35 @@ function setup_passwordless_ssh {
 	bugout "delete \"$host\" and/or \"$ip\" from known_hosts file"
 	[[ -f $KNOWN_HOSTS ]] && sed -i "/^$host/d;/^$ip/d" $KNOWN_HOSTS
 
-	display "Copying SSH keyfile to $host"
+	echo "Copying SSH keyfile to $host"
 	bugout "---> with 'sh-copy-id -i ~/.ssh/id_rsa.pub root@$host' command"
-	display "** Answer \"yes\" to the '...continue connecting' prompt, and"
-	display "   enter the password for each node..."
+	echo "** Answer \"yes\" to the '...continue connecting' prompt, and"
+	echo "   enter the password for each node..."
 	ssh-copy-id -i ~/.ssh/id_rsa.pub root@$host # user will be prompted
 
 	# test if passwordless SSH is working
 	ssh -q -oBatchMode=yes root@$host exit
 	if (( $? != 0 )) ; then
           sshOK='FAILED'
-          display "PASSWORDLESS SSH SETUP FAILED - FATAL!"
+          echo "PASSWORDLESS SSH SETUP FAILED - FATAL!"
           exit 20
 	fi
 
 	if [[ $SETHOSTNAME == true ]] ; then 
-          display "Setting hostname for $host"
+          echo "Setting hostname for $host"
           bugout "--> with 'ssh root@$ip hostname $host' command"
           ssh root@$ip hostname $host
 	fi
 
-	display "...Node: $host (IP: $ip), SSH=$sshOK"
+	echo "...Node: $host (IP: $ip), SSH=$sshOK"
         echo
    done
 
    # set up passwordless-ssh from 1st host in the hosts file to all the other
    # hosts in that file.
    firstHost=${HOSTS[0]}
-   display "Last, set up passwordless-ssh from $firstHost to all other nodes"
-   display "in the hosts file"
+   echo "Last, set up passwordless-ssh from $firstHost to all other nodes"
+   echo "in the hosts file"
    bugout "---> with 'scp ~/.ssh/id_* $KNOWN_HOSTS root@$firstHost:/root/.ssh'"
    scp ~/.ssh/id_* $KNOWN_HOSTS root@$firstHost:/root/.ssh
    for (( i=1; i<$NUMNODES; i++ )); do
@@ -295,12 +280,12 @@ function setup_passwordless_ssh {
 
 parse_cmd $@
 
-display "$(/bin/date). Begin: $SCRIPT -- version $SCRIPT_VERS ***"
+echo "$(/bin/date). Begin: $SCRIPT -- version $SCRIPT_VERS ***"
 
-display "Using host file: $HOSTS_FILE"
+echo "Using host file: $HOSTS_FILE"
 read_verify_local_hosts_file
 
-display "Begin setup of passwordless SSH"
+echo "Begin setup of passwordless SSH"
 setup_passwordless_ssh
 
 #
