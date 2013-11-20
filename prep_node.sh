@@ -77,7 +77,8 @@ function install_plugin(){
   local HADOOP_JAVA_DIR='/usr/lib/hadoop/lib/'
   local jar=''; local out; local err
 
-  match_dir "$PLUGIN_JAR" # sets MATCH_DIR and MATCH_FILE vars if match
+  # set MATCH_DIR and MATCH_FILE vars if match
+  match_dir "$PLUGIN_JAR" "$SUBDIR_FILES"
   [[ -z "$MATCH_DIR" ]] && {
 	display "INFO: gluster-hadoop plugin not supplied" $LOG_INFO;
 	return; }
@@ -193,7 +194,8 @@ function verify_fuse(){
     return
   fi
 
-  match_dir "$FUSE_TARBALL_RE" # sets MATCH_DIR and MATCH_FILE vars if match
+  # set MATCH_DIR and MATCH_FILE vars if match
+  match_dir "$FUSE_TARBALL_RE" "$SUBDIR_FILES"
   [[ -z "$MATCH_DIR" ]] && {
 	display "INFO: FUSE patch not supplied" $LOG_INFO;
 	return; }
@@ -281,7 +283,8 @@ function apply_tuned(){
   local TUNE_PATH_BAK="$TUNE_PATH.orig"
   local TUNE_PERMS=755 # rwxr-xr-x
 
-  match_dir "$TUNE_FILE" # sets MATCH_DIR and MATCH_FILE vars if match
+  # set MATCH_DIR and MATCH_FILE vars if match
+  match_dir "$TUNE_FILE" "$SUBDIR_FILES"
   [[ -z "$MATCH_DIR" ]] && {
 	display "INFO: $TUNE_FILE file not supplied" $LOG_INFO
 	return; }

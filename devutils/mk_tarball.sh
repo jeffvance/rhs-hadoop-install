@@ -148,7 +148,7 @@ function convert_odt_2_pdf(){
   local PDF_FILE="$ODT_DOC.pdf"
 
   # get dirname of odt file and cd to it if match
-  match_dir "$ODT_FILE" # sets MATCH_DIR var if match
+  match_dir "$ODT_FILE" "$INCLUDED_FILES" # sets MATCH_DIR var if match
   [[ -z "$MATCH_DIR" ]] && {
     echo "INFO: $ODT_FILE file does not exist, no PDF conversion needed.";
     return; }
@@ -208,9 +208,9 @@ echo "  Source dir:  $SOURCE"
 echo "  Target dir:  $TARGET"
 echo "  Extra dirs:  ${DIRS[@]}"
 
-# format for SUBDIR_FILES: "dir1/file1 dir1/file2...dir2/fileN ..."
+# format for INCLUDED_FILES: "dir1/file1 dir1/file2...dir2/fileN ..."
 # note: DIRS always contains at least the devutils dir
-SUBDIR_FILES=$(find ${DIRS[@]} -type f) # all files in all extra sub-dirs
+INCLUDED_FILES=$(find ${DIRS[@]} -type f) # all files in all extra sub-dirs
 
 convert_odt_2_pdf
 create_tarball

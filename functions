@@ -55,19 +55,19 @@ function fixup_etc_hosts_file(){
 # match_dir: given the passed-in filename ($1) set the global variables
 # MATCH_DIR and MATCH_FILE to the dirname and basename if $1 matches one of
 # the entries in SUBDIR_FILES.
-# NOTE: SUBDIR_FILES is a string list of "dirname/filename dir2/f2 ..." and
-#   must be set prior to invoking this function.
+# Args:
+#   $1=filename to be matched (can be wildcarded as a regexp, not glob)
+#   $2=list of sub-dirs formatted as "dir/file dir/f..."
 #
 function match_dir(){
 
-  # note: $1 can be wildcarded but must be a regexp not a glob
-  local match="$1"
+  local match="$1"; local dirs="$2"
   local f; local dir
 
   MATCH_DIR=''; MATCH_FILE=''
-  [[ -z "$SUBDIR_FILES" ]] && return # nothing to do...
+  [[ -z "$dirs" ]] && return # nothing to do...
 
-  for f in $SUBDIR_FILES; do
+  for f in $dirs; do
       dir="$(dirname $f)"; f="$(basename $f)"
       [[ "$f" =~ "$match" ]] && {
         $MATCH_DIR="$dir"; $MATCH_FILE="$f"; return; }
