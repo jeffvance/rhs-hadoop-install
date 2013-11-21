@@ -553,7 +553,7 @@ function create_trusted_pool(){
 function setup(){
 
   local i=0; local node=''; local ip=''; local out
-  local PERMISSIONS='777' # for now until we learn how to reduce this...
+  local PERMISSIONS='775' # for now until we learn how to reduce this...
   local OWNER='mapred'; local GROUP='hadoop'
   local BRICK_MNT_OPTS="noatime,inode64"
   local GLUSTER_MNT_OPTS="entry-timeout=0,attribute-timeout=0,use-readdirp=no,_netdev"
