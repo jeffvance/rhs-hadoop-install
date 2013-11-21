@@ -58,5 +58,5 @@ setPerms paths[@] perms[@] ${1}
 
 echo "Setting local permissions, using hadoop install ${2}"
 paths=(${HADOOP_LOG_DIR});
-perms1=(1777);
+perms=(1777);
 setPerms paths[@] perms[@] ${2}
