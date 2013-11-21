@@ -103,8 +103,11 @@ Instructions:
     contain all messages.
 
  4) When the script completes remaining Hadoop distro and management steps need
-    to be followed.
-
+    to be followed.  After hadoop distro installation completes, create gluster 
+    base directories and fix permissions by running this script:
+    
+    $ ./post_install_dirs.sh /mnt/glusterfs /lib/hadoop
+ 
  5) Validate the Installation
 
     Open a terminal and navigate to the Hadoop Directory
