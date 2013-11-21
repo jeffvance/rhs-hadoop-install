@@ -38,7 +38,6 @@ then
   exit
 fi
 
-# expects $1=paths, $2=permissions $3 to be the root
 setPerms(){
   Paths=("${!1}")
   Perms=("${!2}")
@@ -60,4 +59,4 @@ setPerms paths[@] perms[@] ${1}
 echo "Setting local permissions, using hadoop install ${2}"
 paths=(${HADOOP_LOG_DIR});
 perms1=(1777);
-setPerms paths[@] perms[@] ${1}
+setPerms paths[@] perms[@] ${2}
