@@ -42,8 +42,8 @@ setPerms(){
 
 echo "Setting permissions on Gluster Volume located at ${1}"
 
-paths=("/" "/tmp" "/user" "/mr_history" "${yarn_nodemanager_remote_app_log_dir}" "${mapreduce_jobhistory_intermediate_done_dir}" "${mapreduce_jobhistory_done_dir}" "/mapred" "${yarn_staging_dir}");
-perms=(0755 1777 0770 0755 1777 1777 0750 0770 0770);
+paths=("/tmp" "/user" "/mr_history" "${yarn_nodemanager_remote_app_log_dir}" "${mapreduce_jobhistory_intermediate_done_dir}" "${mapreduce_jobhistory_done_dir}" "/mapred" "${yarn_staging_dir}");
+perms=(1777 0770 0755 1777 1777 0750 0770 0770);
 setPerms paths[@] perms[@] ${1} ${3} ${4}
 
 echo "Setting local permissions, using hadoop install ${2}"
