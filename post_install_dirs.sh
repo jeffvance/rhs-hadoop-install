@@ -1,5 +1,4 @@
-#! /bin/bash
-
+#!/bin/sh
 yarn_nodemanager_remote_app_log_dir="/tmp/logs"
 mapreduce_jobhistory_intermediate_done_dir="/mr_history/tmp"
 mapreduce_jobhistory_done_dir="/mr_history/done"
@@ -49,9 +48,10 @@ perms=(1777 0770 0755 1777 1777 0750 0770 0770);
 setPerms paths[@] perms[@] ${1} ${3} ${4}
 
 echo "Setting local permissions, using hadoop install ${2}"
-paths=(${HADOOP_LOG_DIR});
-perms=(1777);
-setPerms paths[@] perms[@] ${2} ${3} ${4}
+chown root:$4 ${HADOOP_LOG_DIR}
+chmod 0770 ${HADOOP_LOG_DIR}
+
+
 
 echo "Setuid bit on task controller"
 chown root:${4} ${task_controler} ; chmod 6050 ${task_controler}
