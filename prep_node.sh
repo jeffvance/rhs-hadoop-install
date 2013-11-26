@@ -155,24 +155,36 @@ function verify_ntp(){
 }
 
 # rhn_register: rhn register $NODE if a rhn username and password were passed.
+# Note: --use-eus-channel on the rhnreg_ks command causes the base channel to
+#   be the "z" channel.
+# Note: rhn-channel is run programmatically to add additional RHS channels.
 #
 function rhn_register(){
 
-  local out; local err
+  # list of channels separated by a space
+  local channels='rhel-x86_64-server-6-rhs-2.1 rhel-x86_64-server-sfs-6.4.z'
+  local channel; local out; local err
 
-  if [[ -n "$RHN_USER" && -n "$RHN_PASS" ]] ; then
-    echo
-    display "-- RHN registering with provided rhn user and password" \
+  [[ -z "$RHN_USER" || -z "$RHN_PASS" ]] && return # no error, don't register
+
+  echo
+  display "-- RHN registering with provided rhn user and password" \
 	$LOG_INFO
-    out="$(rhnreg_ks --profilename="$NODE" --username="$RHN_USER" \
-	--password="$RHN_PASS" --force 2>&1)"
-    err=$?
-    display "rhn_register: $out" $LOG_DEBUG
-    if (( err != 0 )) ; then
-      display "ERROR: rhn_register error $err" $LOG_FORCE
-      exit 10
-    fi
+  out="$(rhnreg_ks --profilename="$NODE" --username="$RHN_USER" \
+	--password="$RHN_PASS" --use-eus-channel --force 2>&1)"
+  err=$?
+  display "rhn_register: $out" $LOG_DEBUG
+  if (( err != 0 )) ; then
+    display "ERROR: rhn_register error $err" $LOG_FORCE
+    exit 10
   fi
+
+  # register the rhs channels
+  for channel in $channels ; do
+      rhn-channel --user="$RHN_USER" --password="$RHN_PASS" --add \
+	--channel="$channel"
+  done
+  display "   RHN channels:\n$(rhn-channel -l)" $LOG_INFO
 }
 
 # verify_fuse: verify this node has the correct kernel FUSE patch installed. If
