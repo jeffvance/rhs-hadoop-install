@@ -1,3 +1,5 @@
+#! /bin/bash
+
 yarn_nodemanager_remote_app_log_dir="/tmp/logs"
 mapreduce_jobhistory_intermediate_done_dir="/mr_history/tmp"
 mapreduce_jobhistory_done_dir="/mr_history/done"
