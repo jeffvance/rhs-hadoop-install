@@ -79,12 +79,15 @@ function match_dir(){
 # file. Verify connectivity between localhost and each data/storage node. Assign
 # global HOSTS, HOST_IPS, and MGMT_NODE variables.
 #
-# Args: $1=true(any value passed) means to check that the user is root.
+# Args:
+#   $1=true means to check that the user is root.
+#   $2=true means to check that passwordless-ssh works
 # NOTE: REPLICA_CNT expected to be defined.
 #
 function verify_local_deploy_setup(){
 
-  local errmsg=''; local errcnt=0; local chk_root=$1
+  local errmsg=''; local errcnt=0
+  local chk_root=$1; local chk_ssh=$2
 
   # read_verify_local_hosts_file: sub-function to read the deploy "hosts"
   # file, split it into the HOSTS and HOST_IPS global array variables, validate
@@ -143,13 +146,15 @@ function verify_local_deploy_setup(){
         fi
 	HOSTS+=($host)
 
-        # verify connectivity from localhost to data node. Note: ip used since
-	# /etc/hosts may not be set up to map ip to hostname
-	ssh -q -oBatchMode=yes -oStrictHostKeyChecking=no root@$ip exit
-        if (( $? != 0 )) ; then
-	  errmsg+=" * $HOSTS_FILE record $((i/2)):\n   Cannot connect via password-less ssh to \"$host\"\n"
-	  ((errcnt++))
-	  break # exit loop
+	if [[ "$chk_ssh" == true ]] ; then
+          # verify connectivity from localhost to data node. Note: ip used since
+	  # /etc/hosts may not be set up to map ip to hostname
+	  ssh -q -oBatchMode=yes -oStrictHostKeyChecking=no root@$ip exit
+          if (( $? != 0 )) ; then
+	    errmsg+=" * $HOSTS_FILE record $((i/2)):\n   Cannot connect via password-less ssh to \"$host\"\n"
+	    ((errcnt++))
+	    break # exit loop
+	  fi
 	fi
     done
 
@@ -168,7 +173,7 @@ function verify_local_deploy_setup(){
 
   # main #
   #      #
-  if [[ -n "$chk_root" && $UID != 0 ]] ; then
+  if [[ "$chk_root" == true && $UID != 0 ]] ; then
     errmsg+=" * Must be root to run this script.\n"
     ((errcnt++))
   fi

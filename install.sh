@@ -21,7 +21,7 @@
 
 # set global variables
 SCRIPT=$(basename $0)
-INSTALL_VER='0.43'   # self version
+INSTALL_VER='0.44'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/rhs-hadoop-install/" # on each node
@@ -913,7 +913,7 @@ MAPRED_SYSTEM_DIR="$GLUSTER_MNT/mapred/system" # distributed, not local
 
 echo
 display "-- Verifying the deploy environment, including the \"hosts\" file format:" $LOG_INFO
-verify_local_deploy_setup true
+verify_local_deploy_setup true true
 firstNode=${HOSTS[0]}
 
 report_deploy_values

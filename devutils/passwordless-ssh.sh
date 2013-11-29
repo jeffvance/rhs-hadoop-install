@@ -192,7 +192,7 @@ parse_cmd $@
 echo "$(/bin/date). Begin: $SCRIPT -- version $SCRIPT_VERS ***"
 
 echo "Using host file: $HOSTS_FILE"
-verify_local_deploy_setup
+verify_local_deploy_setup false false
 
 echo "Begin setup of passwordless SSH"
 setup_passwordless_ssh
