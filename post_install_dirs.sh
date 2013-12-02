@@ -48,6 +48,7 @@ perms=(1777 0770 0755 1777 1777 0750 0770 0770);
 setPerms paths[@] perms[@] ${1} ${3} ${4}
 
 echo "Setting local permissions, using hadoop install ${2}"
+mkdir -p ${HADOOP_LOG_DIR}
 chown root:$4 ${HADOOP_LOG_DIR}
 chmod 0770 ${HADOOP_LOG_DIR}
 
