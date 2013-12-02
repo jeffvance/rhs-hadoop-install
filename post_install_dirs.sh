@@ -5,7 +5,7 @@ mapreduce_jobhistory_done_dir="/mr_history/done"
 HADOOP_LOG_DIR=${HADOOP_LOG_DIR:-${2}/logs}
 yarn_staging_dir=/job-staging-yarn/
 task_controler=${2}/bin/container-executor
-
+task_cfg=${2}/etc/hadoop/container-executor.cfg
 #
 # the rest of these seem to be outdated.
 #
@@ -56,4 +56,4 @@ chmod 0770 ${HADOOP_LOG_DIR}
 
 echo "Setuid bit on task controller"
 chown root:${4} ${task_controler} ; chmod 6050 ${task_controler}
-
+chown root:${4} ${task_cfg}
