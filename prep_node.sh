@@ -325,12 +325,66 @@ function apply_tuned(){
   cd -
 }
 
+# check_selinux: if selinux is enabled then set it to permissive. This seems
+# to be a requirement for HDP.
+#
+function check_selinux(){
+
+  local out
+  local CONF='/etc/sysconfig/selinux' # symlink to /etc/selinux/config
+  local SELINUX_KEY='SELINUX='
+  local PERMISSIVE='permissive'; local ENABLED='enabled'
+
+  # report selinux state
+  out=$(sestatus | head -n 1 | awk '{print $3}') # enforcing, permissive
+  echo
+  display "SELinux is: $out" $LOG_SUMMARY
+ 
+  [[ "$out" != "$ENABLED" ]] && return # done
+
+  # set selinux to permissive (audit errors reported but not enforced)
+  setenforce permissive
+
+  # keep selinux permissive on reboots
+  if [[ ! -f $CONF ]] ; then
+    display "WARN: SELinux config file $CONF missing" $LOG_FORCE
+    return # nothing more to do...
+  fi
+  # config SELINUX=permissive which takes effect the next reboot
+  display "-- Setting SELinux to permissive..." $LOG_SUMMARY
+  sed -i -e "/^$SELINUX_KEY/c\\$SELINUX_KEY$PERMISSIVE" $CONF
+}
+
+# disable_firewall: use iptables to disable the firewall.
+#
+function disable_firewall(){
+
+  local out; local err
+
+  out="$(iptables -F)" # sure fire way to disable iptables
+  err=$?
+  display "iptables: $out" $LOG_DEBUG
+  if (( err != 0 )) ; then
+    display "WARN: iptables error $err" $LOG_FORCE
+  fi
+
+  out="$(chkconfig iptables off 2>&1)" # keep disabled after reboots
+  display "chkconfig off: $out" $LOG_DEBUG
+}
+
 # install_common: perform node installation steps independent of whether or not
 # the node is to be the management server or simple a storage/data node.
 #
 function install_common(){
 
-  # set up /etc/hosts to map ip -> hostname
+  # set SELinux to permissive if it's enabled
+  check_selinux
+
+  # disable firewall
+  echo
+  display "-- Disable firewall" $LOG_SUMMARY
+  disable_firewall
+
   echo
   display "-- Setting up IP -> hostname mapping" $LOG_SUMMARY
   fixup_etc_hosts_file
@@ -362,6 +416,7 @@ function install_storage(){
   done
   IP=${HOST_IPS[$i]}
 
+  # set up /etc/hosts to map ip -> hostname
   # install Gluster-Hadoop plug-in on agent nodes
   echo
   display "-- Verifying RHS-GlusterFS installation:" $LOG_SUMMARY
@@ -446,7 +501,7 @@ fi
 
 # create SUBDIR_FILES variable which contains all files in all sub-dirs. There 
 # can be 0 or more sub-dirs. Note: devutils/ is not copied to each node.
-DIRS="$(ls -d */)" 
+DIRS="$(ls -d */ 2>/dev/null)" 
 # format for SUBDIR_FILES:  "dir1/file1 dir1/file2...dir2/fileN ..."
 # format for SUBDIR_XFILES: "dir/x-file1 dir/x-file2 dir2/x-file3 ..." 
 if [[ -n "$DIRS" ]] ; then
