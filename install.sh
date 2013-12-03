@@ -96,7 +96,6 @@ EOF
                        Default: "./hosts".
   --mgmt-node <node> : hostname of the node to be used as the management node.
                        Default: the first node appearing in the "hosts" file.
-                       IGNORED FOR NOW.
   --rhn-user  <name> : Red Hat Network user name. Default is to not register
                        the storage nodes.
   --rhn-pass <value> : RHN password for rhn-user. Default is to not register
@@ -142,7 +141,7 @@ function parse_cmd(){
   NEW_DEPLOY=true
   # "hosts" file concontains hostname ip-addr for all nodes in cluster
   HOSTS_FILE="$INSTALL_DIR/hosts"
-  MGMT_NODE='' # ignored for now...
+  MGMT_NODE=''
   RHN_USER=''
   RHN_PASS=''
   LOGFILE='/var/log/rhs-hadoop-install.log'
@@ -177,7 +176,7 @@ function parse_cmd(){
 	--hosts)
 	    HOSTS_FILE=$2; shift 2; continue
 	;;
-	--mgmt-node) # ignored for now...
+	--mgmt-node)
 	    MGMT_NODE=$2; shift 2; continue
 	;;
 	--rhn-user)
@@ -308,7 +307,7 @@ function report_deploy_values(){
     display "  RHN user:           $RHN_USER"       $LOG_REPORT
   display "  \"hosts\" file:       $HOSTS_FILE"     $LOG_REPORT
   display "  Number of nodes:    $NUMNODES"         $LOG_REPORT
- #display "  Management node:    $MGMT_NODE"        $LOG_REPORT # ignored...
+  display "  Management node:    $MGMT_NODE"        $LOG_REPORT
   display "  Volume name:        $VOLNAME"          $LOG_REPORT
   display "  Volume mount:       $GLUSTER_MNT"      $LOG_REPORT
   display "  # of replicas:      $REPLICA_CNT"      $LOG_REPORT
@@ -804,7 +803,7 @@ function install_nodes(){
       install_mgmt_node=false
       [[ -n "$MGMT_NODE_IN_POOL" && "$node" == "$MGMT_NODE" ]] && \
 	install_mgmt_node=true
-      prep_node $node $ip true false # note: install_mgmt_node ignored for now
+      prep_node $node $ip true $install_mgmt_node
 
       display '-------------------------------------------------' $LOG_SUMMARY
       display "-- Done installing on $node ($ip)"                 $LOG_SUMMARY
@@ -817,9 +816,8 @@ function install_nodes(){
   if [[ -z "$MGMT_NODE_IN_POOL" ]] ; then
     echo
     display 'Management node is not a datanode thus mgmt code needs to be installed...' $LOG_INFO
-    #display "-- Starting install of management node \"$MGMT_NODE\"" $LOG_DEBUG
-    display "-- management node ignored for now..." $LOG_DEBUG
-    #prep_node $MGMT_NODE $MGMT_NODE false true
+    display "-- Starting install of management node \"$MGMT_NODE\"" $LOG_DEBUG
+    prep_node $MGMT_NODE $MGMT_NODE false true
   fi
 }
 

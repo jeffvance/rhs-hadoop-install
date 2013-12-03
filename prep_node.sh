@@ -435,14 +435,15 @@ function install_storage(){
 }
 
 # install_mgmt: perform the installations steps needed when the node is the
-# management node. IGNORED FOR NOW...
+# management node.
 #
 function install_mgmt(){
 
   echo
-  display "-- Preparing management node..." $LOG_SUMMARY
+  display "-- Management node is $NODE" $LOG_INFO
+  display "   Special management node processing, if any, will be done by scripts in sub-directories" $LOG_INFO
 
-  # nothing to do yet...
+  # nothing to do here (yet)...
 }
 
 # execute_extra_scripts: if there are any scripts within the extra sub-dirs
@@ -457,7 +458,7 @@ function install_mgmt(){
 #
 function execute_extra_scripts(){
 
-  local f; local dir
+  local f; local dir; local err
 
   echo
   [[ -z "$SUBDIR_XFILES" ]] && {
@@ -474,7 +475,9 @@ function execute_extra_scripts(){
       cd $dir
       ./$f $NODE $STORAGE_INSTALL $MGMT_INSTALL "$tmp1" "$tmp2" $MGMT_NODE \
 	   $VERBOSE $LOGFILE $DEPLOY_DIR "$RHN_USER" "$RHN_PASS"
+      err=$?
       cd -
+      (( err != 0 )) && display "$f error: $err" $LOG_INFO
       display "Done executing: $f" $LOG_INFO
       display '-----------------------' $LOG_INFO
       echo
