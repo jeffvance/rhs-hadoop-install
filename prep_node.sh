@@ -15,6 +15,8 @@
 #  - sets up the sudoers file
 #  - registers this node with RHN (red hat support network)
 #  - ensures that ntp is running correctly
+#  - disables the firewall via iptables
+#  - set selinux to permissive mode
 #
 # Additionally, depending on the contents of the tarball (see devutils/
 # mk_tarball), this script may install the following:
