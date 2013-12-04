@@ -32,7 +32,10 @@
 # usage() function.
 
 # source common constants and functions
-. ../functions
+if [[ -f functions ]] ; then source functions
+elif [[ -f ../functions ]] ; then source ../functions
+else echo "Missing \"functions \" library"; exit -1
+fi
 
 # usage: echo the standard usage text with supported options.
 #

@@ -1,3 +1,5 @@
+#!/bin/bash
+#
 # This script will copy the current git master to jenkins, to mock
 # a proper jenkins build. And afterwards, it will copy the jenkins current
 # build to s3 as a release. This entire process should actually run inside of
@@ -8,7 +10,9 @@
 BUILD_LOCATION=/var/lib/jenkins/workspace/Ambari
 REPO=/root/archivainstall/apache-archiva-1.3.6/data/repositories/internal
 SOURCE=$(pwd) # expected to be a git directory
-S3='s3://rhbd/rhs-hadoop-install'
+S3_BKT='s3://rhbd'
+S3_1_X_OBJ="$S3_BKT/rhs-hadoop-install/1.x" # location for hadoop 1.x files
+S3_2_X_OBJ="$S3_BKT/rhs-hadoop-install/2.x" # location for hadoop 2.x files
 TARBALL_PREFIX='rhs-hadoop-install-'
 TARBALL_SUFFIX='.tar.gz'
 
@@ -17,11 +21,13 @@ TARBALL_SUFFIX='.tar.gz'
 #
 function parse_cmd(){
 
-  local OPTIONS='D:'
-  local LONG_OPTS='dirs:'
+  local OPTIONS='D:12'
+  local LONG_OPTS='dirs:,1x,2x'
 
   # defaults (global variables)
-  DIRS=''
+  DIRS='' # default is no extra dirs
+  One_X=false
+  Two_X=true # default is 2.xx
 
   # note: there seems to be a bug in getopt whereby it won't parse correctly
   #   unless short options are also provided. Using --long only causes --dirs
@@ -34,6 +40,12 @@ function parse_cmd(){
       case "$1" in
         -D|--dirs)
             DIRS=$2; shift 2; continue
+        ;;
+        -1|--1x)
+            One_X=true; Two_X=false; shift 1; continue
+        ;;
+        -2|--2x)
+            One_X=false; Two_X=true; shift 1; continue
         ;;
         --)  # no more args to parse
             shift; break
@@ -64,14 +76,20 @@ $SOURCE/devutils/mk_tarball.sh \
 	--pkg-version="$TAGNAME" \
 	--dirs=$DIRS
 
-# git archive HEAD | gzip > $BUILD_LOCATION
-cd /opt/JEFF/  ##why??
-
+if [[ -f "$BUILD_LOCATION/$TARBALL" ]] ; then
+  git archive HEAD | gzip >$BUILD_LOCATION
+else
+  echo "$BUILD_LOCATION/$TARBALL was not built"
+  exit 1
+fi
+	
 echo "Done archiving $TAGNAME to $BUILD_LOCATION..." 
-ls -alth $BUILD_LOCATION 
+ls -rlth $BUILD_LOCATION 
+
 echo
 echo "Proceed? <ENTER>"
 read 
+
 #### NOW RUN SOME TESTS against the tar file (again, should run in jenkins)
 /opt/JEFF/shelltest.sh ### <-- dummy script.
 result=$?
@@ -82,13 +100,11 @@ if [[ ! $result == 0 ]]; then
 else
    echo "TEST PASSED !!!! DEPLOYING $TAGNAME !"
 fi
- 
 ### IF TESTS PASSED, we PROCEED WITH THE DEPLOYMENT !!!
 
-# First deploy into s3: This is the preferred (but new) place where we store
+# Deploy into s3: This is the preferred (but new) place where we store
 # binaries:
-
-# Now, we deploy into archiva.
+[[ "$One_X" == true ]] && S3="$S3_1_X_OBJ" || S3="$S3_2_X_OBJ"
 echo
 echo "Press a key to deploy to $TARBALL in $S3."
 echo "Note that you need to run: \"s3cmd --configure\" the first time you do"
@@ -99,5 +115,8 @@ echo "    s3      -> $S3"
 echo "Proceed? <ENTER>"
 read
 s3cmd put $BUILD_LOCATION/$TARBALL $S3/$TARBALL
-(( $? == 0 )) && echo "Your tarball is now deployed to : $S3/$TARBALL"
+err=$?
+(( err == 0 )) && echo "Your tarball is now deployed to $S3/$TARBALL" || \
+	echo "s3cmd put error $err"
+echo
 exit 0
