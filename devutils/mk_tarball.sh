@@ -181,7 +181,7 @@ function create_tarball(){
   local FILES_TO_TAR="*.sh README.* functions hosts.example ${DIRS[@]}"
 
   echo -e "\n  - Creating $TARBALL tarball in $TARGET"
-  rm $TARBALL
+  rm -f $TARBALL
 
   # create temp tarball dir and copy subset of content there
   rm -rf $TARBALL_DIR
