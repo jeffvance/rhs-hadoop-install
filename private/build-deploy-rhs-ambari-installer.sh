@@ -76,6 +76,10 @@ $SOURCE/devutils/mk_tarball.sh \
 	--pkg-version="$TAGNAME" \
 	--dirs=$DIRS
 
+echo
+echo "Proceed? <ENTER>"
+read 
+
 if [[ -f "$BUILD_LOCATION/$TARBALL" ]] ; then
   git archive HEAD | gzip >$BUILD_LOCATION
 else
