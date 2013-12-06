@@ -189,10 +189,9 @@ function rhn_register(){
   display "   RHN channels:\n$(rhn-channel -l)" $LOG_INFO
 }
 
-# verify_fuse: verify this node has the correct kernel FUSE patch installed and
-# if then it will be installed and a global variable is set to indicate that
-# this node needs to be rebooted. Sets the global REBOOT_REQUIRED variable if
-# the fuse patch is installed.
+# verify_fuse: verify this node has the correct kernel FUSE patch installed,
+# and if not it will be installed and this node will need to be rebooted. Sets
+# the global REBOOT_REQUIRED variable if the fuse patch is installed.
 #
 function verify_fuse(){
 
@@ -207,7 +206,7 @@ function verify_fuse(){
     return
   fi
 
-  display "  In theory the FUSE patch is needed..." $LOG_INFO
+  display "   In theory the FUSE patch is needed..." $LOG_INFO
 
   # set MATCH_DIR and MATCH_FILE vars if match
   match_dir "$FUSE_TARBALL_RE" "$SUBDIR_FILES"
@@ -220,7 +219,7 @@ function verify_fuse(){
 
   display "-- Installing FUSE patch via $FUSE_TARBALL ..." $LOG_INFO
   echo
-  rm -rf fusetmp  # scratch dir
+  rm -rf fusetmp # scratch dir
   mkdir fusetmp
 
   out="$(tar -C fusetmp/ -xzf $FUSE_TARBALL 2>&1)"
@@ -254,25 +253,25 @@ function verify_fuse(){
 function sudoers(){
 
   local SUDOER_DIR='/etc/sudoers.d'
-  local SUDOER_FILE='20_glusterfs_hadoop_sudoer' # 20 is somewhat arbitrary
-  local SUDOER_PATH="$SUDOER_DIR/$SUDOER_FILE"
+  local SUDOER_GLOB='*sudoer*'
+  local sudoer_file="$(ls $SUDOER_GLOB 2>/dev/null)" # except 0 or 1 only!
+  local SUDOER_PATH="$SUDOER_DIR/$sudoer_file"
   local SUDOER_PERM='440'
   local out; local err
 
   echo
-  display "-- Prepping $SUDOER_PATH for user access exceptions..." $LOG_SUMMARY
+  display "-- Installing sudoers file..." $LOG_SUMMARY
 
-  [[ -f $SUDOER_FILE ]] || {
-	display "INFO: sudoers file $SUDOER_FILE not supplied" $LOG_INFO;
+  [[ -z "$sudoer_file" ]] && {
+	display "INFO: sudoers file not supplied in package" $LOG_INFO;
 	return; }
 
-  if [[ ! -d "$SUDOER_DIR" ]] ; then
-    display "   Creating $SUDOER_DIR..." $LOG_DEBUG
-    mkdir -p $SUDOER_DIR
-  fi
+  [[ -d "$SUDOER_DIR" ]] || {
+    display "   Creating $SUDOER_DIR..." $LOG_DEBUG;
+    mkdir -p $SUDOER_DIR; }
 
   # copy packaged sudoers file to correct location
-  cp $SOUDER_FILE $SOUDER_PATH
+  cp $sudoer_file $SUDOER_PATH
   if [[ ! -f $SUDOER_PATH ]] ; then
     display "ERROR: sudoers copy to $SUDOER_PATH failed" $LOG_FORCE
     exit 20

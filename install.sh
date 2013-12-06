@@ -299,9 +299,10 @@ function report_deploy_values(){
   report_gluster_versions
   
   display
-  display "__________ Deployment Values __________" $LOG_REPORT
+  display "---------- Deployment Values ----------" $LOG_REPORT
   display "  Install-from dir:   $INSTALL_DIR"      $LOG_REPORT
   display "  Install-from IP:    $INSTALL_FROM_IP"  $LOG_REPORT
+  display "  Included sub-dirs:  $SUBDIRS"          $LOG_REPORT
   display "  Remote install dir: $REMOTE_INSTALL_DIR"  $LOG_REPORT
   [[ -n "$RHN_USER" ]] && \
     display "  RHN user:           $RHN_USER"       $LOG_REPORT
@@ -739,9 +740,7 @@ function install_nodes(){
 
     local node="$1"; local ip="$2"; local install_storage="$3"
     local install_mgmt="$4"; local err
-    # copy prep_node + all subdirs (if any)
-    local subdirs="$(ls -d */ | grep -v devutils/)" # exclude devutils
-    local FILES_TO_CP="$PREP_SH functions $subdirs"
+    local FILES_TO_CP="$PREP_SH functions *sudoers* $SUBDIRS"
 
     # use ip rather than node for scp and ssh until /etc/hosts is set up
     ssh -oStrictHostKeyChecking=no root@$ip "
@@ -908,6 +907,8 @@ display "$(date). Begin: $SCRIPT -- version $INSTALL_VER ***" $LOG_REPORT
 BRICK_MNT=$BRICK_DIR/$VOLNAME
 MAPRED_SCRATCH_DIR="$BRICK_DIR/mapredlocal"    # xfs but not distributed
 MAPRED_SYSTEM_DIR="$GLUSTER_MNT/mapred/system" # distributed, not local
+# all sub-directories that are related to the install
+SUBDIRS="$(ls -d */ | grep -v devutils/)" # exclude devutils
 
 echo
 display "-- Verifying the deploy environment, including the \"hosts\" file format:" $LOG_INFO
