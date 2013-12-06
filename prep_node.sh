@@ -207,6 +207,8 @@ function verify_fuse(){
     return
   fi
 
+  display "  In theory the FUSE patch is needed..." $LOG_INFO
+
   # set MATCH_DIR and MATCH_FILE vars if match
   match_dir "$FUSE_TARBALL_RE" "$SUBDIR_FILES"
   [[ -z "$MATCH_DIR" ]] && {
