@@ -189,21 +189,20 @@ function rhn_register(){
   display "   RHN channels:\n$(rhn-channel -l)" $LOG_INFO
 }
 
-# verify_fuse: verify this node has the correct kernel FUSE patch installed. If
-# not then it will be installed and a global variable is set to indicate that
-# this node needs to be rebooted. There is no shell command/utility to report
-# whether or not the FUSE patch has been installed (eg. uname -r doesn't), so
-# a file is used for this test.
+# verify_fuse: verify this node has the correct kernel FUSE patch installed and
+# if then it will be installed and a global variable is set to indicate that
+# this node needs to be rebooted. Sets the global REBOOT_REQUIRED variable if
+# the fuse patch is installed.
 #
 function verify_fuse(){
 
   local FUSE_TARBALL_RE='fuse-.*.tar.gz' # note: regexp not glob
   local FUSE_TARBALL
   local out; local err
-  # if below file exists then fuse patch installed
-  local FUSE_INSTALLED='/tmp/FUSE_INSTALLED' # Note: deploy dir is rm'd
+  local FUSE_CHK_CMD="rpm -q --changelog kernel-2.6.32-358.28.1.el6.x86_64 | less | head -20 | grep fuse"
 
-  if [[ -f "$FUSE_INSTALLED" ]]; then # file exists, assume installed
+  out="$($FUSE_CHK_CMD)"
+  if [[ -n "$out" ]] ; then # assume fuse patch has been installed
     display "   ... verified" $LOG_DEBUG
     return
   fi
@@ -238,8 +237,6 @@ function verify_fuse(){
     exit 16
   fi
 
-  # create kludgy fuse-has-been-installed file
-  touch $FUSE_INSTALLED
   display "   A reboot of $NODE is required and will be done automatically" \
         $LOG_INFO
   echo
@@ -248,41 +245,41 @@ function verify_fuse(){
 }
 
 
-# sudoers: create the /etc/sudoers.d/20_gluster file, add the mapred and yarn
-# users to it, and set its permissions. Note: this file will be overwritten.
+# sudoers: copy the packaged sudoers file to /etc/sudoers.d/ and set its
+# permissions. Note: it is ok if the sudoers file is not included in the
+# install package.
 #
 function sudoers(){
 
   local SUDOER_DIR='/etc/sudoers.d'
-  local SUDOER_PATH="$SUDOER_DIR/20_gluster" # 20 is somewhat arbitrary
+  local SUDOER_FILE='20_glusterfs_hadoop_sudoer' # 20 is somewhat arbitrary
+  local SUDOER_PATH="$SUDOER_DIR/$SUDOER_FILE"
   local SUDOER_PERM='440'
-  local SUDOER_DEFAULTS='Defaults:%hadoop !requiretty'
-  local SUDOER_ACC='ALL= NOPASSWD: /usr/bin/getfattr'
-  local mapred='mapred'; local yarn='yarn'
-  local MAPRED_SUDOER="$mapred $SUDOER_ACC"
-  local YARN_SUDOER="$yarn $SUDOER_ACC"
   local out; local err
 
   echo
   display "-- Prepping $SUDOER_PATH for user access exceptions..." $LOG_SUMMARY
+
+  [[ -f $SUDOER_FILE ]] || {
+	display "INFO: sudoers file $SUDOER_FILE not supplied" $LOG_INFO;
+	return; }
 
   if [[ ! -d "$SUDOER_DIR" ]] ; then
     display "   Creating $SUDOER_DIR..." $LOG_DEBUG
     mkdir -p $SUDOER_DIR
   fi
 
-  display "   Appending \"$MAPRED_SUDOER\" and \"$YARN_SUDOER\" to $SUDOER_PATH" $LOG_INFO
-  echo "$SUDOER_DEFAULTS" > $SUDOER_PATH # create/overwrite file
-  echo "$MAPRED_SUDOER"  >> $SUDOER_PATH
-  echo "$YARN_SUDOER"    >> $SUDOER_PATH
+  # copy packaged sudoers file to correct location
+  cp $SOUDER_FILE $SOUDER_PATH
+  if [[ ! -f $SUDOER_PATH ]] ; then
+    display "ERROR: sudoers copy to $SUDOER_PATH failed" $LOG_FORCE
+    exit 20
+  fi
 
   out="$(chmod $SUDOER_PERM $SUDOER_PATH 2>&1)"
   err=$?
   display "sudoer chmod: $out" $LOG_DEBUG
-  if (( err != 0 )) ; then
-    display "ERROR: sudoers chmod error $err" $LOG_FORCE
-    exit 20
-  fi
+  (( err != 0 )) && display "WARN: sudoers chmod error $err" $LOG_FORCE
 }
 
 # apply_tuned: apply the tuned-adm peformance tuning for RHS.
