@@ -1,11 +1,11 @@
-#! /bin/bash
+#!/bin/bash
 #
 # Set up password-less SSH based on contents of the local hosts file.
 # See the usage() function for arguments and their definitions.
 
 # set global variables
 SCRIPT=$(/bin/basename $0)
-SCRIPT_VERS='0.3'  # self version
+SCRIPT_VERS='0.4'  # self version
 INSTALL_DIR="$PWD" # name of deployment (install-from) dir
 
 # source common constants and functions
@@ -71,7 +71,6 @@ function parse_cmd(){
   local LONG_OPTS='hosts:,help,version,noset,nosethostnamem,verbose'
 
   # defaults (global variables)
-  REPLICA_CNT=2
   SETHOSTNAME=true
   DEBUG=false
 
@@ -91,7 +90,7 @@ function parse_cmd(){
 	    echo "$SCRIPT version: $SCRIPT_VERS"; exit 0
 	;;
 	--hosts)
-	    HOSTS_FILE=$2; shift 2; continue
+	    HOSTS_FILE="$2"; shift 2; continue
 	;;
 	--verbose)
            DEBUG=true; shift; continue
@@ -192,7 +191,7 @@ parse_cmd $@
 echo "$(/bin/date). Begin: $SCRIPT -- version $SCRIPT_VERS ***"
 
 echo "Using host file: $HOSTS_FILE"
-verify_local_deploy_setup false false
+verify_local_deploy_setup false
 
 echo "Begin setup of passwordless SSH"
 setup_passwordless_ssh

@@ -80,14 +80,13 @@ function match_dir(){
 # global HOSTS, HOST_IPS, and MGMT_NODE variables.
 #
 # Args:
-#   $1=true means to check that the user is root.
-#   $2=true means to check that passwordless-ssh works
-# NOTE: REPLICA_CNT expected to be defined.
+#   $1=false means to skip various checks that are needed by install.sh but are
+#      not needed by passwordless-ssh. Default is true.
 #
 function verify_local_deploy_setup(){
 
   local errmsg=''; local errcnt=0
-  local chk_root=$1; local chk_ssh=$2
+  local verify_arg=${1:-true} # default is full checking
 
   # read_verify_local_hosts_file: sub-function to read the deploy "hosts"
   # file, split it into the HOSTS and HOST_IPS global array variables, validate
@@ -95,6 +94,14 @@ function verify_local_deploy_setup(){
   # Comments and empty lines are ignored in the hosts file. The number of nodes
   # represented in the hosts file is enforced to be a multiple of the replica
   # count. Downcase host names if they are upper case.
+  # Expects the following global variables to already be set:
+  #   HOSTS_FILE  -- name of local hosts file. Can be set by --hosts option
+  #                  otherwise expected to be $PWD/hosts.
+  #
+  # Sets the folowing global variables:
+  #   HOSTS()
+  #   HOST_IPS()
+  #   NUMNODES
   # 
   function read_verify_local_hosts_file(){
 
@@ -116,7 +123,7 @@ function verify_local_deploy_setup(){
 	# IP address:
 	ip=${hosts_ary[$i]}
 	# validate basic ip-addr syntax
-	if [[ ! $ip =~ $VALID_IP_RE ]] ; then
+	if [[ "$verify_arg" == true && ! $ip =~ $VALID_IP_RE ]] ; then
 	  errmsg+=" * $HOSTS_FILE record $((i/2)):\n   Unexpected IP address syntax for \"$ip\"\n"
 	  ((errcnt++))
 	  break # exit loop
@@ -139,14 +146,14 @@ function verify_local_deploy_setup(){
           MGMT_NODE_IN_POOL=true
         fi
 	# validate basic hostname syntax
- 	if [[ ! $host =~ $VALID_HOSTNAME_RE ]] ; then
+ 	if [[ "$verify_arg" == true && ! $host =~ $VALID_HOSTNAME_RE ]] ; then
 	  errmsg+=" * $HOSTS_FILE record $((i/2)):\n   Unexpected hostname syntax for \"$host\"\n"
 	  ((errcnt++))
 	  break # exit loop
         fi
 	HOSTS+=($host)
 
-	if [[ "$chk_ssh" == true ]] ; then
+	if [[ "$verify_arg" == true ]] ; then
           # verify connectivity from localhost to data node. Note: ip used since
 	  # /etc/hosts may not be set up to map ip to hostname
 	  ssh -q -oBatchMode=yes -oStrictHostKeyChecking=no root@$ip exit
@@ -160,20 +167,23 @@ function verify_local_deploy_setup(){
 
     (( errcnt != 0 )) && return # errors in hosts checking loop are fatal
 
-    # validate the number of nodes in the hosts file
-    NUMNODES=${#HOSTS[@]}
-    if (( NUMNODES < REPLICA_CNT )) ; then
-      errmsg+=" * The $HOSTS_FILE file must contain at least $REPLICA_CNT nodes (replica count)\n"
-      ((errcnt++))
-    elif (( NUMNODES % REPLICA_CNT != 0 )) ; then
-      errmsg+=" * The number of nodes in the $HOSTS_FILE file must be a multiple of the\n   replica count ($REPLICA_CNT)\n"
-      ((errcnt++))
+    NUMNODES=${#HOSTS[@]} # global var used by other functions and scripts
+
+    if [[ -n "$REPLICA_CNT" ]] ; then
+      # validate the number of nodes in the hosts file
+      if [[ "$verify_arg" == true && $NUMNODES < $REPLICA_CNT ]] ; then
+        errmsg+=" * The $HOSTS_FILE file must contain at least $REPLICA_CNT nodes (replica count)\n"
+        ((errcnt++))
+      elif (( NUMNODES % REPLICA_CNT != 0 )) ; then
+        errmsg+=" * The number of nodes in the $HOSTS_FILE file must be a multiple of the\n   replica count ($REPLICA_CNT)\n"
+        ((errcnt++))
+      fi
     fi
   }
 
   # main #
   #      #
-  if [[ "$chk_root" == true && $UID != 0 ]] ; then
+  if [[ "$verify_arg" == true && $UID != 0 ]] ; then
     errmsg+=" * Must be root to run this script.\n"
     ((errcnt++))
   fi

@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 #
 # Copyright (c) 2013 Red Hat, Inc.
 # License: Apache License v2.0
@@ -21,7 +21,7 @@
 
 # set global variables
 SCRIPT=$(basename $0)
-INSTALL_VER='0.47'   # self version
+INSTALL_VER='0.48'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/rhs-hadoop-install/" # on each node
@@ -911,7 +911,7 @@ MAPRED_SYSTEM_DIR="$GLUSTER_MNT/mapred/system" # distributed, not local
 
 echo
 display "-- Verifying the deploy environment, including the \"hosts\" file format:" $LOG_INFO
-verify_local_deploy_setup true true
+verify_local_deploy_setup
 firstNode=${HOSTS[0]}
 
 report_deploy_values
