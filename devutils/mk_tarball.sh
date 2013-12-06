@@ -178,7 +178,12 @@ function create_tarball(){
   local TARBALL="$TARBALL_PREFIX.tar.gz"
   local TARBALL_DIR="$TARBALL_PREFIX" # scratch dir not TARGET dir
   local TARBALL_PATH="$TARBALL_DIR/$TARBALL"
-  local FILES_TO_TAR="*.sh README.* functions hosts.example ${DIRS[@]}"
+  local FILES_TO_TAR="*.sh \
+	functions \
+	*sudoers* \
+	hosts.example \
+	README.* \
+	${DIRS[@]}"
 
   echo -e "\n  - Creating $TARBALL tarball in $TARGET"
   rm -f $TARBALL
