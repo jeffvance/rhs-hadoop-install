@@ -5,27 +5,16 @@
   General packaging and generic install directions are found in the parent 
   directory README file.
 
-  The install.sh script (and the companion prep_node.sh script) sets up
-  Red Hat Storage (RHS) for Hadoop workloads. It is expected that the Red Hat
-  Storage installation guide was followed to set up RHS. Note: the storage
-  (brick) partition (e.g. /dev/sdb) should be configured as RAID 6.
+  The common install.sh script sets up Red Hat Storage (RHS) for Hadoop
+  workloads. It is expected that the Red Hat Storage installation guide was
+  followed to set up RHS. Note: the storage (brick) partition (e.g. /dev/sdb)
+  should be configured as RAID 6.
 
-  A tarball named "rhs-hadoop-install-<version>.tar.gz" is downloaded to one of
-  the cluster nodes or to the user's localhost. The download directory is
-  arbitrary. install.sh requires password-less ssh from the node hosting the
-  rhs install tarball (the "install-from" node) to all nodes in the cluster.
-  There is a utility script, devutils/passwordless-ssh.sh, to set up password-
-  less SSH based on the nodes listed in the "hosts" file. 
- 
-  The rhs-hadoop-install tarball contains the following:
-   - hosts.example: sample "hosts" config file.
-   - install.sh: the main install script, executed by the root user.
-   - prep_node.sh: companion script, not to be executed directly.
-   - README.txt: this file.
-   - devutils/: utility directory.
+  The rhs/ directory contains files and/or scripts used to install RHS-specific
+  aspects of the general installation process.
 
    [ optional ]
-   - rhs2.*/: directory which may contain one or more of the following:
+   - rhs2.0/: directory which may contain one or more of the following:
      - Ambari_Configuration_Guide.pdf
      - ambari-<version>.rpms.tar.gz: Ambari server and agent RPMs.
      - ambari.repo: Ambari's repo file.
