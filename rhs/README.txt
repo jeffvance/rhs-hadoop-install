@@ -3,18 +3,27 @@
 == Overview ==
 
   General packaging and generic install directions are found in the parent 
-  directory README file.
+  directory README file. This directory contains files and/or scripts used to
+  install RHS-specific aspects of the general installation process.
 
-  The common install.sh script sets up Red Hat Storage (RHS) for Hadoop
-  workloads. It is expected that the Red Hat Storage installation guide was
-  followed to set up RHS. Note: the storage (brick) partition (e.g. /dev/sdb)
-  should be configured as RAID 6.
+  The common ../install.sh script sets up the hosts defined in the local "hosts"
+  file as a trusted Glusterfs storage pool. The pre_install.sh script in the
+  rhs/ directory is executed as one of the first steps of the common
+  ../prep_node.sh script. Here, RHS-specific settings are configured to optimize
+  RHS for Hadoop workloads. It is expected that the Red Hat Storage installation
+  guide was followed to set up RHS. Note: the storage (brick) partition (e.g.
+  /dev/sdb) should be configured as RAID 6.
 
-  The rhs/ directory contains files and/or scripts used to install RHS-specific
-  aspects of the general installation process.
 
-   [ optional ]
-   - rhs2.0/: directory which may contain one or more of the following:
+== Sub-directories ==
+
+  rhs2.1/ --
+     - blah, blah
+     - ...
+
+  rhs2.0/ -- archive scripts and files
+     - blah, blah
+     - rhs2.0/: directory which may contain one or more of the following:
      - Ambari_Configuration_Guide.pdf
      - ambari-<version>.rpms.tar.gz: Ambari server and agent RPMs.
      - ambari.repo: Ambari's repo file.
@@ -24,45 +33,22 @@
      - prep_node.sh: Ambari-specific install script (not to be executed
        directly).
  
-  install.sh is the main script and should be run as the root user. It installs
-  the files in the rhs2.0/ directory to each node contained in the "hosts" file.
- 
-== Before you begin ==
+  hdp2.x/ -- hdp 2.x scripts and files
+     - a and b 
+     - ...
 
-  The "hosts" file must be created by the user doing the install. It is not
-  part of the tarball, but an example hosts file is provided. The "hosts" file
-  is expected to be created in the same directory where the tarball has been 
-  downloaded. If a different location is required the "--hosts" option can be 
-  used to specify the "hosts" file path. The "hosts" file contains a list of IP
-  adress followed by hostname (same format as /etc/hosts), one pair per line.
-  Each line represents one node in the storage cluster (gluster trusted pool).
-  Example:
-     ip-for-node-1 hostname-for-node-1
-     ip-for-node-3 hostname-for-node-3
-     ip-for-node-2 hostname-for-node-2
-     ip-for-node-4 hostname-for-node-4
- 
-  IMPORTANT: the node order in the hosts file is critical for two reasons:
-  1) Assuming the RHS volume is created with replica 2 (which is the only
-     value supported for RHS) then each pair of lines in hosts represents
-     replica pairs. For example, the first 2 lines in hosts are replica pairs,
-     as are the next two lines, etc.
-  2) Hostnames are expected to be lower-case.
 
-  Red Hat Network Registering (RHN):
-  ----------------------------------
-  install.sh will automatically register each node in the "hosts" file with the
-  Red Hat Network (RHN) when the --rhn-user and --rhn-pass options are used. 
+==  Red Hat Network Registering (RHN) ==
+
+  pre_install.sh will automatically register each node in the "hosts" file with
+  the Red Hat Network (RHN) when the --rhn-user and --rhn-pass options are used.
   If the --rhn-* options are not specified, it is assumed that the servers have
-  been manually registered prior to running install.sh. If not, the installation
-  may fail.
+  been manually registered prior to running pre_install.sh. If not, the 
+  installation may fail.
 
-  Note:
-  - passwordless SSH is required between the installation node and each storage
-    node. See the Addendum at the end of this document if you would like to see 
-    instructions on how to do this. Note: there is a utility script named
-    devutils/passwordless-ssh.sh which sets up password-less SSH using the nodes
-    defined in the local hosts file.
+
+== Installation ==
+
   - the correct version of RHS needs to be installed on each node per RHS
     guidelines. The RHS ISO just needs to be installed with a separate data
     (brick) partition and with static IP addresss configured. Do not create a
@@ -71,8 +57,6 @@
     /dev/sdb.
   - the order of the nodes in the "hosts" file is in replica order.
   - the --mgmt-node option is IGNORED for now.
-
-== Installation ==
 
 Instructions:
  0) upload rhs-hadoop-install-<version> tarball to the deployment directory on
