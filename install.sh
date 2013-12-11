@@ -4,18 +4,22 @@
 # License: Apache License v2.0
 # Author: Jeff Vance <jvance@redhat.com>
 #
-# This script (and the companion prep_node.sh script) helps to set up Gluster
-# (RHS) for Hadoop workloads. Please read the README.txt file. This script does
-# not verify/enforce any aspects of the RHS installation procedures.
+# Please read the README.txt file.
+#
+# This script helps to set up Glusterfs for Hadoop workloads. All tasks common
+# to both fedora and RHS are done here and in the companion prep_node.sh script,
+# which is executed once per node. prep_node.sh will automatically execute pre_
+# install.sh and post_install.sh scripts in all directories listed in the --dirs
+# option, with the default being to execute only scripts in the fedora/
+# directory. Also, all files contained in directories listed in the --dirs
+# option are copied to each host defined in the local "hosts" file, with the
+# same fedora/ default.
 #
 # Assumptions:
 #  - passwordless SSH is setup between the installation node and each storage
-#    node **
-#  - correct version of RHS installed on each node per RHS guidelines
-#  - a data partition has been created for the storage brick
-#  - storage partition is setup as RAID 6
-#  - the order of the nodes in the "hosts" file is in replica order
-#  ** verified by this script
+#    node,
+#  - a data partition has been created for the storage brick,
+#  - the order of the nodes in the "hosts" file is in replica order.
 #
 # See the usage() function for arguments and their definitions.
 
@@ -35,7 +39,7 @@ PREP_NODE_LOG='prep_node.log'
 PREP_NODE_LOG_PATH="${REMOTE_INSTALL_DIR}$PREP_NODE_LOG"
 
 # source common constants and functions
-. $INSTALL_DIR/functions
+source $INSTALL_DIR/functions
 
 
 # short_usage: write short usage to stdout.
