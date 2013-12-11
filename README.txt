@@ -3,7 +3,7 @@
 == Overview ==
 
   The install.sh script (and the companion prep_node.sh script) sets up
-  Red Hat Storage (RHS) for Hadoop workloads.  It is expected that the Red Hat
+  Red Hat Storage (RHS) for Hadoop workloads. It is expected that the Red Hat
   Storage installation guide was followed to set up RHS. Note: the storage
   (brick) partition (e.g. /dev/sdb) should be configured as RAID 6.
 
