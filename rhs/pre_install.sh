@@ -91,47 +91,6 @@ function install_plugin(){
   cd -
 }
 
-# verify_ntp: verify that ntp is installed, running, and synchronized.
-#
-function verify_ntp(){
-
-  local err; local out
-
-  # run ntpd on reboot
-  out="$(chkconfig ntpd on 2>&1)"
-  err=$?
-  display "chkconfig ntpd on: $out" $LOG_DEBUG
-  (( err != 0 )) &&  display "WARN: chkconfig ntpd on error $err" $LOG_FORCE
-
-  # stop ntpd so that ntpd -qg can potentially do a large time change
-  ps -C ntpd >& /dev/null
-  if (( $? == 0 )) ; then
-    out="$(service ntpd stop 2>&1)"
-    display "ntpd stop: $out" $LOG_DEBUG
-    sleep 1
-    ps -C ntpd >& /dev/null # see if ntpd is stopped now...
-    (( $? == 0 )) && display "WARN: ntpd did NOT stop" $LOG_FORCE
-  fi
-
-  # set time to ntp clock time now (ntpdate is being deprecated)
-  # note: ntpd can't be running...
-  out="$(ntpd -qg 2>&1)"
-  err=$?
-  display "ntpd -qg: $out" $LOG_DEBUG
-  (( err != 0 )) && display "WARN: ntpd -qg (aka ntpdate) error $err" \
-	$LOG_FORCE
-
-  # start ntpd
-  out="$(service ntpd start 2>&1)"
-  err=$?
-  display "ntpd start: $out" $LOG_DEBUG
-  (( err != 0 )) && display "WARN: ntpd start error $err" $LOG_FORCE
-
-  # used to invoke ntpstat to verify the synchronization state, but error 1 was
-  # always returned if the above ntpd -qg cmd did a large time change. Thus, we
-  # no longer call ntpstat since the node will "realtively" soon sync up.
-}
-
 # rhn_register: rhn register $NODE if a rhn username and password were passed.
 # Note: --use-eus-channel on the rhnreg_ks command causes the base channel to
 #   be the "z" channel.
@@ -163,100 +122,6 @@ function rhn_register(){
 	--channel="$channel"
   done
   display "   RHN channels:\n$(rhn-channel -l)" $LOG_INFO
-}
-
-# verify_fuse: verify this node has the correct kernel FUSE patch installed,
-# and if not it will be installed and this node will need to be rebooted. Sets
-# the global REBOOT_REQUIRED variable if the fuse patch is installed.
-#
-function verify_fuse(){
-
-  local FUSE_TARBALL_RE='fuse-.*.tar.gz' # note: regexp not glob
-  local FUSE_TARBALL
-  local out; local err
-  local FUSE_CHK_CMD="rpm -q --changelog kernel-2.6.32-358.28.1.el6.x86_64 | less | head -20 | grep fuse"
-
-  out="$($FUSE_CHK_CMD)"
-  if [[ -n "$out" ]] ; then # assume fuse patch has been installed
-    display "   ... verified" $LOG_DEBUG
-    return
-  fi
-
-  display "   In theory the FUSE patch is needed..." $LOG_INFO
-
-  # set MATCH_DIR and MATCH_FILE vars if match
-  match_dir "$FUSE_TARBALL_RE" "$SUBDIR_FILES"
-  [[ -z "$MATCH_DIR" ]] && {
-	display "INFO: FUSE patch not supplied" $LOG_INFO;
-	return; }
-
-  cd $MATCH_DIR
-  FUSE_TARBALL=$MATCH_FILE
-
-  display "-- Installing FUSE patch via $FUSE_TARBALL ..." $LOG_INFO
-  echo
-  rm -rf fusetmp # scratch dir
-  mkdir fusetmp
-
-  out="$(tar -C fusetmp/ -xzf $FUSE_TARBALL 2>&1)"
-  err=$?
-  display "untar fuse: $out" $LOG_DEBUG
-  if (( err != 0 )) ; then
-    display "ERROR: untar fuse error $err" $LOG_FORCE
-    exit 13
-  fi
-
-  out="$(yum -y install fusetmp/*.rpm 2>&1)"
-  err=$?
-  display "fuse install: $out" $LOG_DEBUG
-  if (( err != 0 && err != 1 )) ; then # 1--> nothing to do
-    display "ERROR: fuse install error $err" $LOG_FORCE
-    exit 16
-  fi
-
-  display "   A reboot of $NODE is required and will be done automatically" \
-        $LOG_INFO
-  echo
-  REBOOT_REQUIRED=true
-  cd -
-}
-
-
-# sudoers: copy the packaged sudoers file to /etc/sudoers.d/ and set its
-# permissions. Note: it is ok if the sudoers file is not included in the
-# install package.
-#
-function sudoers(){
-
-  local SUDOER_DIR='/etc/sudoers.d'
-  local SUDOER_GLOB='*sudoer*'
-  local sudoer_file="$(ls $SUDOER_GLOB 2>/dev/null)" # except 0 or 1 only!
-  local SUDOER_PATH="$SUDOER_DIR/$sudoer_file"
-  local SUDOER_PERM='440'
-  local out; local err
-
-  echo
-  display "-- Installing sudoers file..." $LOG_SUMMARY
-
-  [[ -z "$sudoer_file" ]] && {
-	display "INFO: sudoers file not supplied in package" $LOG_INFO;
-	return; }
-
-  [[ -d "$SUDOER_DIR" ]] || {
-    display "   Creating $SUDOER_DIR..." $LOG_DEBUG;
-    mkdir -p $SUDOER_DIR; }
-
-  # copy packaged sudoers file to correct location
-  cp $sudoer_file $SUDOER_PATH
-  if [[ ! -f $SUDOER_PATH ]] ; then
-    display "ERROR: sudoers copy to $SUDOER_PATH failed" $LOG_FORCE
-    exit 20
-  fi
-
-  out="$(chmod $SUDOER_PERM $SUDOER_PATH 2>&1)"
-  err=$?
-  display "sudoer chmod: $out" $LOG_DEBUG
-  (( err != 0 )) && display "WARN: sudoers chmod error $err" $LOG_FORCE
 }
 
 # apply_tuned: apply the tuned-adm peformance tuning for RHS.
@@ -329,23 +194,6 @@ function check_selinux(){
   # config SELINUX=permissive which takes effect the next reboot
   display "-- Setting SELinux to permissive..." $LOG_SUMMARY
   sed -i -e "/^$SELINUX_KEY/c\\$SELINUX_KEY$PERMISSIVE" $CONF
-}
-
-# disable_firewall: use iptables to disable the firewall.
-#
-function disable_firewall(){
-
-  local out; local err
-
-  out="$(iptables -F)" # sure fire way to disable iptables
-  err=$?
-  display "iptables: $out" $LOG_DEBUG
-  if (( err != 0 )) ; then
-    display "WARN: iptables error $err" $LOG_FORCE
-  fi
-
-  out="$(chkconfig iptables off 2>&1)" # keep disabled after reboots
-  display "chkconfig off: $out" $LOG_DEBUG
 }
 
 # install_common: perform node installation steps independent of whether or not

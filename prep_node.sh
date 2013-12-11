@@ -156,42 +156,9 @@ function verify_ntp(){
   # no longer call ntpstat since the node will "realtively" soon sync up.
 }
 
-# rhn_register: rhn register $NODE if a rhn username and password were passed.
-# Note: --use-eus-channel on the rhnreg_ks command causes the base channel to
-#   be the "z" channel.
-# Note: rhn-channel is run programmatically to add additional RHS channels.
-#
-function rhn_register(){
-
-  # list of channels separated by a space
-  local channels='rhel-x86_64-server-6-rhs-2.1 rhel-x86_64-server-sfs-6.4.z'
-  local channel; local out; local err
-
-  [[ -z "$RHN_USER" || -z "$RHN_PASS" ]] && return # no error, don't register
-
-  echo
-  display "-- RHN registering with provided rhn user and password" \
-	$LOG_INFO
-  out="$(rhnreg_ks --profilename="$NODE" --username="$RHN_USER" \
-	--password="$RHN_PASS" --use-eus-channel --force 2>&1)"
-  err=$?
-  display "rhn_register: $out" $LOG_DEBUG
-  if (( err != 0 )) ; then
-    display "ERROR: rhn_register error $err" $LOG_FORCE
-    exit 10
-  fi
-
-  # register the rhs channels
-  for channel in $channels ; do
-      rhn-channel --user="$RHN_USER" --password="$RHN_PASS" --add \
-	--channel="$channel"
-  done
-  display "   RHN channels:\n$(rhn-channel -l)" $LOG_INFO
-}
-
-# verify_fuse: verify this node has the correct kernel FUSE patch installed,
-# and if not it will be installed and this node will need to be rebooted. Sets
-# the global REBOOT_REQUIRED variable if the fuse patch is installed.
+# verify_fuse: verify this node has the correct kernel FUSE patch, and if not
+# it will be installed and this node will need to be rebooted. Sets the global
+# REBOOT_REQUIRED variable if the fuse patch is installed.
 #
 function verify_fuse(){
 
@@ -281,78 +248,6 @@ function sudoers(){
   err=$?
   display "sudoer chmod: $out" $LOG_DEBUG
   (( err != 0 )) && display "WARN: sudoers chmod error $err" $LOG_FORCE
-}
-
-# apply_tuned: apply the tuned-adm peformance tuning for RHS.
-#
-function apply_tuned(){
-
-  local out; local err
-  local TUNE_PROFILE='rhs-high-throughput'
-  local TUNE_DIR="/etc/tune-profiles/$TUNE_PROFILE"
-  local TUNE_FILE='ktune.sh'
-  local TUNE_PATH="$TUNE_DIR/$TUNE_FILE"
-  local TUNE_PATH_BAK="$TUNE_PATH.orig"
-  local TUNE_PERMS=755 # rwxr-xr-x
-
-  # set MATCH_DIR and MATCH_FILE vars if match
-  match_dir "$TUNE_FILE" "$SUBDIR_FILES"
-  [[ -z "$MATCH_DIR" ]] && {
-	display "INFO: $TUNE_FILE file not supplied" $LOG_INFO
-	return; }
-
-  cd $MATCH_DIR
-
-  # replace ktune.sh
-  [[ -f $TUNE_PATH_BAK ]] || mv $TUNE_PATH $TUNE_PATH_BAK
-  out="$(cp -f $TUNE_FILE $TUNE_PATH)"
-  err=$?
-  display "$TUNE_FILE cp: $out" $LOG_DEBUG
-  if [[ ! -f $TUNE_PATH ]] ; then
-    display "ERROR: cp of $TUNE_FILE to $TUNE_DIR error $err" $LOG_FORCE
-    exit 23 
-  fi
-  chmod $TUNE_PERMS $TUNE_PATH
-
-  # run profile
-  out="$(tuned-adm profile $TUNE_PROFILE 2>&1)"
-  err=$?
-  display "tuned-adm: $out" $LOG_DEBUG
-  if (( err != 0 )) ; then
-    display "ERROR: tuned-adm error $err" $LOG_FORCE
-    exit 25
-  fi
-  cd -
-}
-
-# check_selinux: if selinux is enabled then set it to permissive. This seems
-# to be a requirement for HDP.
-#
-function check_selinux(){
-
-  local out
-  local CONF='/etc/sysconfig/selinux' # symlink to /etc/selinux/config
-  local SELINUX_KEY='SELINUX='
-  local PERMISSIVE='permissive'; local ENABLED='enabled'
-
-  # report selinux state
-  out=$(sestatus | head -n 1 | awk '{print $3}') # enforcing, permissive
-  echo
-  display "SELinux is: $out" $LOG_SUMMARY
- 
-  [[ "$out" != "$ENABLED" ]] && return # done
-
-  # set selinux to permissive (audit errors reported but not enforced)
-  setenforce permissive
-
-  # keep selinux permissive on reboots
-  if [[ ! -f $CONF ]] ; then
-    display "WARN: SELinux config file $CONF missing" $LOG_FORCE
-    return # nothing more to do...
-  fi
-  # config SELINUX=permissive which takes effect the next reboot
-  display "-- Setting SELinux to permissive..." $LOG_SUMMARY
-  sed -i -e "/^$SELINUX_KEY/c\\$SELINUX_KEY$PERMISSIVE" $CONF
 }
 
 # disable_firewall: use iptables to disable the firewall.
