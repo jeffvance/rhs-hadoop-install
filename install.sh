@@ -25,7 +25,7 @@
 
 # set global variables
 SCRIPT=$(basename $0)
-INSTALL_VER='0.49'   # self version
+INSTALL_VER='0.50'   # self version
 INSTALL_DIR=$PWD     # name of deployment (install-from) dir
 INSTALL_FROM_IP=$(hostname -i)
 REMOTE_INSTALL_DIR="/tmp/rhs-hadoop-install/" # on each node
@@ -913,7 +913,8 @@ MAPRED_SCRATCH_DIR="$BRICK_DIR/mapredlocal"    # xfs but not distributed
 MAPRED_SYSTEM_DIR="$GLUSTER_MNT/mapred/system" # distributed, not local
 # all sub-directories that are related to the install
 #SUBDIRS="$(ls -d */ | grep -v devutils/)" # exclude devutils
-SUBDIRS="$(find . -type d -not -iwholename '*.[a-z]*' | grep -v devutils)"
+SUBDIRS="$(find ./* -type d -not -iwholename '*.[a-z]*' | grep -v devutils)"
+echo "***** SUBDIRS=$SUBDIRS"
 
 echo
 display "-- Verifying the deploy environment, including the \"hosts\" file format:" $LOG_INFO

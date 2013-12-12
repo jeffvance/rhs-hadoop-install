@@ -4,8 +4,7 @@
 # License: Apache License v2.0
 # Author: Jeff Vance <jvance@redhat.com>
 #
-# THIS SCRIPT IS NOT MEANT TO BE RUN STAND-ALONE. IT IS A COMPANION SCRIPT TO
-# install.sh.
+# THIS SCRIPT IS NOT MEANT TO BE RUN STAND-ALONE.
 #
 # This script is a companion script to install.sh and runs on a remote node. It
 # prepares the hosting node for hadoop workloads ontop of red hat storage. 
@@ -23,14 +22,12 @@
 #  - FUSE kernel patch,
 #  - ktune.sh performance script
 #
-# Lastly, if there are any executable files (expected to be shell scripts)
-# within any sub-directories found under the deployment dir, they are 
-# executed (and passed the same args as prep_node in the same order).
-# Note: executables are invoked after all tasks above are completed.
-# Note: the order of execution is alphabetical based on 1) sub-dir name and 
-#   2) shell script name.
-# Note: sub-dir naming such as 001-foo and 002-bar can force the desired
-#    execution order.
+# Lastly, if there are any shell scripts within any sub-directories found under
+# the deployment dir, they are executed (and passed the same args as prep_node
+# in the same order). Scripts named "pre_install.sh" are invoked before
+# prep_node starts any of its tasks, and scripts named "post_install.sh" are
+# invoked just prior to prep_node exiting. The order of execution is alphabetic
+# based on sub-directory name.
 #
 # Please read the README file.
 #
@@ -386,7 +383,8 @@ fi
 
 # create SUBDIR_FILES variable which contains all files in all sub-dirs. There 
 # can be 0 or more sub-dirs. Note: devutils/ is not copied to each node.
-DIRS="$(ls -d */ 2>/dev/null)" 
+#DIRS="$(ls -d */ 2>/dev/null)" 
+DIRS="$(find . -type d -not -iwholename '*.[a-z]*')"
 # format for SUBDIR_FILES:  "dir1/file1 dir1/file2...dir2/fileN ..."
 # format for SUBDIR_XFILES: "dir/x-file1 dir/x-file2 dir2/x-file3 ..." 
 if [[ -n "$DIRS" ]] ; then
@@ -394,6 +392,8 @@ if [[ -n "$DIRS" ]] ; then
    [[ -n "$SUBDIR_FILES" ]] &&
 	SUBDIR_XFILES="$(find $SUBDIR_FILES -executable -name '*.sh')"
 fi
+echo "DIRS=$DIRS, SUBDIR_FILES=$SUBDIR_FILES, x=$SUBDIR_XFILES"
+exit
 
 # remove special logfile, start "clean" each time script is invoked
 rm -f $LOGFILE
