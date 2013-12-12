@@ -12,11 +12,10 @@
 #
 # This script does the following on the host (this) node:
 #  - modifes /etc/hosts to include all hosts ip/hostname for the cluster
+#  - verifies the FUSE patch has been installed, or installs it
 #  - sets up the sudoers file
-#  - registers this node with RHN (red hat support network)
 #  - ensures that ntp is running correctly
 #  - disables the firewall via iptables
-#  - set selinux to permissive mode
 #
 # Additionally, depending on the contents of the tarball (see devutils/
 # mk_tarball), this script may install the following:
@@ -272,9 +271,6 @@ function disable_firewall(){
 #
 function install_common(){
 
-  # set SELinux to permissive if it's enabled
-  check_selinux
-
   # disable firewall
   echo
   display "-- Disable firewall" $LOG_SUMMARY
@@ -288,9 +284,6 @@ function install_common(){
 
   # set up sudoers file for mapred and yarn users
   sudoers
-
-  # rhn register, if username/pass provided
-  rhn_register
 
   # verify NTP setup and sync clock
   echo
@@ -314,19 +307,13 @@ function install_storage(){
   # set up /etc/hosts to map ip -> hostname
   # install Gluster-Hadoop plug-in on agent nodes
   echo
-  display "-- Verifying RHS-GlusterFS installation:" $LOG_SUMMARY
+  display "-- Verifying GlusterFS installation:" $LOG_SUMMARY
   install_plugin
 
   # verify FUSE patch on data (agent) nodes, if not installed yum install it
   echo
   display "-- Verifying FUSE patch installation:" $LOG_SUMMARY
   verify_fuse
-
-  # apply the tuned-admin rhs-high-throughput profile
-  echo
-  display "-- Applying the rhs-high-throughput profile using tuned-adm" \
-	$LOG_SUMMARY
-  apply_tuned
 }
 
 # install_mgmt: perform the installations steps needed when the node is the
@@ -383,7 +370,7 @@ function execute_extra_scripts(){
 # ** main ** #
 #            #
 echo
-display "$(date). Begin: prep_node" $LOG_REPORT
+display "$(date). Begin: $0" $LOG_REPORT
 
 if [[ ! -d $DEPLOY_DIR ]] ; then
   display "$NODE: Directory '$DEPLOY_DIR' missing on $(hostname)" $LOG_FORCE
@@ -420,7 +407,7 @@ install_common
 execute_extra_scripts
 
 echo
-display "$(date). End: prep_node" $LOG_REPORT
+display "$(date). End: $0" $LOG_REPORT
 
 [[ -n "$REBOOT_REQUIRED" ]] && exit 99 # tell install.sh a reboot is needed
 exit 0
