@@ -171,7 +171,7 @@ function execute_extra_scripts(){
 # ** main ** #
 #            #
 echo
-display "$(date). Begin: prep_node" $LOG_REPORT
+display "$(date). Begin: $0" $LOG_REPORT
 
 if [[ ! -d $DEPLOY_DIR ]] ; then
   display "$NODE: Directory '$DEPLOY_DIR' missing on $(hostname)" $LOG_FORCE
