@@ -325,41 +325,45 @@ function install_mgmt(){
   # nothing to do here (yet)...
 }
 
-# execute_extra_scripts: if there are any scripts within the extra sub-dirs
-# then execute them now. All prep_node args are passed to the script; however,
-# unfortunately, $@ cannot be used since the arrays are lost. Therefore, each
-# arg is passed individually.
+# execute_scripts: if there are pre_ or post_ scripts in any of the extra sub-
+# dirs then execute them now. All prep_node args are passed to the script;
+# however, unfortunately, $@ cannot be used since the arrays are lost.
+# Therefore, each arg is passed individually. $1 is the prefix flag for "pre"
+# or "post" processing of target scripts. Only scripts named "pre_install.sh"
+# or "post_install.sh" are automatically executed.
 # Note: script errors are ignored and do not stop the next script from
 #    executing. This may need to be changed later...
 # Note: for an unknown reason, the 2 arrays need to be converted to strings
 #   then passed to the script. This is not necessary when passing the same
 #   arrays from install.sh to prep_node.sh but seems to be required here...
 #
-function execute_extra_scripts(){
+function execute_scripts(){
 
-  local f; local dir; local err
+  local dir; local f; local err
+  local prefix="$1" # required, "pre" or "post"
 
   echo
-  [[ -z "$SUBDIR_XFILES" ]] && {
-	display "No additional executable scripts found" $LOG_INFO;
-	return; }
+  [[ -z "$DIRS" ]] && return # no extra dirs so no extra scripts
 
-  display " --  Executing scripts in sub-directories..." $LOG_SUMMARY
+  display " --  $prefix execution (if any)..." $LOG_SUMMARY
   local tmp1="${HOSTS[@]}"    # convert array -> string
   local tmp2="${HOST_IPS[@]}"
 
-  for f in $SUBDIR_XFILES ; do
-      display "Begin executing: $f ..." $LOG_INFO
-      dir="$(dirname $f)"; f="$(basename $f)"
-      cd $dir
-      ./$f $NODE $STORAGE_INSTALL $MGMT_INSTALL "$tmp1" "$tmp2" $MGMT_NODE \
+  for dir in $DIRS ; do
+      f="$dir/${prefix}_install.sh"
+      if [[ -x $f ]] ; then
+	display "Begin executing: $f ..." $LOG_INFO
+        f="$(basename $f)"
+	cd $dir
+	./$f $NODE $STORAGE_INSTALL $MGMT_INSTALL "$tmp1" "$tmp2" $MGMT_NODE \
 	   $VERBOSE $LOGFILE $DEPLOY_DIR "$RHN_USER" "$RHN_PASS"
-      err=$?
-      cd -
-      (( err != 0 )) && display "$f error: $err" $LOG_INFO
-      display "Done executing: $f" $LOG_INFO
-      display '-----------------------' $LOG_INFO
-      echo
+	err=$?
+	cd -
+	(( err != 0 )) && display "$f error: $err" $LOG_INFO
+	display "Done executing: $f" $LOG_INFO
+	display '-----------------------' $LOG_INFO
+	echo
+      fi
   done
 }
 
@@ -383,17 +387,14 @@ fi
 
 # create SUBDIR_FILES variable which contains all files in all sub-dirs. There 
 # can be 0 or more sub-dirs. Note: devutils/ is not copied to each node.
-#DIRS="$(ls -d */ 2>/dev/null)" 
-DIRS="$(find . -type d -not -iwholename '*.[a-z]*')"
-# format for SUBDIR_FILES:  "dir1/file1 dir1/file2...dir2/fileN ..."
-# format for SUBDIR_XFILES: "dir/x-file1 dir/x-file2 dir2/x-file3 ..." 
-if [[ -n "$DIRS" ]] ; then
-   SUBDIR_FILES="$(find $DIRS -type f)";
-   [[ -n "$SUBDIR_FILES" ]] &&
-	SUBDIR_XFILES="$(find $SUBDIR_FILES -executable -name '*.sh')"
-fi
-echo "DIRS=$DIRS, SUBDIR_FILES=$SUBDIR_FILES, x=$SUBDIR_XFILES"
-exit
+DIRS="$(find ./* -type d)"
+# format for SUBDIR_FILES:  "dir1/file1 dir1/dir2/file2...dir2/fileN ..."
+[[ -n "$DIRS" ]] &&
+	SUBDIR_FILES="$(find $DIRS -type f -not -executable)"
+echo -e "****DIRS=$DIRS \n SUBDIR_FILES=$SUBDIR_FILES"
+
+# execute pre_install.sh scripts within each sub-dir, if any
+execute_scripts 'pre'
 
 # remove special logfile, start "clean" each time script is invoked
 rm -f $LOGFILE
@@ -403,8 +404,8 @@ install_common
 [[ $STORAGE_INSTALL == true ]] && install_storage
 [[ $MGMT_INSTALL    == true ]] && install_mgmt
 
-# execute all shell scripts within sub-dirs, if any
-execute_extra_scripts
+# execute post_install.sh scripts within each sub-dir, if any
+execute_scripts 'post'
 
 echo
 display "$(date). End: $0" $LOG_REPORT
