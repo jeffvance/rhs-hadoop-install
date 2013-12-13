@@ -551,8 +551,6 @@ function create_trusted_pool(){
 #    each node
 # TODO: limit disk space usage in MapReduce scratch dir so that it does not
 #       consume too much of the shared storage space.
-# NOTE: read comments below about the inablility to persist gluster volume
-#       mounts via /etc/fstab when using pre-2.1 RHS.
 #
 function setup(){
 
