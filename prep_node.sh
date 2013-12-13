@@ -22,12 +22,12 @@
 #  - FUSE kernel patch,
 #  - ktune.sh performance script
 #
-# Lastly, if there are any shell scripts within any sub-directories found under
-# the deployment dir, they are executed (and passed the same args as prep_node
-# in the same order). Scripts named "pre_install.sh" are invoked before
-# prep_node starts any of its tasks, and scripts named "post_install.sh" are
-# invoked just prior to prep_node exiting. The order of execution is alphabetic
-# based on sub-directory name.
+# Lastly, if there are specific shell scripts within any sub-directories found
+# under the deployment dir, they are executed (and passed the same args as
+# prep_node in the same order). Scripts named "pre_install.sh" are invoked
+# before prep_node starts any of its tasks, and scripts named "post_install.sh"
+# are invoked just prior to prep_node exiting. The order of execution for all
+# pre and post install scripts is alphabetic based on sub-directory name.
 #
 # Please read the README file.
 #
@@ -326,11 +326,14 @@ function install_mgmt(){
 }
 
 # execute_scripts: if there are pre_ or post_ scripts in any of the extra sub-
-# dirs then execute them now. All prep_node args are passed to the script;
-# however, unfortunately, $@ cannot be used since the arrays are lost.
-# Therefore, each arg is passed individually. $1 is the prefix flag for "pre"
-# or "post" processing of target scripts. Only scripts named "pre_install.sh"
-# or "post_install.sh" are automatically executed.
+# dirs then execute them. All prep_node args are passed to the script; however,
+# unfortunately, $@ cannot be used since the arrays are lost.# Therefore, each
+# arg is passed individually.
+#
+# $1 is required and is the prefix flag for "pre" or "post" processing of
+# target scripts. Only scripts named "pre_install.sh" or "post_install.sh" are
+# automatically executed.
+#
 # Note: script errors are ignored and do not stop the next script from
 #    executing. This may need to be changed later...
 # Note: for an unknown reason, the 2 arrays need to be converted to strings
@@ -339,15 +342,15 @@ function install_mgmt(){
 #
 function execute_scripts(){
 
-  local dir; local f; local err
   local prefix="$1" # required, "pre" or "post"
+  local dir; local f; local err
+  local tmp1="${HOSTS[@]}" # convert array -> string
+  local tmp2="${HOST_IPS[@]}"
 
   echo
   [[ -z "$DIRS" ]] && return # no extra dirs so no extra scripts
 
   display " --  $prefix execution (if any)..." $LOG_SUMMARY
-  local tmp1="${HOSTS[@]}"    # convert array -> string
-  local tmp2="${HOST_IPS[@]}"
 
   for dir in $DIRS ; do
       f="$dir/${prefix}_install.sh"
