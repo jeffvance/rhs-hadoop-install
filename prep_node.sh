@@ -62,11 +62,12 @@ RHN_PASS=${11:-}
 NUMNODES=${#HOSTS[@]}
 
 # source common constants and functions
-. ${DEPLOY_DIR}functions
+source ${DEPLOY_DIR}functions
 
 
-# install_plugin: copy the Hadoop-Gluster plug-in from the rhs install files to
-# the appropriate Hadoop directory. Fatal errors exit script.
+# install_plugin: copy the glusterfs-hadoop plugin from a deploy directory to
+# the appropriate Hadoop directory and create a symlink in the hadoop directory.
+# Fatal errors exit script.
 #
 function install_plugin(){
 

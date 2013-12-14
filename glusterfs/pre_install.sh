@@ -73,11 +73,48 @@ function get_plugin(){
   display "   glusterfs-hadoop plugin copied to $PWD" $LOG_SUMMARY
 }
 
+# install_xfs: 
+#
+function install_xfs(){
+
+  local err; local out
+
+  out="$(yum -y install xfsprogs xfsdump)"
+  err=$?
+  display "install xfsprogs: $out"
+  (( err == 0 )) || {
+	display "ERROR: XFS not installed: $err" $LOG_FORCE; exit 10; }
+}
+
+# verify_install_xfs: 
+#
+function verify_install_xfs(){
+
+  rpm -q xfsprogs >& /dev/null
+  (( $? == 0 )) || install_xfs
+}
+
+# verify_install_glusterfs:
+#
+function verify_install_glusterfs(){
+
+}
+
 # install_storage: perform the installation steps needed when the node is a
 # storage/data node.
 #
 function install_storage(){
 
+  echo
+  display "-- verify XFS" $LOG_INFO
+  verify_install_xfs
+
+  echo
+  display "-- install glusterfs" $LOG_INFO
+  verify_install_glusterfs
+
+  echo
+  display "-- get glusterfs-hadoop plugin" $LOG_INFO
   get_plugin
 }
 
