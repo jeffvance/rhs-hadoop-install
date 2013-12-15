@@ -90,8 +90,7 @@ function install_xfs(){
 #
 function verify_install_xfs(){
 
-  rpm -q xfsprogs >& /dev/null
-  (( $? == 0 )) || install_xfs
+  rpm -q xfsprogs >& /dev/null || install_xfs
 }
 
 # verify_install_glusterfs:
@@ -106,7 +105,7 @@ function verify_install_glusterfs(){
 function install_storage(){
 
   echo
-  display "-- verify XFS" $LOG_INFO
+  display "-- verify / install XFS" $LOG_INFO
   verify_install_xfs
 
   echo
