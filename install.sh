@@ -551,6 +551,8 @@ function create_trusted_pool(){
 #    each node
 # TODO: limit disk space usage in MapReduce scratch dir so that it does not
 #       consume too much of the shared storage space.
+# NOTE: read comments below about the inablility to persist gluster volume
+#       mounts via /etc/fstab when using pre-2.1 RHS.
 #
 function setup(){
 
@@ -757,11 +759,21 @@ function install_nodes(){
       exit 35
     fi
 
-    # note: prep_node.sh may apply patches which reqire the node to be rebooted
+    # delcare local associative args array, rather than passing separate args
+    # note: it's tricky passing an assoc array to a script or function. The
+    #  declaration is passed as a string, and the receiving script or function
+    #  eval's the arg, but omits the "declare -A name=" substring. The 2 arrays
+    #  are also a bit tricky to pass and receive. And remember values in an
+    #  associative array cannot be arrays or other structures.
+    # note: prep_node.sh may apply patches which require $node to be rebooted
+    declare -A PREP_ARGS=([BRICK_DEV]="$BRICK_DEV" [NODE]="$node" \
+	[INST_STORAGE]="$install_storage" [INST_MGMT]="$install_mgmt" \
+	[MGMT_NODE]="$MGMT_NODE" [VERBOSE]="$VERBOSE" \
+	[PREP_LOG]="$PREP_NODE_LOG_PATH" [REMOTE_DIR]="$REMOTE_INSTALL_DIR" \
+	[RHN_USER]="$RHN_USER" [RHN_PASS]="$RHN_PASS")
     out="$(ssh -oStrictHostKeyChecking=no root@$ip $REMOTE_PREP_SH \
-	$node $install_storage $install_mgmt "\"${HOSTS[@]}\"" \
-	"\"${HOST_IPS[@]}\"" $MGMT_NODE $VERBOSE $PREP_NODE_LOG_PATH \
-	$REMOTE_INSTALL_DIR "$RHN_USER" "$RHN_PASS")"
+        "\"$(declare -p PREP_ARGS)\"" "\"${HOSTS[@]}\"" \ "\"${HOST_IPS[@]}\""
+	)"
     err=$?
     # prep_node writes all messages to the PREP_NODE_LOG logfile regardless of
     # the verbose setting. However, it outputs (and is captured above) only
@@ -910,7 +922,9 @@ BRICK_MNT=$BRICK_DIR/$VOLNAME
 MAPRED_SCRATCH_DIR="$BRICK_DIR/mapredlocal"    # xfs but not distributed
 MAPRED_SYSTEM_DIR="$GLUSTER_MNT/mapred/system" # distributed, not local
 # all sub-directories that are related to the install
-SUBDIRS="$(find ./* -type d | grep -v devutils)" # exclude devutils
+#SUBDIRS="$(ls -d */ | grep -v devutils/)" # exclude devutils
+SUBDIRS="$(find ./* -type d | grep -v devutils)"
+echo "***** SUBDIRS=$SUBDIRS"
 
 echo
 display "-- Verifying the deploy environment, including the \"hosts\" file format:" $LOG_INFO

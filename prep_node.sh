@@ -32,32 +32,37 @@
 # Please read the README file.
 #
 # Arguments (all positional):
-#   $1=self hostname*, $2=install storage flag*, $3=install mgmt server flag*,
-#   $4=HOSTS(array)*, $5=HOST IP-addrs(array)*, $6=management server hostname*,
-#   $7=verbose value*, $8=special logfile*, $9=working dir, $10=rhn user, 
-#   $11=rhn user password
-# '*' means required argument, others are optional.
+#   $1=associative array, passed by *declaration*, containing many individual
+#      arg values. Note: special care needed when passing and receiving
+#      associative arrays,
+#   $2=HOSTS(array),
+#   $3=HOST IP-addrs(array).
 #
-# Note: as of now, in prep_node.sh, the "install mgmt server" flag is ignored.
-#   However, supporting scripts executed by prep_node are passed this flag and
-#   may act upon its setting.
-#
-# Note on passing arrays: the caller (install.sh) needs to surround the array
-#   values with embedded double quotes, eg. "\"${ARRAY[@]}\""
+# Note on passing arrays: the caller needs to surround the array values with
+#   embedded double quotes, eg. "\"${ARRAY[@]}\""
+# Note on passing associative arrays: the caller needs to pass the declare -A
+#   command line which initializes the array. The receiver then evals this
+#   string in order to set its own assoc array.
 
 # constants and args
-NODE=$1
-STORAGE_INSTALL=$2 # true or false
-MGMT_INSTALL=$3    # true or false
-HOSTS=($4)
-HOST_IPS=($5)
-MGMT_NODE="$6" # note: this node can be inside or outside the storage cluster
-VERBOSE=$7
-LOGFILE=$8
-DEPLOY_DIR=${9:-/tmp/rhs-hadoop-install/}
-RHN_USER=${10:-}
-RHN_PASS=${11:-}
-#echo -e "*** $(basename $0)\n 1=$NODE, 2=$STORAGE_INSTALL, 3=$MGMT_INSTALL, 4=${HOSTS[@]}, 5=${HOST_IPS[@]}, 6=$MGMT_NODE, 7=$VERBOSE, 8=$LOGFILE, 9=$DEPLOY_DIR, 10=$RHN_USER, 11=$RHN_PASS"
+echo "**** (1) prep_node 1=$1*****"
+eval 'declare -A _ARGS='${1#*=} # delete the "declare -A name=" portion of arg
+echo "**** (2) prep_node _ARGS declare="
+declare -p _ARGS
+NODE="${_ARGS[NODE]}"
+STORAGE_INSTALL="${_ARGS[INST_STORAGE]}" # true or false
+MGMT_INSTALL="${_ARGS[INST_MGMT]}"       # true or false
+MGMT_NODE="${_ARGS[MGMT_NODE]}" # node can be in or out of storage pool
+VERBOSE="${_ARGS[VERBOSE]}"
+LOGFILE="${_ARGS[PREP_LOG]}"
+DEPLOY_DIR="${_ARGS[REMOTE_DIR]}"
+RHN_USER="${_ARGS[RHN_USER]}"
+RHN_PASS="${_ARGS[RHN_PASS]}"
+HOSTS=($2)
+HOST_IPS=($3)
+echo -e "*** $(basename $0) 1="$1"\n1=$(declare -p _ARGS),\n2=${HOSTS[@]},\n3=${HOST_IPS[@]}"
+echo "NODE=$NODE, VERBOSE=$VERBOSE, LOGFILE=$LOGFILE..."
+exit
 
 NUMNODES=${#HOSTS[@]}
 
