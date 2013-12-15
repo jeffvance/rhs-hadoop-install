@@ -52,17 +52,12 @@ declare -p _ARGS
 NODE="${_ARGS[NODE]}"
 STORAGE_INSTALL="${_ARGS[INST_STORAGE]}" # true or false
 MGMT_INSTALL="${_ARGS[INST_MGMT]}"       # true or false
-MGMT_NODE="${_ARGS[MGMT_NODE]}" # node can be in or out of storage pool
 VERBOSE="${_ARGS[VERBOSE]}"
 LOGFILE="${_ARGS[PREP_LOG]}"
 DEPLOY_DIR="${_ARGS[REMOTE_DIR]}"
-RHN_USER="${_ARGS[RHN_USER]}"
-RHN_PASS="${_ARGS[RHN_PASS]}"
 HOSTS=($2)
 HOST_IPS=($3)
 echo -e "*** $(basename $0) 1="$1"\n1=$(declare -p _ARGS),\n2=${HOSTS[@]},\n3=${HOST_IPS[@]}"
-echo "NODE=$NODE, VERBOSE=$VERBOSE, LOGFILE=$LOGFILE..."
-exit
 
 NUMNODES=${#HOSTS[@]}
 
@@ -364,8 +359,7 @@ function execute_scripts(){
 	display "Begin executing: $f ..." $LOG_INFO
         f="$(basename $f)"
 	cd $dir
-	./$f $NODE $STORAGE_INSTALL $MGMT_INSTALL "$tmp1" "$tmp2" $MGMT_NODE \
-	   $VERBOSE $LOGFILE $DEPLOY_DIR "$RHN_USER" "$RHN_PASS"
+	./$f "\"$(declare -p _ARGS)\"" "$tmp1" "$tmp2"
 	err=$?
 	cd -
 	(( err != 0 )) && display "$f error: $err" $LOG_INFO
