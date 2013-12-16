@@ -52,12 +52,12 @@ declare -p _ARGS
 NODE="${_ARGS[NODE]}"
 STORAGE_INSTALL="${_ARGS[INST_STORAGE]}" # true or false
 MGMT_INSTALL="${_ARGS[INST_MGMT]}"       # true or false
-VERBOSE="${_ARGS[VERBOSE]}"
-LOGFILE="${_ARGS[PREP_LOG]}"
+VERBOSE="${_ARGS[VERBOSE]}"  # needed by display()
+LOGFILE="${_ARGS[PREP_LOG]}" # needed by display()
 DEPLOY_DIR="${_ARGS[REMOTE_DIR]}"
 HOSTS=($2)
 HOST_IPS=($3)
-echo -e "*** $(basename $0) 1="$1"\n1=$(declare -p _ARGS),\n2=${HOSTS[@]},\n3=${HOST_IPS[@]}"
+echo -e "*** $(basename $0) 1=$1\n1=$(declare -p _ARGS),\n2=${HOSTS[@]},\n3=${HOST_IPS[@]}"
 
 NUMNODES=${#HOSTS[@]}
 
@@ -162,7 +162,7 @@ function verify_fuse(){
   local FUSE_TARBALL_RE='fuse-.*.tar.gz' # note: regexp not glob
   local FUSE_TARBALL
   local out; local err
-  local FUSE_CHK_CMD="rpm -q --changelog kernel-2.6.32-358.28.1.el6.x86_64 | less | head -20 | grep fuse"
+  local FUSE_CHK_CMD="rpm -q --changelog kernel-2.6.32-358.28.1.el6.x86_64 | less | head 20 | grep fuse"
 
   out="$($FUSE_CHK_CMD)"
   if [[ -n "$out" ]] ; then # assume fuse patch has been installed
@@ -351,22 +351,22 @@ function execute_scripts(){
   echo
   [[ -z "$DIRS" ]] && return # no extra dirs so no extra scripts
 
-  display " --  $prefix execution (if any)..." $LOG_SUMMARY
+  display "--  $prefix execution (if any)..." $LOG_SUMMARY
 
   for dir in $DIRS ; do
       f="$dir/${prefix}_install.sh"
-      if [[ -x $f ]] ; then
-	display "Begin executing: $f ..." $LOG_INFO
-        f="$(basename $f)"
-	cd $dir
-	./$f "\"$(declare -p _ARGS)\"" "$tmp1" "$tmp2"
-	err=$?
-	cd -
-	(( err != 0 )) && display "$f error: $err" $LOG_INFO
-	display "Done executing: $f" $LOG_INFO
-	display '-----------------------' $LOG_INFO
-	echo
-      fi
+echo "**** execute_scripts: f=$f"
+      [[ -x $f ]] || continue
+      display "Begin executing: $f ..." $LOG_INFO
+      f="$(basename $f)"
+      cd $dir
+      ./$f "\"$(declare -p _ARGS)\"" "$tmp1" "$tmp2"
+      err=$?
+      cd -
+      (( err != 0 )) && display "$f error: $err" $LOG_INFO
+      display "Done executing: $f" $LOG_INFO
+      display '-----------------------' $LOG_INFO
+      echo
   done
 }
 
@@ -396,11 +396,11 @@ DIRS="$(find ./* -type d)"
 	SUBDIR_FILES="$(find $DIRS -type f -not -executable)"
 echo -e "****DIRS=$DIRS \n SUBDIR_FILES=$SUBDIR_FILES"
 
-# execute pre_install.sh scripts within each sub-dir, if any
-execute_scripts 'pre'
-
 # remove special logfile, start "clean" each time script is invoked
 rm -f $LOGFILE
+
+# execute pre_install.sh scripts within each sub-dir, if any
+execute_scripts 'pre'
 
 install_common
 
