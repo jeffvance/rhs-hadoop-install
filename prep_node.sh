@@ -45,10 +45,7 @@
 #   string in order to set its own assoc array.
 
 # constants and args
-echo "**** (1) prep_node 1=$1*****"
 eval 'declare -A _ARGS='${1#*=} # delete the "declare -A name=" portion of arg
-echo "**** (2) prep_node _ARGS declare="
-declare -p _ARGS
 NODE="${_ARGS[NODE]}"
 STORAGE_INSTALL="${_ARGS[INST_STORAGE]}" # true or false
 MGMT_INSTALL="${_ARGS[INST_MGMT]}"       # true or false
@@ -355,12 +352,11 @@ function execute_scripts(){
 
   for dir in $DIRS ; do
       f="$dir/${prefix}_install.sh"
-echo "**** execute_scripts: f=$f"
       [[ -x $f ]] || continue
       display "Begin executing: $f ..." $LOG_INFO
       f="$(basename $f)"
       cd $dir
-      ./$f "\"$(declare -p _ARGS)\"" "$tmp1" "$tmp2"
+      ./$f "$(declare -p _ARGS)" "$tmp1" "$tmp2"
       err=$?
       cd -
       (( err != 0 )) && display "$f error: $err" $LOG_INFO

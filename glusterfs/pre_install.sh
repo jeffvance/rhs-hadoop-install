@@ -27,11 +27,8 @@
 #   string in order to set its own assoc array.
 
 # constants and args
-echo "**** (1) pre_1=$1 *****"
 # note, delete the "declare -A name=" portion of arg
 eval 'declare -A _ARGS='${1#*=}
-echo "**** (2) pre_ARGS declare="
-  declare -p _ARGS
 BRICK_DEV="${_ARGS[BRICK_DEV]}"
 STORAGE_INSTALL="${_ARGS[INST_STORAGE]}" # true or false
 MGMT_INSTALL="${_ARGS[INST_MGMT]}"       # true or false
@@ -41,7 +38,6 @@ DEPLOY_DIR="${_ARGS[REMOTE_DIR]}"
 HOSTS=($2)
 HOST_IPS=($3)
 echo -e "*** $(basename $0) 1=$1\n1=$(declare -p _ARGS),\n2=${HOSTS[@]},\n3=${HOST_IPS[@]}, BRICK_DEV=$BRICK_DEV"
-exit
 
 NUMNODES=${#HOSTS[@]}
 
@@ -147,4 +143,3 @@ echo
 display "$(date). End: $0" $LOG_REPORT
  
 # end of script
-
