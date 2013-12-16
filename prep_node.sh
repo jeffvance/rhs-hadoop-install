@@ -354,9 +354,8 @@ function execute_scripts(){
       f="$dir/${prefix}_install.sh"
       [[ -x $f ]] || continue
       display "Begin executing: $f ..." $LOG_INFO
-      f="$(basename $f)"
       cd $dir
-      ./$f "$(declare -p _ARGS)" "$tmp1" "$tmp2"
+      ./$(basename $f) "$(declare -p _ARGS)" "$tmp1" "$tmp2"
       err=$?
       cd -
       (( err != 0 )) && display "$f error: $err" $LOG_INFO

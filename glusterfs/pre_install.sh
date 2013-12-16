@@ -58,7 +58,6 @@ function get_plugin(){
   local SCRAPE_FILE='plugin-index.txt'
   local jar=''; local jar_ver; local out
 
-  display "-- Getting glusterfs-hadoop plugin"... $LOG_SUMMARY
   # get plugin index page and find the most current version, which is the last
   # list element (<li><a href=...) on the index page
   wget -q -O $SCRAPE_FILE $INDEX_URL
@@ -73,7 +72,7 @@ function get_plugin(){
     display "ERROR: gluster-hadoop plug-in missing in $DEPLOY_DIR" $LOG_FORCE
     display "       attemped to retrieve JAR from $INDEX_URL/$jar_ver/" \
         $LOG_FORCE
-    exit 3
+    exit 2
   fi
   display "   glusterfs-hadoop plugin copied to $PWD" $LOG_SUMMARY
 }
@@ -88,7 +87,7 @@ function install_xfs(){
   err=$?
   display "install xfsprogs: $out"
   (( err == 0 )) || {
-	display "ERROR: XFS not installed: $err" $LOG_FORCE; exit 10; }
+	display "ERROR: XFS not installed: $err" $LOG_FORCE; exit 5; }
 }
 
 # verify_install_xfs: 
@@ -102,6 +101,9 @@ function verify_install_xfs(){
 #
 function verify_install_glusterfs(){
 
+  local err
+
+  # nothing to do here (yet)...
 }
 
 # install_storage: perform the installation steps needed when the node is a
@@ -110,15 +112,15 @@ function verify_install_glusterfs(){
 function install_storage(){
 
   echo
-  display "-- verify / install XFS" $LOG_INFO
+  display "-- Verify / install XFS" $LOG_SUMMARY
   verify_install_xfs
 
   echo
-  display "-- install glusterfs" $LOG_INFO
+  display "-- Install glusterfs" $LOG_SUMMARY
   verify_install_glusterfs
 
   echo
-  display "-- get glusterfs-hadoop plugin" $LOG_INFO
+  display "-- Get glusterfs-hadoop plugin" $LOG_SUMMARY
   get_plugin
 }
 
@@ -127,6 +129,8 @@ function install_storage(){
 #
 function install_mgmt(){
 
+  local err;
+
   # nothing to do here (yet)...
 }
 
@@ -134,12 +138,9 @@ function install_mgmt(){
 # ** main ** #
 #            #
 echo
-display "$(date). Begin: $0" $LOG_REPORT
 
 [[ $STORAGE_INSTALL == true ]] && install_storage
 [[ $MGMT_INSTALL    == true ]] && install_mgmt
 
 echo
-display "$(date). End: $0" $LOG_REPORT
- 
 # end of script

@@ -2,8 +2,12 @@
 
 == Overview ==
 
-  Specific OS (RHEL / Fedora) packaging and install instructions are found in 
-  the respective rhs/ and fedora/ directories.
+  This top-level directory contains files and scripts common to all aspects of
+  preparing glusterfs volumes for Hadoop workloads. If the target is fedora or
+  other non Red Hat Storage (RHS) platorms then files under the "glusterfs/"
+  directory will are used. If the target is any version of RHS then the
+  glusterfs/ directory is omitted and a version-specific RHS directory (or
+  directories) will be used.
 
   The glusterfs-hadoop-install git package consists of common (meaning the same
   steps needed on both fedora and Red Hat Storage, RHS) scripts and files, plus
