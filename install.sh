@@ -278,17 +278,22 @@ function report_deploy_values(){
 
     uniq_vers=($(printf '%s\n' "${node_vers[@]}" | sort -u))
 
-    (( ${#uniq_vers[@]} == 1 )) && {
-      display "GlusterFS:            $vers (same on all nodes)" $LOG_REPORT;
-      return; }
-
-    # display each node and version
-    display "WARNING! There are ${#uniq_vers[@]} versions of gluster in this cluster" $LOG_REPORT
-    for (( i=0; i<$NUMNODES; i++ )); do
-	node="${HOSTS[$i]}"
-	vers="${node_vers[$i]}"
-        display "  $node: $vers" $LOG_REPORT
-    done
+    case ${#uniq_vers[@]} in
+      0)
+	display "No nodes in this cluster have gluster installed" $LOG_REPORT
+      ;;
+      1)
+	display "GlusterFS:            $vers (same on all nodes)" $LOG_REPORT
+      ;;
+      *) 
+	display "WARNING! There are ${#uniq_vers[@]} versions of gluster in this cluster" $LOG_REPORT
+	for (( i=0; i<$NUMNODES; i++ )); do
+	    node="${HOSTS[$i]}"
+	    vers="${node_vers[$i]}"
+	    display "  $node: $vers" $LOG_REPORT
+	done
+      ;;
+    esac
   }
 
   # main #
