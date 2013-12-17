@@ -53,15 +53,16 @@ Syntax:
 $SCRIPT [-v|--version] | [-h|--help]
 
 $SCRIPT [--brick-mnt <path>] [--vol-name <name>]  [--vol-mnt <path>]
-           [--replica <num>]    [--hosts <path>]     [--mgmt-node <node>*]
-           [--rhn-user <name>]  [--rhn-pass <value>] [--logfile <path>]
+           [--replica <num>]    [--hosts <path>]     [--mgmt-node <node>]
+           [--logfile <path>]
            [--verbose [num] ]   [-q|--quiet]         [--debug]
            [-y]                 [-h|--help]          [--old-deploy*]
-           brick-dev
-
-* not implemented
-
 EOF
+  [[ "$RHS_INSTALL" == true ]] &&
+    echo "           [--rhn-user <name>]  [--rhn-pass <value>]"
+  
+  echo "           brick-dev"
+  echo
 }
 
 # usage: write full usage/help text to stdout.
@@ -72,10 +73,11 @@ function usage(){
 
 Usage:
 
-Deploys Hadoop on top of Red Hat Storage (RHS). Each node in the storage
-cluster must be defined in the "hosts" file. The "hosts" file is not included
-in the RHS tarball but must be created prior to running this script. The file
-format is:
+Prepares a glusterfs volume for Hadoop workloads. Note that hadoop itself is not
+installed by these scripts. The user is expected to install hadoop separately.
+Each node in the storage cluster must be defined in the "hosts" file. The
+"hosts" file is not included and must be created prior to running this script.
+The "hosts" file format is:
    hostname  host-ip-address
 repeated one host per line in replica pair order. See the "hosts.example"
 sample hosts file for more information.
@@ -100,10 +102,6 @@ EOF
                        Default: "./hosts".
   --mgmt-node <node> : hostname of the node to be used as the management node.
                        Default: the first node appearing in the "hosts" file.
-  --rhn-user  <name> : Red Hat Network user name. Default is to not register
-                       the storage nodes.
-  --rhn-pass <value> : RHN password for rhn-user. Default is to not register
-                       the storage nodes.
   --logfile   <path> : logfile name. Default is /var/log/rhs-hadoo-install.log.
   -y                 : suppress prompts and auto-answer "yes". Default is to
                        prompt the user.
@@ -116,9 +114,16 @@ EOF
   -q|--quiet         : suppress all output including the final summary report.
                        Internally sets verbose=9. Note: all output is still
                        written to the logfile.
-  --old-deploy       : Use if this is an existing deployment. The default
-                       is a new ("greenfield") RHS customer installation. 
-                       IGNORED FOR NOW.
+EOF
+  if [[ "$RHS_INSTALL" == true ]] ; then
+    cat <<EOF
+  --rhn-user  <name> : Red Hat Network user name. Default is to not register
+                       the storage nodes.
+  --rhn-pass <value> : RHN password for rhn-user. Default is to not register
+                       the storage nodes.
+EOF
+  fi
+  cat <<EOF
   -v|--version       : current version string.
   -h|--help          : help text (this).
 
@@ -251,7 +256,7 @@ function parse_cmd(){
 function report_deploy_values(){
 
   local ans='y'
-  local RHEL_RELEASE='/etc/redhat-release'
+  local OS_RELEASE='/etc/redhat-release'
   local RHS_RELEASE='/etc/redhat-storage-release'
   local OS; local RHS
 
@@ -267,7 +272,7 @@ function report_deploy_values(){
 	node="${HOSTS[$i]}"
 	vers="$(ssh root@$node 'gluster --version|head -n 1')"
 	vers=${vers#glusterfs } # strip glusterfs from beginning
-	vers=${vers%%rhs*}      # strip trailing chars from end to "rhs"
+	vers=${vers%% built*}   # strip trailing chars from end to " built"
 	node_vers[$i]=$vers
     done
 
@@ -289,17 +294,20 @@ function report_deploy_values(){
   # main #
   #      #
   # assume 1st node is representative of OS version for cluster
-  OS="$(ssh -oStrictHostKeyChecking=no root@$firstNode cat $RHEL_RELEASE)"
-  RHS="$(ssh -oStrictHostKeyChecking=no root@$firstNode "
+  OS="$(ssh -oStrictHostKeyChecking=no root@$firstNode cat $OS_RELEASE)"
+  if [[ "$RHS_INSTALL" == true ]] ; then
+    RHS="$(ssh -oStrictHostKeyChecking=no root@$firstNode "
 	if [[ -f $RHS_RELEASE ]] ; then
 	  cat $RHS_RELEASE
 	else
 	  echo '2.0.x'
 	fi")"
+  fi
 
   display
   display "OS:                   $OS" $LOG_REPORT
-  display "RHS:                  $RHS" $LOG_REPORT
+  [[ -n "$RHS" ]] &&
+    display "RHS:                  $RHS" $LOG_REPORT
   report_gluster_versions
   
   display
@@ -911,7 +919,12 @@ function reboot_self(){
 
 
 ## ** main ** ##
+##            ##
 echo
+
+# flag if we're doing an rhs related install, set before parsing args
+[[ -d glusterfs ]] && RHS_INSTALL=false || RHS_INSTALL=true
+
 parse_cmd $@
 
 display "$(date). Begin: $SCRIPT -- version $INSTALL_VER ***" $LOG_REPORT
@@ -922,9 +935,7 @@ BRICK_MNT=$BRICK_DIR/$VOLNAME
 MAPRED_SCRATCH_DIR="$BRICK_DIR/mapredlocal"    # xfs but not distributed
 MAPRED_SYSTEM_DIR="$GLUSTER_MNT/mapred/system" # distributed, not local
 # all sub-directories that are related to the install
-#SUBDIRS="$(ls -d */ | grep -v devutils/)" # exclude devutils
-SUBDIRS="$(find ./* -type d | grep -v devutils)"
-echo "***** SUBDIRS=$SUBDIRS"
+SUBDIRS="$(find ./* -type d | grep -v devutils)" # exclude devutils/
 
 echo
 display "-- Verifying the deploy environment, including the \"hosts\" file format:" $LOG_INFO
