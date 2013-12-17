@@ -276,7 +276,7 @@ function report_deploy_values(){
 	node_vers[$i]=$vers
     done
 
-    uniq_vers=($(echo "${node_vers[@]}"|tr ' ' "\n"|sort|uniq))
+    uniq_vers=($(printf '%s\n' "${node_vers[@]}" | sort -u))
 
     (( ${#uniq_vers[@]} == 1 )) && {
       display "GlusterFS:            $vers (same on all nodes)" $LOG_REPORT;
