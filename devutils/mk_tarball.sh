@@ -1,28 +1,14 @@
-#! /bin/bash
+#!/bin/bash
 #
-# This script creates the install tarball package. Currently this includes the
-# following files:
-#  * rhs-hadoop-install-<verison> directory whicn contains:
+# This script creates the RHS install tarball package. Currently this includes 
+# the following files:
+#  * rhs-hadoop-install-<verison> directory which contains:
 #   - hosts.example: sample "hosts" config file.
 #   - install.sh: the main install script, executed by the root user.
 #   - prep_node.sh: companion script, not to be executed directly.
 #   - README.txt: this file.
 #   - devutils/: utility directory.
-#
-#   [ optional: via --dirs option ]
-#   - rhs2.*/: directory which may contain one or more of the following:
-#     - Ambari_Configuration_Guide.pdf
-#     - ambari-<version>.rpms.tar.gz: Ambari server and agent RPMs.
-#     - ambari.repo: Ambari's repo file.
-#     - fuse-patch.tar.gz: FUSE patch RPMs.
-#     - gluster-hadoop-<version>.jar: Gluster-Hadoop plug-in.
-#     - ktune.sh: optimized RHEL 2.0.5 tuned-adm high-throughput script
-#     - prep_node.sh: Ambari-specific install script (not to be executed
-#       directly).
-#
-# The Ambari_Configuration_Guide.pdf file may be exported from the git
-# Ambari_Installation_Guide.odt file prior to creating the tarball, if present
-# in one of the supplied directories -- see usage().
+#   - plus optional directories via the --dirs option.
 #
 # This script is expected to be run from a git repo so that source version
 # info can be used in the tarball filename. The --source and --target-dir
@@ -43,9 +29,9 @@ function usage(){
 
   cat <<EOF
 
-  This script converts the install guide .odt document file to pdf (if the doc
-  file is present in one of the supplied --dirs=) and creates the rhs-hadoop-
-  install tarball package.
+  This script may convert the install guide .odt document file to pdf (if the
+  doc file is present in one of the supplied --dirs=) and creates the rhs-
+  hadoop-install tarball package.
 
   There are no required parameters.
   
@@ -63,7 +49,9 @@ function usage(){
                  Default is the most recent git version in the SOURCE dir.
   --dirs       : list of directory names, separated by only a comma. The
                  contents of these directories will be included in the tarball
-                 and ultimately installed by the installation scripts.
+                 and ultimately installed by the installation scripts. NOTE: 
+                 collecting files within each dir is *not* recursive, meaning
+                 sub-dirs within the supplied dir names are ignored.
 EOF
 }
 
@@ -182,16 +170,33 @@ function create_tarball(){
 	functions \
 	*sudoers* \
 	hosts.example \
-	README.* \
-	${DIRS[@]}"
+	README.*"
 
+  # copy_dir_files: sub-function to copy all files contained in the supplied
+  # --dirs list. Note: sub-directories within a specific --dir name are *not*
+  # copied and thus cp -R is not used.
+  #
+  function copy_dir_files(){
+
+    local dir; local files
+
+    for dir in ${DIRS[@]} ; do
+	files="$(find $dir -maxdepth 1 -type f)" # omit sub-dirs under $dir
+	cp $files $TARBALL_DIR
+    done
+  }
+
+  ## main ##
+  ##      ##
   echo -e "\n  - Creating $TARBALL tarball in $TARGET"
   rm -f $TARBALL
 
   # create temp tarball dir and copy subset of content there
   rm -rf $TARBALL_DIR
   mkdir $TARBALL_DIR
-  cp -R $FILES_TO_TAR $TARBALL_DIR
+  cp $FILES_TO_TAR $TARBALL_DIR
+
+  copy_dir_files
 
   tar cvzf $TARBALL $TARBALL_DIR
   if [[ $? != 0 || $(ls $TARBALL|wc -l) != 1 ]] ; then
@@ -206,7 +211,7 @@ function create_tarball(){
 
 
 ## main ##
-##
+##      ##
 parse_cmd $@
 
 echo -e "This script converts the existing .odt doc file to pdf and then creates"

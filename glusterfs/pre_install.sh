@@ -130,6 +130,38 @@ function install_glusterfs(){
 	display "ERROR: glusterfs not installed: $err" $LOG_FORCE; exit 11; }
 }
 
+# start_glusterd:
+#
+function start_glusterd(){
+
+  local err; local out
+
+  # persist glusterd across reboots
+  out=$(systemctl enable glusterd.service)
+  err=$?
+  display "systemctl enable: $out" $LOG_DEBUG
+  (( err != 0 )) && display "WARN: systemctl enable error $err" $LOG_FORCE 
+
+  # start glusterd
+  out=$(systemctl start glusterd.service 2>&1)
+  err=$?
+  display "glusterd start: $out" $LOG_DEBUG
+  if (( err != 0 )) ; then
+    display "ERROR: glusterd start error $err" $LOG_FORCE
+    exit 14
+  fi
+
+  # verify glusterd started
+  ps -C glusterd >& /dev/null
+  if (( $? != 0 )) ; then
+    display "ERROR: glusterd not started" $LOG_FORCE
+    exit 17
+  fi
+
+  display "   Gluster version: $(gluster --version | head -n 1) started" \
+        $LOG_SUMMARY
+}
+
 # install_storage: perform the installation steps needed when the node is a
 # storage/data node.
 #
@@ -146,6 +178,10 @@ function install_storage(){
   echo
   display "-- Install glusterfs" $LOG_SUMMARY
   install_glusterfs
+
+  echo
+  display "-- Start glusterd" $LOG_SUMMARY
+  start_glusterd
 
   echo
   display "-- Get glusterfs-hadoop plugin" $LOG_SUMMARY
