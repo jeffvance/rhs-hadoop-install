@@ -181,8 +181,9 @@ function create_tarball(){
     local dir; local files
 
     for dir in ${DIRS[@]} ; do
+	mkdir -p $TARBALL_DIR/$dir
 	files="$(find $dir -maxdepth 1 -type f)" # omit sub-dirs under $dir
-	cp $files $TARBALL_DIR
+	cp $files $TARBALL_DIR/$dir
     done
   }
 
