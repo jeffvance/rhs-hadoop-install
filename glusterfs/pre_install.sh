@@ -77,6 +77,26 @@ function get_plugin(){
   display "   glusterfs-hadoop plugin copied to $PWD" $LOG_SUMMARY
 }
 
+# install_openjdk: 
+#
+function install_openjdk(){
+
+  local err; local out
+
+  out="$(yum -y install java-1.7.0-openjdk-devel)"
+  err=$?
+  display "install openjdk: $out"
+  (( err == 0 )) || {
+	display "ERROR: openjdk not installed: $err" $LOG_FORCE; exit 5; }
+}
+
+# verify_install_openjdk: 
+#
+function verify_install_openjdk(){
+
+  rpm -q java-1.7.0-openjdk-devel >& /dev/null || install_xfs
+}
+
 # install_xfs: 
 #
 function install_xfs(){
@@ -87,7 +107,7 @@ function install_xfs(){
   err=$?
   display "install xfsprogs: $out"
   (( err == 0 )) || {
-	display "ERROR: XFS not installed: $err" $LOG_FORCE; exit 5; }
+	display "ERROR: XFS not installed: $err" $LOG_FORCE; exit 8; }
 }
 
 # verify_install_xfs: 
@@ -97,13 +117,17 @@ function verify_install_xfs(){
   rpm -q xfsprogs >& /dev/null || install_xfs
 }
 
-# verify_install_glusterfs:
+# install_glusterfs:
 #
-function verify_install_glusterfs(){
+function install_glusterfs(){
 
-  local err
+  local err; local out
 
-  # nothing to do here (yet)...
+  out="$(yum -y install glusterfs glusterfs-server glusterfs-fuse attr psmisc)"
+  err=$?
+  display "install glusterfs: $out"
+  (( err == 0 )) || {
+	display "ERROR: glusterfs not installed: $err" $LOG_FORCE; exit 11; }
 }
 
 # install_storage: perform the installation steps needed when the node is a
@@ -116,8 +140,12 @@ function install_storage(){
   verify_install_xfs
 
   echo
+  display "-- Verify / install openjdk" $LOG_SUMMARY
+  verify_install_openjdk
+
+  echo
   display "-- Install glusterfs" $LOG_SUMMARY
-  verify_install_glusterfs
+  install_glusterfs
 
   echo
   display "-- Get glusterfs-hadoop plugin" $LOG_SUMMARY
