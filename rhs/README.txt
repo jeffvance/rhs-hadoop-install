@@ -2,9 +2,20 @@
 
 == Overview ==
 
-  General packaging and generic install directions are found in the parent 
-  directory README file. This directory contains files and/or scripts used to
-  install RHS-specific aspects of the general installation process.
+  NOTE: this script is not meant to be run stand-alone. It is automatically
+  invoked by the common prep_node.sh script found in the public community 
+  glusterfs-hadoop-install repo. This repo must be cloned/pulled prior to
+  building any RHS-specific tarballs. The community repo is linked to from the
+  forge-gluster site (https://forge.gluster.org/).
+
+  General packaging and generic install directions are found in the parent
+  directory README file. This directory contains files, scripts, and sub-
+  directories used to perform RHS-specific volume preparations that are not
+  part of the common installation process.
+
+  Currently, this includes:
+  - ...
+  - ...
 
   The common ../install.sh script sets up the hosts defined in the local "hosts"
   file as a trusted Glusterfs storage pool. The pre_install.sh script in the
