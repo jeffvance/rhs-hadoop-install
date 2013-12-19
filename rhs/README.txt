@@ -17,7 +17,7 @@
   - ...
   - ...
 
-  The common ../install.sh script sets up the hosts defined in the local "hosts"
+  The community install.sh script sets up the hosts defined in the local "hosts"
   file as a trusted Glusterfs storage pool. The pre_install.sh script in the
   rhs/ directory is executed as one of the first steps of the common
   ../prep_node.sh script. Here, RHS-specific settings are configured to optimize
