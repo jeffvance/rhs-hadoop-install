@@ -4,7 +4,7 @@ glusterfs/*
 hosts.example
 install.sh
 post_install_dirs.sh
-prep_install.sh
+prep_node.sh
 README.txt
 *_sudoers*
 *.tar.gz

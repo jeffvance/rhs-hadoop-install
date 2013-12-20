@@ -170,34 +170,16 @@ function create_tarball(){
 	functions \
 	*sudoers* \
 	hosts.example \
-	README.*"
+	README.* \
+	$INCLUDED_FILES" 
 
-  # copy_dir_files: sub-function to copy all files contained in the supplied
-  # --dirs list. Note: sub-directories within a specific --dir name are *not*
-  # copied and thus cp -R is not used.
-  #
-  function copy_dir_files(){
-
-    local dir; local files
-
-    for dir in ${DIRS[@]} ; do
-	mkdir -p $TARBALL_DIR/$dir
-	files="$(find $dir -maxdepth 1 -type f)" # omit sub-dirs under $dir
-	cp $files $TARBALL_DIR/$dir
-    done
-  }
-
-  ## main ##
-  ##      ##
   echo -e "\n  - Creating $TARBALL tarball in $TARGET"
   rm -f $TARBALL
 
-  # create temp tarball dir and copy subset of content there
+  # create temp tarball dir and copy all files to be tar'd to tar dir
   rm -rf $TARBALL_DIR
   mkdir $TARBALL_DIR
-  cp $FILES_TO_TAR $TARBALL_DIR
-
-  copy_dir_files
+  cp --parent $FILES_TO_TAR $TARBALL_DIR
 
   tar cvzf $TARBALL $TARBALL_DIR
   if [[ $? != 0 || $(ls $TARBALL|wc -l) != 1 ]] ; then
@@ -222,9 +204,12 @@ echo "  Source dir:  $SOURCE"
 echo "  Target dir:  $TARGET"
 echo "  Extra dirs:  ${DIRS[@]}"
 
-# format for INCLUDED_FILES: "dir1/file1 dir1/file2...dir2/fileN ..."
+# format for INCLUDED_FILES: "dir1/file1 dir1/f2 dir1/dir2/f ..."
 # note: DIRS always contains at least the devutils dir
-INCLUDED_FILES=$(find ${DIRS[@]} -type f) # all files in all extra sub-dirs
+INCLUDED_FILES=''
+for dir in ${DIRS[@]} ; do
+    INCLUDED_FILES+="$(find $dir -maxdepth 1 -type f) "
+done
 
 convert_odt_2_pdf
 create_tarball
