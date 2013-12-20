@@ -1,0 +1,10 @@
+# common files from the glusterfs-hadoop-install repo:
+functions
+glusterfs/*
+hosts.example
+install.sh
+post_install_dirs.sh
+prep_install.sh
+README.txt
+*_sudoers*
+*.tar.gz
