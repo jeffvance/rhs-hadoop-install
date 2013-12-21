@@ -5,6 +5,5 @@ hosts.example
 install.sh
 post_install_dirs.sh
 prep_node.sh
-README.txt
 *_sudoers*
 *.tar.gz

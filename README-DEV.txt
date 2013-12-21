@@ -1,13 +1,39 @@
-		        RHS-Hadoop Installation
+		RHS-Hadoop Installation Development
 
-== Overview ==
+ 
+  NOTE: this files in this repo/directory are NOT meant to be run stand-alone.
+  
+  The rhs-hadoop-install repo has a dependency on the public glusterfs-hadoop-
+  install community repo, and therefore this communiuty repo must be available
+  in a known location before rhs-based tarballs can be created or direct
+  installs can be performed.
 
-  A tarball named rhs-hadoop-install-<version>.tar.gz has been extracted to a 
-  local directory and now you're read this readme file for end users (as opposed
-  to the README-DEV readme file for install tool developers). The directory
-  containing this readme file should also contain scripts named install.sh,
-  prep_node.sh, post_install_dirs.sh, and should contain a sudoers file, a file
-  full of script functions, and the rhs/ directory.
+  After cloning the rhs-hadoop-install repo, cd to the "rhs-hadoop-install" 
+  directory and execute a script named FIRST_PREP_REPO.sh. This script clones
+  the common glusterfs-hadoop-install repo if not present, or refreshes it if
+  present. It also creates symbolic links to every common file contained in the
+  glusterfs-hadoop-install repo.
+
+  NOTE: After reading this README-DEV file the very next step is to run the
+        FIRST_PREP_REPO.sh script!
+
+  The files contained in rhs/ and in rhs/ sub-directories are automatically
+  copied to 
+
+  NOTE: this script is not meant to be run stand-alone. It is automatically
+  invoked by the common prep_node.sh script found in the public community 
+  glusterfs-hadoop-install repo. This repo must be cloned/pulled prior to
+  building any RHS-specific tarballs. The community repo is linked to from the
+  forge-gluster site (https://forge.gluster.org/).
+
+  General packaging and generic install directions are found in the parent
+  directory README file. This directory contains files, scripts, and sub-
+  directories used to perform RHS-specific volume preparations that are not
+  part of the common installation process.
+
+  Currently, this includes:
+  - ...
+  - ...
 
   The community install.sh script sets up the hosts defined in the local "hosts"
   file as a trusted Glusterfs storage pool. The pre_install.sh script in the
