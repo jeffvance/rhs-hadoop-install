@@ -5,9 +5,9 @@
   A tarball named rhs-hadoop-install-<version>.tar.gz has been extracted and now
   you're reading this file targetting end users (as opposed to the README-DEV
   readme file for install tool developers). The directory containing this readme
-  file should also contain scripts named install.sh, prep_node.sh, post_install_
-  dirs.sh, and should contain a sudoers file, a functions file, and the rhs/
-  directory.
+  file should also contain scripts (actually symbolic links) named install.sh,
+  prep_node.sh, post_install_ dirs.sh, and should contain a sudoers file, a
+  functions file, and the rhs/ directory.
 
   If you've already set up the local "hosts" file, and have password-less SSH
   between the install-from node and the install-to nodes working, then all you
