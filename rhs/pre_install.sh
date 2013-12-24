@@ -157,7 +157,7 @@ function apply_tuned(){
   display "$TUNE_FILE cp: $out" $LOG_DEBUG
   if [[ ! -f $TUNE_PATH ]] ; then
     display "ERROR: cp of $TUNE_FILE to $TUNE_DIR error $err" $LOG_FORCE
-    exit 23 
+    exit 13 
   fi
   chmod $TUNE_PERMS $TUNE_PATH
 
@@ -167,7 +167,7 @@ function apply_tuned(){
   display "tuned-adm: $out" $LOG_DEBUG
   if (( err != 0 )) ; then
     display "ERROR: tuned-adm error $err" $LOG_FORCE
-    exit 25
+    exit 15
   fi
   cd -
 }
@@ -209,23 +209,34 @@ function check_selinux(){
 function verify_fuse(){
 
   local FUSE_TARBALL_RE='fuse-.*.tar.gz' # note: regexp not glob
-  local FUSE_TARBALL
+  local FUSE_TARBALL; local FUSE_OUT='fuse_chk.out'
+  local FUSE_KW1='fuse'; local FUSE_KW2='dentry'
+  local KERNEL="$(uname -r)"
   local out; local err
-  local FUSE_CHK_CMD="rpm -q --changelog kernel-2.6.32-358.28.1.el6.x86_64 | less | head 20 | grep fuse"
 
-  out="$($FUSE_CHK_CMD)"
-  if [[ -n "$out" ]] ; then # assume fuse patch has been installed
+  rpm -q --changelog kernel-$KERNEL >$FUSE_OUT
+  if (( $? == 0 )) && grep $FUSE_KW1 $FUSE_OUT | grep -q $FUSE_KW2 ; then
     display "   ... verified" $LOG_DEBUG
     return
   fi
 
   display "   In theory the FUSE patch is needed..." $LOG_INFO
 
-  # set MATCH_DIR and MATCH_FILE vars if match
+  # if fuse tarball present then use it else yum udate to pick up fuse patches
+  # note: match_dir sets MATCH_DIR and MATCH_FILE vars if match
   match_dir "$FUSE_TARBALL_RE" "$SUBDIR_FILES"
-  [[ -z "$MATCH_DIR" ]] && {
-        display "INFO: FUSE patch not supplied" $LOG_INFO;
-        return; }
+  if [[ -z "$MATCH_DIR" ]] ; then
+    display "INFO: FUSE tarball not supplied" $LOG_INFO
+    display "Doing yum update to apply fuse patches. This will take several minutes..." $LOG_INFO
+    out="$(yum -y update)"
+    err=$?
+    display "yum update: $out" $LOG_DEBUG
+    (( err != 0 )) && {
+	display "ERROR: yum update $err" $LOG_FORCE;
+	exit 17; }
+    REBOOT_REQUIRED=true
+    return
+  fi
 
   cd $MATCH_DIR
   FUSE_TARBALL=$MATCH_FILE
@@ -240,7 +251,7 @@ function verify_fuse(){
   display "untar fuse: $out" $LOG_DEBUG
   if (( err != 0 )) ; then
     display "ERROR: untar fuse error $err" $LOG_FORCE
-    exit 13
+    exit 20
   fi
 
   out="$(yum -y install fusetmp/*.rpm 2>&1)"
@@ -248,7 +259,7 @@ function verify_fuse(){
   display "fuse install: $out" $LOG_DEBUG
   if (( err != 0 && err != 1 )) ; then # 1--> nothing to do
     display "ERROR: fuse install error $err" $LOG_FORCE
-    exit 16
+    exit 23
   fi
 
   display "   A reboot of $NODE is required and will be done automatically" \
