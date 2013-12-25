@@ -225,6 +225,7 @@ function verify_fuse(){
   # if fuse tarball present then use it else yum udate to pick up fuse patches
   # note: match_dir sets MATCH_DIR and MATCH_FILE vars if match
   match_dir "$FUSE_TARBALL_RE" "$SUBDIR_FILES"
+
   if [[ -z "$MATCH_DIR" ]] ; then
     display "INFO: FUSE tarball not supplied" $LOG_INFO
     display "Doing yum update to apply fuse patches. This will take several minutes..." $LOG_INFO
@@ -234,39 +235,35 @@ function verify_fuse(){
     (( err != 0 )) && {
 	display "ERROR: yum update $err" $LOG_FORCE;
 	exit 17; }
-    REBOOT_REQUIRED=true
-    return
-  fi
 
-  cd $MATCH_DIR
-  FUSE_TARBALL=$MATCH_FILE
-
-  display "-- Installing FUSE patch via $FUSE_TARBALL ..." $LOG_INFO
-  echo
-  rm -rf fusetmp # scratch dir
-  mkdir fusetmp
-
-  out="$(tar -C fusetmp/ -xzf $FUSE_TARBALL 2>&1)"
-  err=$?
-  display "untar fuse: $out" $LOG_DEBUG
-  if (( err != 0 )) ; then
-    display "ERROR: untar fuse error $err" $LOG_FORCE
-    exit 20
-  fi
-
-  out="$(yum -y install fusetmp/*.rpm 2>&1)"
-  err=$?
-  display "fuse install: $out" $LOG_DEBUG
-  if (( err != 0 && err != 1 )) ; then # 1--> nothing to do
-    display "ERROR: fuse install error $err" $LOG_FORCE
-    exit 23
-  fi
-
-  display "   A reboot of $NODE is required and will be done automatically" \
+  else # fuse patch tarball provided
+    cd $MATCH_DIR
+    FUSE_TARBALL="$MATCH_FILE"
+    display "-- Installing FUSE patch via $FUSE_TARBALL ..." $LOG_INFO
+    echo
+    rm -rf fusetmp # scratch dir
+    mkdir fusetmp
+    out="$(tar -C fusetmp/ -xzf $FUSE_TARBALL 2>&1)"
+    err=$?
+    display "untar fuse: $out" $LOG_DEBUG
+    if (( err != 0 )) ; then
+      display "ERROR: untar fuse error $err" $LOG_FORCE
+      exit 20
+    fi
+    out="$(yum -y install fusetmp/*.rpm 2>&1)"
+    err=$?
+    display "fuse install: $out" $LOG_DEBUG
+    if (( err != 0 && err != 1 )) ; then # 1--> nothing to do
+      display "ERROR: fuse install error $err" $LOG_FORCE
+      exit 23
+    fi
+    display "   A reboot of $NODE is required and will be done automatically" \
         $LOG_INFO
+    cd -
+  fi
+
   echo
   REBOOT_REQUIRED=true
-  cd -
 }
 
 # install_common: perform node installation steps independent of whether or not
