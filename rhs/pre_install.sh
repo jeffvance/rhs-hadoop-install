@@ -232,9 +232,7 @@ function verify_fuse(){
     out="$(yum -y update)"
     err=$?
     display "yum update: $out" $LOG_DEBUG
-    (( err != 0 )) && {
-	display "ERROR: yum update $err" $LOG_FORCE;
-	exit 17; }
+    (( err != 0 )) && display "WARN $err: yum update. Continuing..." $LOG_FORCE
 
   else # fuse patch tarball provided
     cd $MATCH_DIR
