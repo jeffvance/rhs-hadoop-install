@@ -208,15 +208,16 @@ function check_selinux(){
 #
 function verify_fuse(){
 
+  local out; local err
   local FUSE_TARBALL_RE='fuse-.*.tar.gz' # note: regexp not glob
   local FUSE_TARBALL; local FUSE_OUT='fuse_chk.out'
   local FUSE_KW1='fuse'; local FUSE_KW2='dentry'
   local KERNEL="$(uname -r)"
-  local out; local err
+  KERNEL="$(sed 's/\(-[0-9]*\).*/\1/' <<< "$(echo $k)")" # skip after "*-nnn."
 
   rpm -q --changelog kernel-$KERNEL >$FUSE_OUT
   if (( $? == 0 )) && grep $FUSE_KW1 $FUSE_OUT | grep -q $FUSE_KW2 ; then
-    display "   ... verified" $LOG_DEBUG
+    display "   ... verified on kernel $KERNEL" $LOG_DEBUG
     return
   fi
 
