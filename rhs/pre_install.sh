@@ -213,7 +213,7 @@ function verify_fuse(){
   local FUSE_TARBALL; local FUSE_OUT='fuse_chk.out'
   local FUSE_KW1='fuse'; local FUSE_KW2='dentry'
   local KERNEL="$(uname -r)"
-  KERNEL="$(sed 's/\(-[0-9]*\).*/\1/' <<< "$(echo $k)")" # skip after "*-nnn."
+  KERNEL="$(sed 's/\(-[0-9]*\).*/\1/' <<< "$(echo $k)")" # delete after *-nnn.
 
   rpm -q --changelog kernel-$KERNEL >$FUSE_OUT
   if (( $? == 0 )) && grep $FUSE_KW1 $FUSE_OUT | grep -q $FUSE_KW2 ; then
