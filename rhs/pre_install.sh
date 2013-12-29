@@ -215,7 +215,7 @@ function verify_fuse(){
   local KERNEL="$(uname -r)"
   KERNEL="$(sed 's/\(-[0-9]*\).*/\1/' <<< "$(echo $KERNEL)")" # del after *-nnn.
 
-  rpm -q --changelog kernel-$KERNEL >$FUSE_OUT
+  rpm -q --changelog kernel-$KERNEL* >$FUSE_OUT
   if (( $? == 0 )) && grep $FUSE_KW1 $FUSE_OUT | grep -q $FUSE_KW2 ; then
     display "   ... verified on kernel $KERNEL" $LOG_DEBUG
     return
