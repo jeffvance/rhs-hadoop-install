@@ -33,6 +33,7 @@
 
 #
 # constants and args
+VERSION='0.01'
 eval 'declare -A _ARGS='${1#*=} # delete the "declare -A name=" portion of arg
 NODE="${_ARGS[NODE]}"
 STORAGE_INSTALL="${_ARGS[INST_STORAGE]}" # true or false
@@ -310,6 +311,7 @@ function install_mgmt(){
 # ** main ** #
 #            #
 echo
+echo "$(basename $0), version: $VERSION"
 
 # create SUBDIR_FILES variable which contains all files in all sub-dirs. There 
 # can be 0 or more sub-dirs. Format for SUBDIR_FILES:
