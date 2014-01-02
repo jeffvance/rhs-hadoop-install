@@ -52,8 +52,8 @@ HOST_IPS=($3)
 source ${DEPLOY_DIR}functions
 
 
-# install_plugin: copy the Hadoop-Gluster plug-in from the rhs install files to
-# the appropriate Hadoop directory. Fatal errors exit script.
+# install_plugin: copy the glusterfs-hadoop plugin from the rhs install files
+# to the appropriate Hadoop directory. Fatal errors exit script.
 #
 function install_plugin(){
 
