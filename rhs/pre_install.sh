@@ -10,9 +10,9 @@
 # as an initial step by ../prep_node.sh.
 #
 # This script does the following on the host (this) node:
-#  - registers this node with RHN (red hat support network)
-#  - installs the kernel fuse patch if a fuse .tar.gz file exists in rhs/ or in 
-#    any of the sub-dirs under rhs/
+#  - registers this node with RHN (red hat support network),
+#  - tests if the fuse patch is installed in the running kernel, and if not
+#    does a yum update kernel and marks the node for a reboot,
 #  - installs the ktune.sh performance script if it exists in rhs/ or in any of
 #    its sub-dirs.
 #
