@@ -214,7 +214,7 @@ function verify_fuse(){
   local KERNEL="$(uname -r)"
 
   rpm -q --changelog kernel-$KERNEL >$FUSE_OUT # on the running kernel
-  if (( $? == 0 )) && grep -q "$FUSE_SRCH_STRING" ; then
+  if (( $? == 0 )) && grep -q "$FUSE_SRCH_STRING" $FUSE_OUT ; then
     display "   ... verified on kernel $KERNEL" $LOG_DEBUG
     return
   fi
