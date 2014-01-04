@@ -209,7 +209,7 @@ function check_selinux(){
 #
 function verify_fuse(){
 
-  local out; local err
+  local out; local err; local FUSE_OUT='fuse_chk.out'
   FUSE_SRCH_STRING='[fs] fuse: drop dentry on failed revalidate (Brian Foster) [1009756 924014]'
   local KERNEL="$(uname -r)"
 
