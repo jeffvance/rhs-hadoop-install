@@ -1,20 +1,29 @@
-mk_tarball:
+                           devutils tools
 
-Use --help to see script command line options.
 
-This script converts the .odt file (if present) to a PDF and then creates a
-tarball containing the minimal set of files necessary for RHS-Ambari installs.
+passwordless-ssh.sh:
+-------------------
+  This script sets up password-less SSH as required for the RHS cluster. A local
+  "hosts" file of "ip-address hostname" pairs contains the list of hosts for
+  which password-less SSH is configured. Additionally, the first host in this
+  file will be able to password-less SSH to all other hosts in the file. Thus,
+  after running this script the user will be able to password-less SSH from
+  localhost to all hosts in the hosts file, and from the first host to all
+  other hosts defined in the file.
 
-The script is expected to be run in the same dir where a git pull or git clone
-is done.
+  "host" file format:
+     IP-address   simple-hostname
+     IP-address   simple-hostname ...
 
-Note: there is a depdendency on libreoffice. To install it:
- wget http://download.documentfoundation.org/libreoffice/stable/4.1.0/rpm/x86_64/LibreOffice_4.1.0_Linux_x86-64_rpm.tar.gz
- tar -xvf Libre*gz
- cd Libre*
- cd RPMS/
- yum install -y *rpm
+  Options:
 
-Then create a symlink to the downloaded version, eg:
- ln -s /usr/bin/libreoffice4.1 /bin/libreoffice
+   --hosts     <path> : path to "hosts" file. This file contains a list of
+                        "IP-addr hostname" pairs for each node in the cluster.
+                        Default: "./hosts".
+   -v|--version       : Version of the script.
+   -h|--help          : help text (this).
+   --sethostname      : sethostname=hostname on each node (default).
+   --noset|nosethostname : do not set the hostname on each node (override
+                        default).
+   --verbose          : causes more output. Default is semi-quiet.
 
