@@ -51,7 +51,7 @@ find -type l -exec rm {} \;
 # note: we excluded the glusterfs/ dir since its content is strictly needed for
 #  fedora (non-rhs) installs
 cnt=0
-COMMON_FILES="$(find $GLUSTERFS_HADOOP_INSTALL_DIR -type f -not -path "*/glusterfs/*" -not -path "*/.*" -not -name README.txt)" # exclude hidden files too
+COMMON_FILES="$(find $GLUSTERFS_HADOOP_INSTALL_DIR -type f -not -path "*/glusterfs/*" -not -path "*/.*" -not -name README.txt -not -name hosts)"
 
 for common in $COMMON_FILES ; do
     f="$(basename $common)"
