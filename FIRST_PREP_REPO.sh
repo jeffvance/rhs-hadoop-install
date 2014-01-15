@@ -4,14 +4,14 @@
 # License: Apache License v2.0
 # Author: Jeff Vance <jvance@redhat.com>
 #
-# This script *must* be run *before* executing anything in the rhs-hadoop-install
-# repo!!
+# This script *must* be run *before* executing anything in the
+# rhs-hadoop-install repo!!
 #
-# This script verifies that the *required* glusterfs-hadoop-install repo has been
-# cloned in the expected location (../glusterfs-hadoop-install), clones this
-# repo if not found, and then creates symlinks to the common files contained in
-# this repo. The common files in the glusterfs-hadoop-install repo are necessary
-# in order to create an rhs-hadoop tarball.
+# This script verifies that the *required* glusterfs-hadoop-install repo has
+# been cloned in the expected location (../glusterfs-hadoop-install), clones 
+# this repo if not found, and then creates symlinks to the common files
+# contained in this repo. The common files in the glusterfs-hadoop-install repo
+# are necessary in order to create an rhs-hadoop tarball.
 # 
 
 GLUSTERFS_HADOOP_INSTALL_DIR="../glusterfs-hadoop-install"
@@ -43,6 +43,9 @@ else
   cd -
 fi
 
+# rm existing symlinks, if any, to start fresh
+find -type l -exec rm {} \;
+
 # create symlinks to the common files in glusterfs-hadoop-install which are
 # needed for all rhs-hadoop-install related builds/installs
 # note: we excluded the glusterfs/ dir since its content is strictly needed for
@@ -65,14 +68,15 @@ cat <<EOF
 
 Now that the common files and scripts are available in your rhs-hadoop-install
 directory, the next step is to examine rhs/ and its sub-directories content, and
-create a tarball via devutils/mk_tarball.sh with the appropriate --dirs
-directory names. Eg. devutils/mk_tarball.sh --dirs rhs,rhs2.1,hdp2.x-beta
+create a tarball via the rhs-install-deploy repo's mk_tarball.sh script with the
+appropriate --dirs directory names. Eg:
+  mk_tarball.sh --dirs rhs,rhs2.1,hdp2.x-beta
 
 Note: each dir specified in --dirs is stand-alone meaning NON-recursive.
 
-The created tarball will contain all of the common files and the files contained
-in each of the dirs specified in the --dirs option above. The tarball can then
-be used as the source for a BREW build, deployed to s3 or OpenStack, or simply
+The created tarball will contain all of the common files and the files within
+each of the dirs specified in the --dirs option above. The tarball can then be
+used as the source for a BREW build, deployed to s3 or OpenStack, or simply
 extracted in place. cd to the rhs-hadoop-install-<version> directory contained
 in the tarball, read the README files, create a local "hosts" file, and run 
 ./install.sh <brick-dev>
