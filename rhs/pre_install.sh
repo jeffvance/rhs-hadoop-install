@@ -295,6 +295,7 @@ install_common
 [[ $MGMT_INSTALL    == true ]] && install_mgmt
 
 echo
+[[ -n "$REBOOT_REQUIRED" ]] && exit 99 # tell invoking script reboot is needed
 exit 0
 #
 # end of script
