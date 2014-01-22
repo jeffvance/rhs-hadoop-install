@@ -5,7 +5,7 @@
 
 # set global variables
 SCRIPT=$(/bin/basename $0)
-SCRIPT_VERS='0.4'  # self version
+SCRIPT_VERS='0.5'  # self version
 INSTALL_DIR="$PWD" # name of deployment (install-from) dir
 
 # source common constants and functions
@@ -127,9 +127,11 @@ function setup_passwordless_ssh {
      ssh-keygen -q -t rsa -f $PRIVATE_KEY_FILE -N ""
    fi
 
-   # add hosts "hosts" file to local /etc/hosts if not already there
-   echo "Potentially update /etc/hosts with hostnames..."
-   fixup_etc_hosts_file
+   if [[ -n "$USING_DNS" && "$USING_DNS" == false ]] ; then
+     # add hosts "hosts" file to local /etc/hosts if not already there
+     echo "Potentially update /etc/hosts with hostnames..."
+     fixup_etc_hosts_file
+   fi
 
    echo "Copying keys to each node..."
    for (( i=0; i<$NUMNODES; i++ )); do
@@ -165,14 +167,15 @@ function setup_passwordless_ssh {
         echo
    done
 
-   # set up passwordless-ssh from 1st host in the hosts file to all the other
-   # hosts in that file.
-   firstHost=${HOSTS[0]}
-   echo "Last, set up passwordless-ssh from $firstHost to all other nodes"
-   echo "in the hosts file"
-   bugout "---> with 'scp ~/.ssh/id_* $KNOWN_HOSTS root@$firstHost:/root/.ssh'"
-   scp ~/.ssh/id_* $KNOWN_HOSTS root@$firstHost:/root/.ssh
-   for (( i=1; i<$NUMNODES; i++ )); do
+   if [[ -n "$USING_DNS" && "$USING_DNS" == false ]] ; then
+     # set up passwordless-ssh from 1st host in the hosts file to all the other
+     # hosts in that file.
+     firstHost=${HOSTS[0]}
+     echo "Last, set up passwordless-ssh from $firstHost to all other nodes"
+     echo "in the hosts file"
+     bugout "---> with 'scp ~/.ssh/id_* $KNOWN_HOSTS $firstHost:/root/.ssh'"
+     scp ~/.ssh/id_* $KNOWN_HOSTS root@$firstHost:/root/.ssh
+     for (( i=1; i<$NUMNODES; i++ )); do
 	ip=${HOST_IPS[$i]}; host=${HOSTS[$i]}
 	# append ip/host to first-node's /etc/hosts file
 	bugout "---> with 'ssh root@$firstHost echo \"$ip $host\" >>/etc/hosts'"
@@ -180,7 +183,8 @@ function setup_passwordless_ssh {
 	# copy id
 	bugout "---> with 'ssh root@$firstHost ssh-copy-id -i ~/.ssh/id_rsa.pub root@$host'"
 	ssh root@$firstHost "ssh-copy-id -i ~/.ssh/id_rsa.pub root@$host"
-   done
+     done
+   fi
 }
 
 
@@ -192,6 +196,7 @@ echo "$(/bin/date). Begin: $SCRIPT -- version $SCRIPT_VERS ***"
 
 echo "Using host file: $HOSTS_FILE"
 verify_local_deploy_setup false
+  # sets global USING_DNS variables
 
 echo "Begin setup of passwordless SSH"
 setup_passwordless_ssh
