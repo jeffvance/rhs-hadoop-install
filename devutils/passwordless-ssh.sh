@@ -127,7 +127,7 @@ function setup_passwordless_ssh {
      ssh-keygen -q -t rsa -f $PRIVATE_KEY_FILE -N ""
    fi
 
-   if [[ -n "$USING_DNS" && "$USING_DNS" == false ]] ; then
+   if [[ -z "$USING_DNS" || "$USING_DNS" == false ]] ; then
      # add hosts "hosts" file to local /etc/hosts if not already there
      echo "Potentially update /etc/hosts with hostnames..."
      fixup_etc_hosts_file
@@ -167,7 +167,7 @@ function setup_passwordless_ssh {
         echo
    done
 
-   if [[ -n "$USING_DNS" && "$USING_DNS" == false ]] ; then
+   if [[ -z "$USING_DNS" || "$USING_DNS" == false ]] ; then
      # set up passwordless-ssh from 1st host in the hosts file to all the other
      # hosts in that file.
      firstHost=${HOSTS[0]}
