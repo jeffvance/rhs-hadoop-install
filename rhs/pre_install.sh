@@ -10,7 +10,6 @@
 # as an initial step by ../prep_node.sh.
 #
 # This script does the following on the host (this) node:
-#  - registers this node with RHN (red hat support network),
 #  - tests if the fuse patch is installed in the running kernel, and if not
 #    does a yum update kernel and marks the node for a reboot,
 #  - installs the ktune.sh performance script if it exists in rhs/ or in any of
@@ -41,8 +40,6 @@ MGMT_INSTALL="${_ARGS[INST_MGMT]}"       # true or false
 VERBOSE="${_ARGS[VERBOSE]}"  # needed by display()
 LOGFILE="${_ARGS[PREP_LOG]}" # needed by display()
 DEPLOY_DIR="${_ARGS[REMOTE_DIR]}"
-RHN_USER="${_ARGS[RHN_USER]}"
-RHN_PASS="${_ARGS[RHN_PASS]}"
 HOSTS=($2)
 HOST_IPS=($3)
 
@@ -96,39 +93,6 @@ function install_plugin(){
 
   display "   ... Gluster-Hadoop plug-in install successful" $LOG_SUMMARY
   cd -
-}
-
-# rhn_register: rhn register $NODE if a rhn username and password were passed.
-# Note: --use-eus-channel on the rhnreg_ks command causes the base channel to
-#   be the "z" channel.
-# Note: rhn-channel is run programmatically to add additional RHS channels.
-#
-function rhn_register(){
-
-  # list of channels separated by a space
-  local channels='rhel-x86_64-server-6-rhs-2.1 rhel-x86_64-server-sfs-6.4.z'
-  local channel; local out; local err
-
-  [[ -z "$RHN_USER" || -z "$RHN_PASS" ]] && return # no error, don't register
-
-  echo
-  display "-- RHN registering with provided rhn user and password" \
-	$LOG_INFO
-  out="$(rhnreg_ks --profilename="$NODE" --username="$RHN_USER" \
-	--password="$RHN_PASS" --use-eus-channel --force 2>&1)"
-  err=$?
-  display "rhn_register: $out" $LOG_DEBUG
-  if (( err != 0 )) ; then
-    display "ERROR: rhn_register error $err" $LOG_FORCE
-    exit 10
-  fi
-
-  # register the rhs channels
-  for channel in $channels ; do
-      rhn-channel --user="$RHN_USER" --password="$RHN_PASS" --add \
-	--channel="$channel"
-  done
-  display "   RHN channels:\n$(rhn-channel -l)" $LOG_INFO
 }
 
 # apply_tuned: apply the tuned-adm peformance tuning for RHS.
@@ -243,8 +207,6 @@ function install_common(){
   # set SELinux to permissive if it's enabled
   check_selinux
 
-  # rhn register, if username/pass provided
-  rhn_register
 }
 
 # install_storage: perform the installation steps needed when the node is a
