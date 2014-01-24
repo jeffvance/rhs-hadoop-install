@@ -207,8 +207,6 @@ function install_common(){
   # set SELinux to permissive if it's enabled
   check_selinux
 
-  # rhn register, if username/pass provided
-  rhn_register
 }
 
 # install_storage: perform the installation steps needed when the node is a
