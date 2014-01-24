@@ -52,15 +52,6 @@ Note:
     in the local hosts file.
 
 
-==  Red Hat Network Registering (RHN) ==
-
-  install.sh will automatically register each node in the "hosts" file with the
-  Red Hat Network (RHN) when the --rhn-user and --rhn-pass options are used.  If
-  the --rhn-* options are not specified, it is assumed that the servers have been
-  manually registered prior to running pre_install.sh. If not, the installation
-  may fail.
-
-
 == Installation ==
 
   - the correct version of RHS needs to be installed on each node per RHS
