@@ -2,109 +2,92 @@
 
 == Overview ==
 
-  A tarball named rhs-hadoop-install-<version>.tar.gz has been extracted and now
-  you're reading this file targetting end users (as opposed to the README-DEV
-  readme file for install tool developers). The directory containing this readme
-  file should also contain scripts (actually symbolic links) named install.sh,
-  prep_node.sh, post_install_ dirs.sh, and should contain a sudoers file, a
-  functions file, and the rhs/ directory.
+  rhs-hadoop-install is a package that prepares Red Hat Storage (RHS, built on
+  glusterfs) for Hadoop workloads. It is easy to install via yum and simple to
+  execute via the install.sh script.
 
-  If you've already set up the local "hosts" file, and have password-less SSH
-  between the install-from node and the install-to nodes working, then all you
-  have left to do is to excute the ./install.sh script, providing the name of 
-  the brick device.  Use the --help option to see what else is supported.
+  It is expected that all nodes in the storage cluster have RHS 2.1.1 installed
+  and the disks are set up for RAID-6.  Additionally, password-less SSH is
+  necessary between the "deploy-from" node (where the install script is run) to
+  all nodes in the cluster. There is a passwordless-ssh.sh script in the
+  devutils/ directory to automate this if needed. Use the install.sh --help
+  option to see the various install options available.
 
-  If this is your first time then you'll need to create a local "hosts" file (as
-  described below), establish password-less SSH from the install-from node (which
-  is typically also the management node), and then run ./install.
+  To install this package:
+   - cd /usr/share,
+   - yum install rhs-hadoop-install,
 
-  Note: it is expected that the Red Hat Storage installation guide was followed
-    to set up RHS. The storage (brick) partition (e.g. /dev/sdb) should be
-    configured as RAID 6.
+  To prepare RHS for Hadoop:
+   - cd /usr/share/rhs-hadoop-install,
+   - create a local "hosts" file (see below),
+   - execute "./install.sh brick-dev",
+   - see /var/log/rhs-hadoop-install.log for install details.
 
 
 == Before you begin ==
 
-  The "hosts" file must be created by the root user doing the install. It is not
-  part of the tarball, but an example hosts file is provided. The "hosts" file
-  is expected to be created in the same directory where the tarball has been
-  downloaded. If a different location is used then install.sh's "--hosts" option
-  can be used to specify the "hosts" file path. The "hosts" file contains a list
-  of IP adress followed by hostname (same format as /etc/hosts), one pair per
-  line.  Each line represents one node in the storage cluster.
+  A local "hosts" file must be created before doing the install. It is not part
+  of the rhs-hadoop-install package, but a sample hosts.example file is
+  provided. The "hosts" file contains a list of an optional IP adress followed
+  by a required hostname (same format as /etc/hosts), one pair per line. Each
+  line represents one node in the storage cluster.
   Example:
      ip-for-node-1 hostname-for-node-1
      ip-for-node-3 hostname-for-node-3
      ip-for-node-2 hostname-for-node-2
      ip-for-node-4 hostname-for-node-4
 
-  IMPORTANT: the node order in the hosts file is critical for two reasons:
-  1) Assuming the storage volume is created with replica 2 then each pair of
-     lines in hosts represents replica pairs. For example, the first 2 lines in
-     hosts are replica pairs, as are the next two lines, etc.
-  2) Hostnames are expected to be lower-case.
+     -- or in DNS environments --
 
-Note:
-  - passwordless SSH is required between the installation node and each storage
-    node. See the Addendum at the end of this document if you would like to see
-    instructions on how to do this. There is a utility script in devutils/ named
-    passwordless-ssh.sh which sets up password-less SSH using the nodes defined
-    in the local hosts file.
+     hostname-for-node-1
+     hostname-for-node-3
+     hostname-for-node-2
+     hostname-for-node-4
 
+  Comments (introduced by #) are allowed.
 
-== Installation ==
+  The node order in the hosts file is critical. Assuming the storage volume is
+  created with replica 2 then each pair of lines in "hosts" represents replica
+  pairs. For example, the first 2 lines in hosts are replica pairs, as are the
+  next two lines, etc.
 
-  - the correct version of RHS needs to be installed on each node per RHS
-    guidelines. The RHS ISO just needs to be installed with a separate data
-    (brick) partition and with static IP addresss configured. Do not create a
-    gluster volume.
-  - the data partition has been set up as RAID 6. It is usually created as
-    /dev/sdb.
-  - the order of the nodes in the "hosts" file is in replica order.
-  - the --mgmt-node option is IGNORED for now.
+  Note: hostnames are expected to be lower-case.
 
 
 == Instructions ==
 
- 0) upload rhs-hadoop-install-<version> tarball to the deployment directory on
-    the "install-from" node.
+ 1) cd to /usr/share/rhs-hadoop-install
 
- 1) extract tarball to the local directory:
-    $ tar xvzf rhs-hadoop-install-<version>.tar.gz
+ 2) create the local "hosts" file as described above
 
- 2) cd to the extracted rhs-hadoop-install directory:
-    $ cd rhs-hadoop-install-<version>
+ 3) execute "install.sh":
+    $ ./install.sh [options (see --help)] <brick-device>
+    Example: ./install.sh /dev/sdb
 
- 3) create the "hosts" file per the instructions above.
+    Output is displayed to STDOUT and is also written to a logfile. The default
+    logfile is: /var/log/rhs-hadoop-install.log. Note: even when less verbose
+    settings are used the logfile contains the greatest level of detail.
 
- 4) execute "install.sh" from the install directory:
-    $ ./install.sh [options (see --help)] <brick-dev> (note: brick_dev is 
-                                                       required)
-    For example: ./install.sh -- rhn-user="me" --rhn-pass="pass" /dev/sdb
-
-    Output is displayed on STDOUT and is also written to a logfile. The default
-    logfile is: /var/log/rhs-hadoop-install.log. The --logfile option allows for
-    a different logfile. Even when a less verbose setting is used the logfile
-    will contain all messages.
-
- 5) When the script completes remaining hadoop distro and management steps need
-    to be followed. After the hadoop distro installation completes, create 
-    gluster base directories and fix permissions by running this script:
-    $ ./post_install_dirs.sh /mnt/glusterfs /lib/hadoop
+ 4) When the script completes remaining hadoop distro and management steps need
+    to be followed: 
+      $ ./setup_container_executor.sh # per the directions provided to RHS 
+                                      # customers
  
- 6) Validate the Installation:
+ 5) Validate the installation per the directions provided to RHS customers. One
+    example would be to:
 
-    Open a terminal and navigate to the Hadoop Directory
-    cd /usr/lib/hadoop
+    - Open a terminal and navigate to the Hadoop Directory
+      cd /usr/lib/hadoop
      
-    Change user to the mapred user
-    su mapred
+    - Change user to the mapred user
+      su mapred
 
-    Submit a TeraGen Hadoop job test
-    bin/hadoop jar hadoop-examples-1.2.0.1.3.2.0-112.jar teragen 1000 in-dir
+    - Submit a TeraGen Hadoop job test
+      bin/hadoop jar hadoop-examples-1.2.0.1.3.2.0-112.jar teragen 1000 in-dir
 	
-    Submit a TeraSort Hadoop job test
-    bin/hadoop jar hadoop-examples-1.2.0.1.3.2.0-112.jar terasort in-dir out-dir
+    - Submit a TeraSort Hadoop job test
+      bin/hadoop jar hadoop-examples-1.2.0.1.3.2.0-112.jar terasort \
+                 in-dir out-dir
 
 
 == Addendum ==
@@ -113,7 +96,7 @@ Note:
  
    There is a utility script (devutils/passwordless-ssh.sh) which will set up
    password-less SSH from localhost (or wherever you run the script from) to 
-   all hosts defined in the local "hosts" file. Use --help for more info.
+   all hosts defined in the deploy "hosts" file. Use --help for more info.
  
 2) Installing Red Hat Storage
 
@@ -143,3 +126,4 @@ Note:
        Hadoop workloads.
 
      * the rest of the above guide can be read but not acted upon.
+
