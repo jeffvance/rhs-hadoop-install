@@ -32,7 +32,7 @@
 
 #
 # constants and args
-VERSION='1.02'
+VERSION='1.03'
 eval 'declare -A _ARGS='${1#*=} # delete the "declare -A name=" portion of arg
 NODE="${_ARGS[NODE]}"
 STORAGE_INSTALL="${_ARGS[INST_STORAGE]}" # true or false
