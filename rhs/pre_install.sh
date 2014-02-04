@@ -49,50 +49,59 @@ HOST_IPS=($3)
 source ${DEPLOY_DIR}functions
 
 
-# install_plugin: copy the glusterfs-hadoop plugin from the rhs install files
-# to the appropriate Hadoop directory. Fatal errors exit script.
+# install_plugin: if a plugin jar file is provided in any of the included sub-
+# directories then copy it to the correct location. Otherwise, yum install the
+# rhs-hadoop plugin package, which also copies the jar file to the correct
+# directory.
 #
 function install_plugin(){
 
   local PLUGIN_JAR='glusterfs-hadoop-.*.jar' # note: regexp not glob
+  local PLUGIN_PKG='rhs-hadoop'
   local USR_JAVA_DIR='/usr/share/java'
   local HADOOP_JAVA_DIR='/usr/lib/hadoop/lib/'
   local jar=''; local out; local err
 
   # set MATCH_DIR and MATCH_FILE vars if match
   match_dir "$PLUGIN_JAR" "$SUBDIR_FILES"
-  [[ -z "$MATCH_DIR" ]] && {
-	display "INFO: gluster-hadoop plugin not supplied" $LOG_INFO;
-	return; }
+  if [[ -n "$MATCH_DIR" ]]; then  # found packaged plugin jar file
+    cd $MATCH_DIR
+    jar="$MATCH_FILE"
+    display "-- Installing Gluster-Hadoop plug-in ($jar)..." $LOG_INFO
 
-  cd $MATCH_DIR
-  jar="$MATCH_FILE"
+    # create target dirs if they does not exist
+    [[ -d $USR_JAVA_DIR ]]    || mkdir -p $USR_JAVA_DIR
+    [[ -d $HADOOP_JAVA_DIR ]] || mkdir -p $HADOOP_JAVA_DIR
 
-  display "-- Installing Gluster-Hadoop plug-in ($jar)..." $LOG_INFO
-  # create target dirs if they does not exist
-  [[ -d $USR_JAVA_DIR ]]    || mkdir -p $USR_JAVA_DIR
-  [[ -d $HADOOP_JAVA_DIR ]] || mkdir -p $HADOOP_JAVA_DIR
+    # copy jar and create symlink
+    out="$(cp -uf $jar $USR_JAVA_DIR 2>&1)"
+    err=$?
+    display "plugin cp: $out" $LOG_DEBUG
+    if (( err != 0 )) ; then
+      display "ERROR: plugin copy error $err" $LOG_FORCE
+      exit 5
+    fi
 
-  # copy jar and create symlink
-  out="$(cp -uf $jar $USR_JAVA_DIR 2>&1)"
-  err=$?
-  display "plugin cp: $out" $LOG_DEBUG
-  if (( err != 0 )) ; then
-    display "ERROR: plugin copy error $err" $LOG_FORCE
-    exit 5
+    rm -f $HADOOP_JAVA_DIR/$jar
+    out="$(ln -s $USR_JAVA_DIR/$jar $HADOOP_JAVA_DIR/$jar 2>&1)"
+    err=$?
+    display "plugin symlink: $out" $LOG_DEBUG
+    if (( err != 0 )) ; then
+      display "ERROR: plugin symlink error $err" $LOG_FORCE
+      exit 7
+    fi
+    cd -
+
+  else
+    out="$(yum -y install $PLUGIN_PKG)"
+    err=$?
+    display "yum install plugin: $out" $LOG_INFO
+    if (( err != 0 )) ; then
+      display "ERROR: yum install error $err" $LOG_FORCE
+      exit 8
+    fi
   fi
-
-  rm -f $HADOOP_JAVA_DIR/$jar
-  out="$(ln -s $USR_JAVA_DIR/$jar $HADOOP_JAVA_DIR/$jar 2>&1)"
-  err=$?
-  display "plugin symlink: $out" $LOG_DEBUG
-  if (( err != 0 )) ; then
-    display "ERROR: plugin symlink error $err" $LOG_FORCE
-    exit 7
-  fi
-
-  display "   ... Gluster-Hadoop plug-in install successful" $LOG_SUMMARY
-  cd -
+  display "   ... $PLUGIN_PKG plugin install successful" $LOG_SUMMARY
 }
 
 # apply_tuned: apply the tuned-adm peformance tuning for RHS.
@@ -200,7 +209,7 @@ function verify_fuse(){
 }
 
 # install_common: perform node installation steps independent of whether or not
-# the node is to be the management server or simple a storage/data node.
+# the node is to be the management server or a storage/data node.
 #
 function install_common(){
 
@@ -225,7 +234,11 @@ function install_storage(){
   echo
   display "-- Applying the rhs-high-throughput profile using tuned-adm" \
 	$LOG_SUMMARY
-  apply_tuned
+
+  # install the rhs-hadoop plugin
+  echo
+  display "-- Installing the rhs-hadoop plugin (jar file)" $LOG_SUMMARY
+  install_plugin
 }
 
 # install_mgmt: perform the installations steps needed when the node is the
