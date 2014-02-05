@@ -53,6 +53,8 @@ source ${DEPLOY_DIR}functions
 # directories then copy it to the correct location. Otherwise, yum install the
 # rhs-hadoop plugin package, which also copies the jar file to the correct
 # directory.
+# NOTE: not currently invoked since the rhs-hadoop plugin package is now part
+#   of the RHS 2.1.1+ ISO.
 #
 function install_plugin(){
 
@@ -92,14 +94,20 @@ function install_plugin(){
     fi
     cd -
 
-  else
+  elif yum -q $PLUGIN_PKG >&/dev/null ; then # pgk available
+    # yum install rhs-hadoop pkg
     out="$(yum -y install $PLUGIN_PKG)"
     err=$?
-    display "yum install plugin: $out" $LOG_INFO
+    display "yum install $PLUGIN_PKG plugin: $out" $LOG_INFO
     if (( err != 0 )) ; then
       display "ERROR: yum install error $err" $LOG_FORCE
       exit 8
     fi
+
+  else
+    display "ERROR: \"$PLUGIN_PKG\" package is not available" $LOG_FORCE
+    display "       This package contains the hadoop plugin" $LOG_FORCE
+    exit 9
   fi
   display "   ... $PLUGIN_PKG plugin install successful" $LOG_SUMMARY
 }
@@ -236,12 +244,13 @@ function install_storage(){
 	$LOG_SUMMARY
 
   # install the rhs-hadoop plugin
-  echo
-  display "-- Installing the rhs-hadoop plugin (jar file)" $LOG_SUMMARY
-  install_plugin
+  # NOTE: no longer needed since the RHS ISO contains the plugin
+  #echo
+  #display "-- Installing the rhs-hadoop plugin (jar file)" $LOG_SUMMARY
+  #install_plugin
 }
 
-# install_mgmt: perform the installations steps needed when the node is the
+# install_mgmt: perform the installation steps needed when the node is the
 # management node.
 #
 function install_mgmt(){
