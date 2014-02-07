@@ -9,7 +9,8 @@ SCRIPT_VERS='0.5'  # self version
 INSTALL_DIR="$PWD" # name of deployment (install-from) dir
 
 # source common constants and functions
-. $INSTALL_DIR/functions
+#echo "$(dirname $(readlink -f $0))/../functions"
+echo ". $INSTALL_DIR/functions"
 
 
 # bugout: Write out a debugging message.
