@@ -15,8 +15,6 @@
 #  - installs the ktune.sh performance script if it exists in rhs/ or in any of
 #    its sub-dirs.
 #
-# Please read the README file.
-#
 # Arguments (all positional):
 #   $1=associative array, passed by *declaration*, containing many individual
 #      arg values. Note: special care needed when passing and receiving
