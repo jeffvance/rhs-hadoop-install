@@ -5,12 +5,12 @@
 
 # set global variables
 SCRIPT=$(/bin/basename $0)
-SCRIPT_VERS='0.5'  # self version
+SCRIPT_VERS='0.6'  # self version
 INSTALL_DIR="$PWD" # name of deployment (install-from) dir
 
-# source common constants and functions
-#echo "$(dirname $(readlink -f $0))/../functions"
-. $INSTALL_DIR/functions
+# source common constants and functions. functions file expected to be in
+# this script's parent dir
+source "$(dirname $(readlink -f $0))/../functions"
 
 
 # bugout: Write out a debugging message.
@@ -38,16 +38,12 @@ Syntax:
   $SCRIPT [options]
 
 Sets up password-less SSH as required for the RHS cluster. A local "hosts"
-file of "ip-address hostname" pairs contains the list of hosts for which
-password-less SSH is configured. Additionally, the first host in this file
-will be able to password-less SSH to all other hosts in the file. Thus,
-after running this script the user will be able to password-less SSH from
-localhost to all hosts in the hosts file, and from the first host to all
-other hosts defined in the file.
+file of "[optional ip-address] hostname" contains the list of hosts for which
+password-less SSH is configured. 
 
 "host" file format:
-   IP-address   simple-hostname
-   IP-address   simple-hostname ...
+   [IP-address]  hostname
+   [IP-address]  hostname ...
 
 Options:
 
@@ -59,7 +55,7 @@ Options:
    --sethostname      : sethostname=hostname on each node (default).
    --noset|nosethostname : do not set the hostname on each node (override
                         default).
-   --verbose          : causes more output. Default is semi-quiet.
+   --verbose|--debug  : causes more output. Default is semi-quiet.
 EOF
 }
 
@@ -69,7 +65,7 @@ EOF
 function parse_cmd(){
 
   local OPTIONS='vh'
-  local LONG_OPTS='hosts:,help,version,noset,nosethostnamem,verbose'
+  local LONG_OPTS='hosts:,help,version,noset,nosethostnamem,verbose,debug'
 
   # defaults (global variables)
   SETHOSTNAME=true
@@ -93,7 +89,7 @@ function parse_cmd(){
 	--hosts)
 	    HOSTS_FILE="$2"; shift 2; continue
 	;;
-	--verbose)
+	--verbose|--debug)
            DEBUG=true; shift; continue
 	;;
 	--noset|--nosethostname)
@@ -129,7 +125,7 @@ function setup_passwordless_ssh {
    fi
 
    if [[ -z "$USING_DNS" || "$USING_DNS" == false ]] ; then
-     # add hosts "hosts" file to local /etc/hosts if not already there
+     # add hosts in "hosts" file to /etc/hosts if not already there
      echo "Potentially update /etc/hosts with hostnames..."
      fixup_etc_hosts_file
    fi
@@ -167,25 +163,6 @@ function setup_passwordless_ssh {
 	echo "...Node: $host (IP: $ip), SSH=$sshOK"
         echo
    done
-
-   if [[ -z "$USING_DNS" || "$USING_DNS" == false ]] ; then
-     # set up passwordless-ssh from 1st host in the hosts file to all the other
-     # hosts in that file.
-     firstHost=${HOSTS[0]}
-     echo "Last, set up passwordless-ssh from $firstHost to all other nodes"
-     echo "in the hosts file"
-     bugout "---> with 'scp ~/.ssh/id_* $KNOWN_HOSTS $firstHost:/root/.ssh'"
-     scp ~/.ssh/id_* $KNOWN_HOSTS root@$firstHost:/root/.ssh
-     for (( i=1; i<$NUMNODES; i++ )); do
-	ip=${HOST_IPS[$i]}; host=${HOSTS[$i]}
-	# append ip/host to first-node's /etc/hosts file
-	bugout "---> with 'ssh root@$firstHost echo \"$ip $host\" >>/etc/hosts'"
-	ssh root@$firstHost "echo '$ip $host' >>/etc/hosts"
-	# copy id
-	bugout "---> with 'ssh root@$firstHost ssh-copy-id -i ~/.ssh/id_rsa.pub root@$host'"
-	ssh root@$firstHost "ssh-copy-id -i ~/.ssh/id_rsa.pub root@$host"
-     done
-   fi
 }
 
 
