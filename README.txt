@@ -28,40 +28,23 @@
 
   A local "hosts" file must be created before doing the install. It is not part
   of the rhs-hadoop-install package, but a sample hosts.example file is
-  provided. The "hosts" file contains a list of an optional IP adress followed
-  by a required hostname (same format as /etc/hosts), one pair per line. Each
-  line represents one node in the storage cluster.
-  Example:
-     ip-for-node-1 hostname-for-node-1
-     ip-for-node-3 hostname-for-node-3
-     ip-for-node-2 hostname-for-node-2
-     ip-for-node-4 hostname-for-node-4
-
-     -- or in DNS environments --
-
-     hostname-for-node-1
-     hostname-for-node-3
-     hostname-for-node-2
-     hostname-for-node-4
-
-  Comments (introduced by #) are allowed.
+  provided and should be read carefully. The "hosts" file defines the nodes 
+  making up the storage cluster (trusted pool).
 
   The node order in the hosts file is critical. Assuming the storage volume is
   created with replica 2 then each pair of lines in "hosts" represents replica
   pairs. For example, the first 2 lines in hosts are replica pairs, as are the
   next two lines, etc.
 
-  Note: hostnames are expected to be lower-case.
-
 
 == Instructions ==
 
  1) cd to /usr/share/rhs-hadoop-install
 
- 2) create the local "hosts" file as described above
+ 2) create the local "hosts" file as described in hosts.example
 
  3) execute "install.sh":
-    $ ./install.sh [options (see --help)] <brick-device>
+    $ ./install.sh [options (see --help)] [brick-device]
     Example: ./install.sh /dev/sdb
 
     Output is displayed to STDOUT and is also written to a logfile. The default

@@ -1,0 +1,11 @@
+[rhss-hadoop-beta]
+name=RHSS Hadoop Beta
+baseurl=ftp://partners.redhat.com/30469c62f142c0abfb57e54516bfa9e7/rhss-hadoop-beta/noarch
+enabled=1
+gpgcheck=0
+
+[rhss-hadoop-beta-src]
+name=RHSS Hadoop Beta Source
+baseurl=ftp://partners.redhat.com/30469c62f142c0abfb57e54516bfa9e7/rhss-hadoop-beta/src
+enabled=0
+gpgcheck=0
