@@ -211,12 +211,14 @@ function cleanup_logfile(){
 # ** main ** #
 #            #
 
+echo "$(basename $0), version: $VERSION"
+
 install_common
 
 [[ $STORAGE_INSTALL == true ]] && install_ambari_agent
 [[ $MGMT_INSTALL    == true ]] && install_ambari_server
 
-###cleanup_logfile
+cleanup_logfile
 
 exit 0
 #
