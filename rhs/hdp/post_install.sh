@@ -66,7 +66,7 @@ function get_ambari_repo(){
     display "ERROR $err: Ambari repo wget" $LOG_FORCE
     exit 5 
   fi
-  cd -
+  cd - >/dev/null
 }
 
 # install_ambari_agent: yum install the ambari agent rpm, modify the .ini file
@@ -211,7 +211,8 @@ function cleanup_logfile(){
 # ** main ** #
 #            #
 
-echo "$(basename $0), version: $VERSION"
+echo
+display "begin: HDP $(basename $0), version: $VERSION"
 
 install_common
 
@@ -219,7 +220,6 @@ install_common
 [[ $MGMT_INSTALL    == true ]] && install_ambari_server
 
 cleanup_logfile
-
 exit 0
 #
 # end of script

@@ -147,7 +147,7 @@ function install_mgmt(){
 # ** main ** #
 #            #
 echo
-echo "$(basename $0), version: $VERSION"
+display "begin: RHS $(basename $0), version: $VERSION"
 
 # create SUBDIR_FILES variable which contains all files in all sub-dirs. There 
 # can be 0 or more sub-dirs. Format for SUBDIR_FILES:
@@ -161,7 +161,6 @@ install_common
 [[ $STORAGE_INSTALL == true ]] && install_storage
 [[ $MGMT_INSTALL    == true ]] && install_mgmt
 
-echo
 [[ -n "$REBOOT_REQUIRED" ]] && exit 99 # tell invoking script reboot is needed
 exit 0
 #
