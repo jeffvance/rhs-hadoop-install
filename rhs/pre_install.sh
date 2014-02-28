@@ -59,7 +59,7 @@ function check_selinux(){
   # report selinux state
   out=$(sestatus | head -n 1 | awk '{print $3}') # enforcing, permissive
   echo
-  display "SELinux is: $out" $LOG_SUMMARY
+  display "   ... SELinux is: $out" $LOG_SUMMARY
  
   [[ "$out" != "$ENABLED" ]] && return # done
 
@@ -114,6 +114,8 @@ function verify_fuse(){
 function install_common(){
 
   # set SELinux to permissive if it's enabled
+  echo
+  display "-- Verifying SELINUX setting:" $LOG_SUMMARY
   check_selinux
 
 }
