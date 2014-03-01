@@ -9,7 +9,7 @@
 # THIS SCRIPT IS NOT MEANT TO BE RUN STAND-ALONE. It is automatically executed
 # as an initial step by ../prep_node.sh.
 #
-# This script does the following on the host (this) node:
+# This script does the following on a single host:
 #  - sets selinux to permissive mode, if enabled
 #  - tests if the fuse patch is installed in the running kernel, and if not
 #    does a yum update kernel and marks the node for a reboot,
@@ -18,11 +18,7 @@
 #   $1=associative array, passed by *declaration*, containing many individual
 #      arg values. Note: special care needed when passing and receiving
 #      associative arrays,
-#   $2=HOSTS(array),
-#   $3=HOST IP-addrs(array).
 #
-# Note on passing arrays: the caller needs to surround the array values with
-#   embedded double quotes, eg. "\"${ARRAY[@]}\""
 # Note on passing associative arrays: the caller needs to pass the declare -A
 #   command line which initializes the array. The receiver then evals this
 #   string in order to set its own assoc array.
@@ -37,10 +33,7 @@ MGMT_INSTALL="${_ARGS[INST_MGMT]}"       # true or false
 VERBOSE="${_ARGS[VERBOSE]}"  # needed by display()
 LOGFILE="${_ARGS[PREP_LOG]}" # needed by display()
 DEPLOY_DIR="${_ARGS[REMOTE_DIR]}"
-HOSTS=($2)
-HOST_IPS=($3)
 
-#echo -e "*** $(basename $0) 1=$1\n1=$(declare -p _ARGS),\n2=${HOSTS[@]},\n3=${HOST_IPS[@]}"
 
 # source common constants and functions
 source ${DEPLOY_DIR}functions
