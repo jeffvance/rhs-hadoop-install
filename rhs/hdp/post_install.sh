@@ -95,7 +95,7 @@ function install_ambari_agent(){
 
   # modify the agent's .ini file to contain the mgmt node hostname
   display "  modifying $ambari_ini file" $LOG_DEBUG
-  sed -i -e "s/'localhost'/${MGMT_NODE}/" $AMBARI_INI
+  sed -i -e "s/'localhost'/${MGMT_NODE}/" $AMBARI_INI 2>&1
 
   # start the agent now
   out="$(ambari-agent start 2>&1)"
