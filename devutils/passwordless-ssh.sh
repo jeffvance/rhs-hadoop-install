@@ -5,7 +5,7 @@
 
 # set global variables
 SCRIPT=$(/bin/basename $0)
-SCRIPT_VERS='0.6'  # self version
+SCRIPT_VERS='0.7'  # self version
 INSTALL_DIR="$PWD" # name of deployment (install-from) dir
 
 # source common constants and functions. functions file expected to be in
@@ -177,6 +177,7 @@ verify_local_deploy_setup false
   # sets global USING_DNS variables
 
 echo "Begin setup of passwordless SSH"
+[[ -n "$USING_DNS" && "$USING_DNS" == true ]] && echo "   ...using DNS"
 setup_passwordless_ssh
 
 #
