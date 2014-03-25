@@ -28,7 +28,7 @@
     - extract the rhs-hadoop-install-<version>.tar.gz tarball into a fresh,
       empty directory,
     - cd to rhs-hadoop-install-<version>
-    - run ./install [--verbose=n] [--hosts=xx] <brick-dev>.
+    - run ./install [--verbose=n] [--hosts=xx] <block-dev>.
   
 Details:
 
@@ -52,7 +52,7 @@ Details:
   options. Once the tarball is created it needs to be extracted into a fresh
   empty directory. cd to the rhs-hadoop-install-<version> sub-directory and
   execute ./install.sh with the desired options (see --help) and the target
-  storage brick device.
+  storage block device.
 
   If the tarball is targetted for a Red Hat BREW build then, in most cases, it
   should not contain any Hadoop distro-specific files.

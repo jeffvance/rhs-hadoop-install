@@ -22,7 +22,7 @@
   To prepare RHS for Hadoop:
    - cd /usr/share/rhs-hadoop-install,
    - create a local "hosts" file (see below),
-   - execute ./install.sh [brick-dev],
+   - execute ./install.sh [block-dev],
    - see /var/log/rhs-hadoop-install.log for install details.
 
 
@@ -46,7 +46,7 @@
  2) create the local "hosts" file as described in hosts.example
 
  3) execute "install.sh":
-    $ ./install.sh [options (see --help)] [brick-device]
+    $ ./install.sh [options (see --help)] [block-device]
     Example: ./install.sh /dev/sdb
 
     Output is displayed to STDOUT and is also written to a logfile. The default
