@@ -6,11 +6,13 @@
   glusterfs) for Hadoop workloads. It is easy to install via yum and simple to
   execute via the install.sh script.
 
-  It is expected that all nodes in the storage cluster have RHS 2.1.1 installed
-  and the disks are set up for RAID-6.  Additionally, password-less SSH is
-  necessary between the "deploy-from" node (where the install script is run) to
-  all nodes in the cluster. There is a passwordless-ssh.sh script in the
-  devutils/ directory to automate this if needed. Use the install.sh --help
+  RHS sits on top of XFS, which is on top of LVM, which runs on RAID-6 disks.
+  This environment is required of every data storage node in the cluster, and
+  ./install.sh will create the LVM PV, VG and LV as needed. It is expected that
+  all nodes in the storage cluster have RHS 2.1.1 installed, and password-less
+  SSH is necessary between the "deploy-from" node (where the install script is
+  run) to all nodes in the cluster. There is a passwordless-ssh.sh script in
+  the devutils/ directory to automate this if needed. Use the install.sh --help
   option to see the various install options available.
 
   To install this package:
@@ -20,7 +22,7 @@
   To prepare RHS for Hadoop:
    - cd /usr/share/rhs-hadoop-install,
    - create a local "hosts" file (see below),
-   - execute "./install.sh brick-dev",
+   - execute ./install.sh [brick-dev],
    - see /var/log/rhs-hadoop-install.log for install details.
 
 
