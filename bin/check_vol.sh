@@ -12,6 +12,7 @@
 # Assumption: the node running this script has access to the gluster cli.
 
 quiet=''
+errcnt=0
 
 # parse cmd opts
 while getopts ':q' opt; do
@@ -35,4 +36,12 @@ for node in $($prefix/find_nodes.sh $VOLNAME); do
 done
 
 $prefix/check_vol_mount.sh $quiet $VOLNAME
+(( $? != 0 )) && ((errcnt++))
+
 $prefix/check_vol_perf.sh $quiet $VOLNAME
+(( $? != 0 )) && ((errcnt++))
+
+(( errcnt > 0 )) && exit 1
+
+[[ -z "$quiet" ]] && echo "$VOLNAME is ready for Hadoop workloads"
+exit 0
