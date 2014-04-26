@@ -7,7 +7,6 @@
 #  -q, if specified, means only set the exit code, do not output anything
 #
 # Assumption: the node running this script has access to the gluster cli.
-#
 
 errcnt=0
 VOLINFO_TMPFILE="$(mktemp --suffix '.volinfo')"

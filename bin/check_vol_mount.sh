@@ -6,6 +6,7 @@
 # /etc/fstab.
 # Syntax:
 #  $1=volume name
+#  $2=optional list of nodes to check
 #  -q, if specified, means only set the exit code, do not output anything
 #
 # Assumption: the node running this script has access to the gluster cli.
@@ -27,10 +28,13 @@ while getopts ':q' opt; do
 	;;
     esac
 done
+
 VOLNAME="$1"
+NODES="$2" # optional
+[[ -z "$NODES" ]] && NODES="$($prefix/find_nodes.sh $VOLNAME)" 
 
 # copy companion volmnt check script to target node and execute it
-for node in $($prefix/find_nodes.sh $VOLNAME); do
+for node in $NODES; do
     scp -q $prefix/check_vol_mnt_attrs.sh $node:/tmp
     out="$(ssh $node /tmp/check_vol_mnt_attrs.sh $VOLNAME)"
     if (( $? != 0 )) ; then
