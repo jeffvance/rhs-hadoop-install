@@ -11,8 +11,7 @@ errcnt=0
 # given the passed-in vol mount opts, verify the correct settings.
 function chk_mnt() {
 
-  local opts="$1"
-  local errcnt=0
+  local opts="$1"; local errcnt=0
 
   if ! grep -wq acl <<<$opts; then
     echo "WARN: missing acl mount option"

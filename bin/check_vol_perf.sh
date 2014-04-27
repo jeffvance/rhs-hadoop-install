@@ -24,7 +24,7 @@ declare -A settings=([$PREFETCH]='off' \
 while getopts ':q' opt; do
     case "$opt" in
       q)
-	quiet=true  # else, undefined
+	QUIET=true  # else, undefined
         shift
 	;;
       \?) # invalid option
@@ -37,7 +37,7 @@ VOLNAME="$1"
 gluster volume info $VOLNAME >$VOLINFO_TMPFILE 2>&1
 err=$?
 if (( err != 0 )) ; then
-  [[ -z "$quiet" ]] && \
+  [[ -z "$QUIET" ]] && \
     echo "vol info error $err: cannot obtain performance settings for $VOLNAME"
   exit 2
 fi
@@ -48,12 +48,12 @@ for setting in $out ; do # "perf-key:value" list
     k=${setting%:*} # strip off the value part
     v=${setting#*:} # strip off the key part
     if [[ "$v" != "${settings[$k]}" ]] ; then
-      [[ -z "$quiet" ]] && \
+      [[ -z "$QUIET" ]] && \
 	echo "WARN: $k set to \"$v\", expect \"${settings[$k]}\""
       ((errcnt++))
     fi
 done
 
 (( errcnt != 0 )) && exit 1
-[[ -z "$quiet" ]] && echo "All $VOLNAME performance settings are set correctly"
+[[ -z "$QUIET" ]] && echo "All $VOLNAME performance settings are set correctly"
 exit 0

@@ -13,14 +13,14 @@
 
 errcnt=0
 
-prefix="$(dirname $(readlink -f $0))"
-[[ ${prefix##*/} != 'bin' ]] && prefix+='/bin'
+PREFIX="$(dirname $(readlink -f $0))"
+[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
 # parse cmd opts
 while getopts ':q' opt; do
     case "$opt" in
       q)
-	quiet=true  # else, undefined
+	QUIET=true  # else, undefined
         shift
 	;;
       \?) # invalid option
@@ -31,19 +31,19 @@ done
 
 VOLNAME="$1"; shift
 NODES="$@" # optional list of nodes
-[[ -z "$NODES" ]] && NODES="$($prefix/find_nodes.sh $VOLNAME)" 
+[[ -z "$NODES" ]] && NODES="$($PREFIX/find_nodes.sh $VOLNAME)" 
 
 # copy companion volmnt check script to target node and execute it
 for node in $NODES; do
-    scp -q $prefix/check_vol_mnt_attrs.sh $node:/tmp
+    scp -q $PREFIX/check_vol_mnt_attrs.sh $node:/tmp
     out="$(ssh $node /tmp/check_vol_mnt_attrs.sh $VOLNAME)"
     if (( $? != 0 )) ; then
-      [[ -z "$quiet" ]] && echo "$node: $out"
+      [[ -z "$QUIET" ]] && echo "$node: $out"
       ((errcnt++))
     fi
 done
 
 (( errcnt > 0 )) && exit 1
-[[ -z "$quiet" ]] && echo \
+[[ -z "$QUIET" ]] && echo \
   "All nodes spanned by $VOLNAME have the correct volume mount settings"
 exit 0

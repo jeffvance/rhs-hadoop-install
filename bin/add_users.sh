@@ -16,7 +16,7 @@ errcnt=0; cnt=0
 while getopts ':q' opt; do
     case "$opt" in
       q)
-        quiet=true # else, undefined
+        QUIET=true # else, undefined
         shift
         ;;
       \?) # invalid option
@@ -25,18 +25,18 @@ while getopts ':q' opt; do
     esac
 done
 
-prefix="$(dirname $(readlink -f $0))"
-[[ ${prefix##*/} != 'bin' ]] && prefix+='/bin'
+PREFIX="$(dirname $(readlink -f $0))"
+[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
-for user in $($prefix/gen_users.sh); do
+for user in $($PREFIX/gen_users.sh); do
     if ! getent passwd $user >/dev/null ; then
       useradd --system -g $HADOOP_G $user 2>&1
       err=$?
       if (( err == 0 )) ; then
-	[[ -z "$quiet" ]] && echo "user $user added with UID=$(id -u $user)"
+	[[ -z "$QUIET" ]] && echo "user $user added with UID=$(id -u $user)"
 	((cnt++))
       else
-	[[ -z "$quiet" ]] && \
+	[[ -z "$QUIET" ]] && \
 	  echo "$(hostname): useradd of $user failed with error $err"
 	((errcnt++))
       fi
@@ -44,5 +44,5 @@ for user in $($prefix/gen_users.sh); do
 done
 
 (( errcnt > 0 )) && exit 1
-[[ -z "$quiet" ]] && echo "$cnt new Hadoop users added"
+[[ -z "$QUIET" ]] && echo "$cnt new Hadoop users added"
 exit 0

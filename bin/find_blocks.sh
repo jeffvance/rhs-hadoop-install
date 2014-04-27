@@ -8,10 +8,10 @@
 #
 VOLNAME="$1" # optional volume name
 
-prefix="$(dirname $(readlink -f $0))"
-[[ ${prefix##*/} != 'bin' ]] && prefix+='/bin'
+PREFIX="$(dirname $(readlink -f $0))"
+[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
-for brick in $($prefix/find_bricks.sh $VOLNAME); do
+for brick in $($PREFIX/find_bricks.sh $VOLNAME); do
     node=${brick%:*}
     brickmnt=${brick#*:}    # remove node
     brickmnt=${brickmnt%/*} # remove volname

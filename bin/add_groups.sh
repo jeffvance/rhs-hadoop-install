@@ -16,7 +16,7 @@ errcnt=0; cnt=0
 while getopts ':q' opt; do
     case "$opt" in
       q)
-        quiet=true # else, undefined
+        QUIET=true # else, undefined
         shift
         ;;
       \?) # invalid option
@@ -25,19 +25,19 @@ while getopts ':q' opt; do
     esac
 done
 
-prefix="$(dirname $(readlink -f $0))"
-[[ ${prefix##*/} != 'bin' ]] && prefix+='/bin'
+PREFIX="$(dirname $(readlink -f $0))"
+[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
 for grp in $GROUPS; do
     if ! getent group $grp >/dev/null ; then
       groupadd --system $grp 2>&1
       err=$?
       if (( err == 0 )) ; then
-	[[ -z "$quiet" ]] && \
+	[[ -z "$QUIET" ]] && \
 	  echo "group $grp added with GID=$(getent group $grp | cut -d: -f3)"
 	((cnt++))
       else
-	[[ -z "$quiet" ]] && \
+	[[ -z "$QUIET" ]] && \
 	  echo "$(hostname): groupadd of $grp failed with error $err"
 	((errcnt++))
       fi
@@ -45,5 +45,5 @@ for grp in $GROUPS; do
 done
 
 (( errcnt > 0 )) && exit 1
-[[ -z "$quiet" ]] && echo "$cnt new Hadoop groups added"
+[[ -z "$QUIET" ]] && echo "$cnt new Hadoop groups added"
 exit 0

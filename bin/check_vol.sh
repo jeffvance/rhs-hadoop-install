@@ -11,14 +11,14 @@
 #
 # Assumption: the node running this script has access to the gluster cli.
 
-quiet=''
+QUIET=''
 errcnt=0
 
 # parse cmd opts
 while getopts ':q' opt; do
     case "$opt" in
       q)
-        quiet='-q'
+        QUIET='-q'
         shift
         ;;
       \?) # invalid option
@@ -28,21 +28,21 @@ while getopts ':q' opt; do
 done
 VOLNAME="$1"
 
-prefix="$(dirname $(readlink -f $0))"
-[[ ${prefix##*/} != 'bin' ]] && prefix+='/bin'
+PREFIX="$(dirname $(readlink -f $0))"
+[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
-NODES="$($prefix/find_nodes.sh $VOLNAME)"
+NODES="$($PREFIX/find_nodes.sh $VOLNAME)"
 
 for node in $NODES; do
-    echo "*** $prefix/check_node.sh $node"
+    echo "*** $PREFIX/check_node.sh $node"
 done
 
-$prefix/check_vol_mount.sh $quiet $VOLNAME $NODES
+$PREFIX/check_vol_mount.sh $QUIET $VOLNAME $NODES
 (( $? != 0 )) && ((errcnt++))
 
-$prefix/check_vol_perf.sh $quiet $VOLNAME
+$PREFIX/check_vol_perf.sh $QUIET $VOLNAME
 (( $? != 0 )) && ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
-[[ -z "$quiet" ]] && echo "$VOLNAME is ready for Hadoop workloads"
+[[ -z "$QUIET" ]] && echo "$VOLNAME is ready for Hadoop workloads"
 exit 0

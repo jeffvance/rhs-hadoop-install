@@ -12,13 +12,13 @@
 
 function check_ambari_agent() {
 
-  local AMBARI_AGENT_PID='/var/run/ambari-agent/ambari-agent.pid'
+  local ambari_agent_pid='/var/run/ambari-agent/ambari-agent.pid'
 
-  if [[ -f $AMBARI_AGENT_PID ]] ; then
-    [[ -z "$quiet" ]] && echo "ambari-agent is running on $NODE"
+  if [[ -f $ambari_agent_pid ]] ; then
+    [[ -z "$QUIET" ]] && echo "ambari-agent is running on $NODE"
     return 0
   fi
-  [[ -z "$quiet" ]] && echo "ambari-agent is not running on $NODE"
+  [[ -z "$QUIET" ]] && echo "ambari-agent is not running on $NODE"
   return 1
 }
 
@@ -26,24 +26,24 @@ function check_ambari_agent() {
 # open.
 function check_open_ports() {
 
-  local out; local errcnt=0; local port; local proto; local PORTS
+  local out; local errcnt=0; local port; local proto; local ports
 
-  PORTS="$($prefix/gen_gluster_ports.sh)"
+  ports="$($PREFIX/gen_gluster_ports.sh)"
 
-  for port in $PORTS; do # "port:protocol", eg "49152-49170:tcp"
+  for port in $ports; do # "port:protocol", eg "49152-49170:tcp"
       proto=${port#*:} # remove port #
       port=${port%:*}  # remove protocol, port can be a range or single number
       [[ "$proto" == 'udp' ]] && proto='-u' || proto=''
       out="$(nc -z $proto localhost $port)"
-      [[ -z "$quiet" ]] && echo "$out"
+      [[ -z "$QUIET" ]] && echo "$out"
       if (( $? != 0 )) ; then
-	[[ -z "$quiet" ]] && echo "port(s) $port not open"
+	[[ -z "$QUIET" ]] && echo "port(s) $port not open"
 	((errcnt++))
       fi
   done
 
   (( errcnt > 0 )) && return 1
-  [[ -z "$quiet" ]] && echo "The following ports are all open: $PORTS"
+  [[ -z "$QUIET" ]] && echo "The following ports are all open: $ports"
 }
 
 # validate_ntp_conf: validate the ntp config file by ensuring there is at least
@@ -51,30 +51,30 @@ function check_open_ports() {
 function validate_ntp_conf(){
 
   local timeserver; local i=1
-  local NTP_CONF='/etc/ntp.conf'
+  local ntp_conf='/etc/ntp.conf'
   local servers=(); local numServers
 
-  servers=($(grep "^ *server " $NTP_CONF|awk '{print $2}')) # time-servers 
+  servers=($(grep "^ *server " $ntp_conf|awk '{print $2}')) # time-servers 
   numServers=${#servers[@]}
 
   if (( numServers == 0 )) ; then
-    [[ -z "$quiet" ]] && echo "ERROR: no server entries in $NTP_CONF"
+    [[ -z "$QUIET" ]] && echo "ERROR: no server entries in $ntp_conf"
     return 1 # can't continue validating this ntp config file
   fi
 
   for timeserver in "${servers[@]}" ; do
-      [[ -z "$quiet" ]] && echo "attempting ntpdate on $timeserver..."
+      [[ -z "$QUIET" ]] && echo "attempting ntpdate on $timeserver..."
       ntpdate -q $timeserver >& /dev/null
       (( $? == 0 )) && break # exit loop, found valid time-server
       ((i+=1))
   done
 
   if (( i > numServers )) ; then
-    [[ -z "$quiet" ]] && \
-	echo "ERROR: no suitable time-servers found in $NTP_CONF"
+    [[ -z "$QUIET" ]] && \
+	echo "ERROR: no suitable time-servers found in $ntp_conf"
     return 1
   fi
-  [[ -z "$quiet" ]] && echo "NTP time-server $timeserver is acceptable"
+  [[ -z "$QUIET" ]] && echo "NTP time-server $timeserver is acceptable"
 }
 
 # check_ntp: verify that ntp is running and the config file has 1 or more
@@ -90,14 +90,14 @@ function check_ntp() {
   # is ntpd configured to run on reboot?
   chkconfig ntpd 
   if (( $? != 0 )); then
-    [[ -z "$quiet" ]] && echo "ERROR: ntpd not configured to run on reboot"
+    [[ -z "$QUIET" ]] && echo "ERROR: ntpd not configured to run on reboot"
     ((errcnt++))
   fi
 
   # verify that ntpd is running
   ps -C ntpd >& /dev/null
   if (( $? != 0 )) ; then
-    [[ -z "$quiet" ]] && echo "ERROR: ntpd is not running"
+    [[ -z "$QUIET" ]] && echo "ERROR: ntpd is not running"
     ((errcnt++))
   fi
 
@@ -108,13 +108,13 @@ function check_ntp() {
 # check_selinux: if selinux is enabled then set it to permissive.
 function check_selinux() {
 
-  local out; local ENABLED='enabled'
+  local out
 
   # report selinux state
   out=$(sestatus | head -n 1 | awk '{print $3}') # enforcing, permissive
-  [[ -z "$quiet" ]] && echo "SElinux is set: $out"
+  [[ -z "$QUIET" ]] && echo "SElinux is set: $out"
  
-  [[ "$out" != "$ENABLED" ]] && return 0 # ok
+  [[ "$out" != 'enabled' ]] && return 0 # ok
   return 1
 }
 
@@ -126,7 +126,7 @@ NODE="$(hostname)"
 while getopts ':q' opt; do
     case "$opt" in
       q)
-        quiet='-q'
+        QUIET='-q'
         shift
         ;;
       \?) # invalid option
@@ -135,8 +135,8 @@ while getopts ':q' opt; do
     esac
 done
 
-prefix="$(dirname $(readlink -f $0))"
-[[ ${prefix##*/} != 'bin' ]] && prefix+='/bin'
+PREFIX="$(dirname $(readlink -f $0))"
+[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
 check_selinux
 

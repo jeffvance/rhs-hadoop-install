@@ -19,7 +19,7 @@ HADOOP_G='hadoop'
 while getopts ':q' opt; do
     case "$opt" in
       q)
-        quiet=true # else, undefined
+        QUIET=true # else, undefined
         shift
         ;;
       \?) # invalid option
@@ -36,10 +36,10 @@ GLUSTER_MNT="$1"
   echo "ERROR: $GLUSTER_MNT is not a directory";
   exit -1; }
 
-prefix="$(dirname $(readlink -f $0))"
-[[ ${prefix##*/} != 'bin' ]] && prefix+='/bin'
+PREFIX="$(dirname $(readlink -f $0))"
+[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
-for tuple in $($prefix/gen_dirs.sh); do
+for tuple in $($PREFIX/gen_dirs.sh); do
     dir="$GLUSTER_MNT/${tuple%%:*}"; let fill=(32-${#dir})
     dir+="$(printf ' %.0s' $(seq $fill))" # left-justified for nicer output
     perm=${tuple%:*}; perm=${perm#*:}
@@ -51,15 +51,15 @@ for tuple in $($prefix/gen_dirs.sh); do
     err=$?
 
     if (( err == 0 )) ; then
-      [[ -z "$quiet" ]] && echo "$dir created/updated with perms $perm"
+      [[ -z "$QUIET" ]] && echo "$dir created/updated with perms $perm"
       ((cnt++))
     else
-      [[ -z "$quiet" ]] && \
+      [[ -z "$QUIET" ]] && \
 	  echo "$(hostname): creation of dir $dir failed with error $err"
       ((errcnt++))
     fi
 done
 
 (( errcnt > 0 )) && exit 1
-[[ -z "$quiet" ]] && echo "$cnt new Hadoop directories added/updated"
+[[ -z "$QUIET" ]] && echo "$cnt new Hadoop directories added/updated"
 exit 0
