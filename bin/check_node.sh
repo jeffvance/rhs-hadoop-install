@@ -34,7 +34,7 @@ function check_open_ports() {
       proto=${port#*:} # remove port #
       port=${port%:*}  # remove protocol, port can be a range or single number
       [[ "$proto" == 'udp' ]] && proto='-u' || proto=''
-      nc -z localhost $port
+      nc -z $proto localhost $port
       if (( $? != 0 )) ; then
 	echo -e "ERROR: nc -z: port(s) $port not open.\nThis port is needed by gluster and/or Ambari"
 	((errcnt++))
