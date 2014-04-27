@@ -29,8 +29,8 @@ while getopts ':q' opt; do
     esac
 done
 
-VOLNAME="$1"
-NODES="$2" # optional
+VOLNAME="$1"; shift
+NODES="$@" # optional list of nodes
 [[ -z "$NODES" ]] && NODES="$($prefix/find_nodes.sh $VOLNAME)" 
 
 # copy companion volmnt check script to target node and execute it
@@ -45,5 +45,5 @@ done
 
 (( errcnt > 0 )) && exit 1
 [[ -z "$quiet" ]] && echo \
-	"All nodes spanned by $VOLNAME have the correct volume mount settings"
+  "All nodes spanned by $VOLNAME have the correct volume mount settings"
 exit 0

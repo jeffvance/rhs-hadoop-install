@@ -6,7 +6,7 @@
 # bin/check_node.sh for each node spanned by the volume.
 #
 # Syntax:
-#  $1=Volume name
+#  $1=volume name
 #  -q, if specified, means only set the exit code, do not output anything
 #
 # Assumption: the node running this script has access to the gluster cli.
@@ -31,17 +31,18 @@ VOLNAME="$1"
 prefix="$(dirname $(readlink -f $0))"
 [[ ${prefix##*/} != 'bin' ]] && prefix+='/bin'
 
-for node in $($prefix/find_nodes.sh $VOLNAME); do
+NODES="$($prefix/find_nodes.sh $VOLNAME)"
+
+for node in $NODES; do
     echo "*** $prefix/check_node.sh $node"
 done
 
-$prefix/check_vol_mount.sh $quiet $VOLNAME
+$prefix/check_vol_mount.sh $quiet $VOLNAME $NODES
 (( $? != 0 )) && ((errcnt++))
 
 $prefix/check_vol_perf.sh $quiet $VOLNAME
 (( $? != 0 )) && ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
-
 [[ -z "$quiet" ]] && echo "$VOLNAME is ready for Hadoop workloads"
 exit 0
