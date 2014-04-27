@@ -15,10 +15,10 @@ function check_ambari_agent() {
   local AMBARI_AGENT_PID='/var/run/ambari-agent/ambari-agent.pid'
 
   if [[ -f $AMBARI_AGENT_PID ]] ; then
-    echo "ambari-agent is running on $NODE"
+    [[ -z "$quiet" ]] && echo "ambari-agent is running on $NODE"
     return 0
   fi
-  echo "ambari-agent is not running on $NODE"
+  [[ -z "$quiet" ]] && echo "ambari-agent is not running on $NODE"
   return 1
 }
 
@@ -26,7 +26,7 @@ function check_ambari_agent() {
 # open.
 function check_open_ports() {
 
-  local errcnt=0; local port; local proto; local PORTS
+  local out; local errcnt=0; local port; local proto; local PORTS
 
   PORTS="$($prefix/gen_gluster_ports.sh)"
 
@@ -34,22 +34,75 @@ function check_open_ports() {
       proto=${port#*:} # remove port #
       port=${port%:*}  # remove protocol, port can be a range or single number
       [[ "$proto" == 'udp' ]] && proto='-u' || proto=''
-      nc -z $proto localhost $port
+      out="$(nc -z $proto localhost $port)"
+      [[ -z "$quiet" ]] && echo "$out"
       if (( $? != 0 )) ; then
-	echo -e "ERROR: nc -z: port(s) $port not open.\nThis port is needed by gluster and/or Ambari"
+	[[ -z "$quiet" ]] && echo "port(s) $port not open"
 	((errcnt++))
       fi
   done
 
   (( errcnt > 0 )) && return 1
-  echo "The following ports are all open: $PORTS"
-  return 0
+  [[ -z "$quiet" ]] && echo "The following ports are all open: $PORTS"
 }
 
+# validate_ntp_conf: validate the ntp config file by ensuring there is at least
+# one time-server suitable for ntp use.
+function validate_ntp_conf(){
+
+  local timeserver; local i=1
+  local NTP_CONF='/etc/ntp.conf'
+  local servers=(); local numServers
+
+  servers=($(grep "^ *server " $NTP_CONF|awk '{print $2}')) # time-servers 
+  numServers=${#servers[@]}
+
+  if (( numServers == 0 )) ; then
+    [[ -z "$quiet" ]] && echo "ERROR: no server entries in $NTP_CONF"
+    return 1 # can't continue validating this ntp config file
+  fi
+
+  for timeserver in "${servers[@]}" ; do
+      [[ -z "$quiet" ]] && echo "attempting ntpdate on $timeserver..."
+      ntpdate -q $timeserver >& /dev/null
+      (( $? == 0 )) && break # exit loop, found valid time-server
+      ((i+=1))
+  done
+
+  if (( i > numServers )) ; then
+    [[ -z "$quiet" ]] && \
+	echo "ERROR: no suitable time-servers found in $NTP_CONF"
+    return 1
+  fi
+  [[ -z "$quiet" ]] && echo "NTP time-server $timeserver is acceptable"
+}
+
+# check_ntp: verify that ntp is running and the config file has 1 or more
+# suitable server records.
 function check_ntp() {
 
+  local errcnt=0
 
+  if ! validate_ntp_conf ; then
+    ((errcnt++))
+  fi
 
+  # is ntpd configured to run on reboot?
+  chkconfig ntpd 
+  if (( $? != 0 )); then
+    [[ -z "$quiet" ]] && echo "ERROR: ntpd not configured to run on reboot"
+    ((errcnt++))
+  fi
+
+  # verify that ntpd is running
+  ps -C ntpd >& /dev/null
+  if (( $? != 0 )) ; then
+    [[ -z "$quiet" ]] && echo "ERROR: ntpd is not running"
+    ((errcnt++))
+  fi
+
+  (( errcnt > 0 )) && return 1
+  return 0
 }
 
 # check_selinux: if selinux is enabled then set it to permissive.
@@ -59,7 +112,7 @@ function check_selinux() {
 
   # report selinux state
   out=$(sestatus | head -n 1 | awk '{print $3}') # enforcing, permissive
-  echo "SElinux is set: $out"
+  [[ -z "$quiet" ]] && echo "SElinux is set: $out"
  
   [[ "$out" != "$ENABLED" ]] && return 0 # ok
   return 1
