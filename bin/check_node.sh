@@ -26,14 +26,17 @@ function check_ambari_agent() {
 # open.
 function check_open_ports() {
 
-  local errcnt=0; local port; local PORTS
+  local errcnt=0; local port; local proto; local PORTS
 
   PORTS="$($prefix/gen_gluster_ports.sh)"
 
-  for port in $PORTS; do # port can be a rang, a-c
+  for port in $PORTS; do # "port:protocol", eg "49152-49170:tcp"
+      proto=${port#*:} # remove port #
+      port=${port%:*}  # remove protocol, port can be a range or single number
+      [[ "$proto" == 'udp' ]] && proto='-u' || proto=''
       nc -z localhost $port
       if (( $? != 0 )) ; then
-	echo "ERROR: port(s) $port not open. This port is needed by gluster"
+	echo -e "ERROR: nc -z: port(s) $port not open.\nThis port is needed by gluster and/or Ambari"
 	((errcnt++))
       fi
   done
@@ -56,8 +59,7 @@ function check_selinux() {
 
   # report selinux state
   out=$(sestatus | head -n 1 | awk '{print $3}') # enforcing, permissive
-  echo
-  echo "on $NODE: SElinux is set: $out"
+  echo "SElinux is set: $out"
  
   [[ "$out" != "$ENABLED" ]] && return 0 # ok
   return 1
