@@ -28,7 +28,7 @@ function check_open_ports() {
 
   local out; local errcnt=0; local port; local proto; local ports
 
-  ports="$($PREFIX/gen_gluster_ports.sh)"
+  ports="$($PREFIX/gen_ports.sh)"
 
   for port in $ports; do # "port:protocol", eg "49152-49170:tcp"
       proto=${port#*:} # remove port #
