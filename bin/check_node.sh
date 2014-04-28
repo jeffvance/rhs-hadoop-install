@@ -45,6 +45,7 @@ function check_dirs() {
 
       # check dir's perms and owner
       out="$(stat -c %a $dir)"
+      [[ ${#out} == 3 ]] && out="0$out"; # leading 0
       [[ $out != $perm ]] && {
  	[[ -z "$QUIET" ]] && \
 	  echo "ERROR: $dir perms are $out, expected to be: $perm";
@@ -164,7 +165,9 @@ function check_users() {
   local user; local errcnt=0
 
   for user in $($PREFIX/gen_users.sh); do
-      if id -u $user >& /dev/null ; then continue
+      if id -u $user >& /dev/null ; then
+	continue
+      fi
       [[ -z "$QUIET" ]] && echo "ERROR: $user is missing from $NODE"
       ((errcnt++))
   done
