@@ -3,12 +3,16 @@
 # check_node.sh verifies that the node running the script (localhost) is setup
 # correctly for hadoop workloads. This includes everything other than volume-
 # specific checks. So, we check: ntp config, required gluster and ambari ports
-# being open, ambari agent running, selinux not enabled...
+# being open, ambari agent running, selinux not enabled, hadoop users and dirs,
+# etc...
 #
 # Syntax:
+#  $1= volume mount directory prefix
 #  -q, if specified, means only set the exit code, do not output anything
 
 # Assumption: the node running this script can passwordless ssh to the node arg.
+
+errcnt=0
 
 function check_ambari_agent() {
 
@@ -20,6 +24,40 @@ function check_ambari_agent() {
   fi
   [[ -z "$QUIET" ]] && echo "ambari-agent is not running on $NODE"
   return 1
+}
+
+# check_dirs: check that the required hadoop-specific directories are present
+# on this node. Also check that the perms and owner are set correctly.
+function check_dirs() {
+
+  local dir; local perm; local owner; local tuple
+  local out; local errcnt=0
+
+  for tuple in $($PREFIX/gen_dirs.sh); do
+      dir="$VOLMNT/${tuple%%:*}"
+      perm=${tuple%:*}; perm=${perm#*:}
+      owner=${tuple##*:}
+
+      [[ ! -d $dir ]] && {
+ 	[[ -z "$QUIET" ]] && echo "ERROR: $dir is missing from $NODE";
+	((errcnt++));
+	continue; }
+
+      # check dir's perms and owner
+      out="$(stat -c %a $dir)"
+      [[ $out != $perm ]] && {
+ 	[[ -z "$QUIET" ]] && \
+	  echo "ERROR: $dir perms are $out, expected to be: $perm";
+	((errcnt++)); }
+      out="$(stat -c %U $dir)"
+      [[ $out != $owner ]] && {
+ 	[[ -z "$QUIET" ]] && \
+	  echo "ERROR: $dir owner is $out, expected to be: $owner";
+	((errcnt++)); }
+  done
+
+  (( errcnt > 0 )) && return 1
+  return 0
 }
 
 # check_open_ports: verify that the ports needed by gluster and ambari are all
@@ -119,6 +157,22 @@ function check_selinux() {
   return 1
 }
 
+# check_users: check that the required hadoop-specific users are present on
+# this node. This function does NOT check for UID consistency across the pool.
+function check_users() {
+
+  local user; local errcnt=0
+
+  for user in $($PREFIX/gen_users.sh); do
+      if id -u $user >& /dev/null ; then continue
+      [[ -z "$QUIET" ]] && echo "ERROR: $user is missing from $NODE"
+      ((errcnt++))
+  done
+
+  (( errcnt > 0 )) && return 1
+  return 0
+}
+
 
 ## main ##
 NODE="$(hostname)"
@@ -135,14 +189,23 @@ while getopts ':q' opt; do
         ;;
     esac
 done
+VOLMNT="$1"
 
 PREFIX="$(dirname $(readlink -f $0))"
 [[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
-check_selinux
+check_selinux || ((errcnt++))
 
-check_open_ports
+check_open_ports || ((errcnt++))
 
-check_ntp
+check_ntp || ((errcnt++))
 
-check_ambari_agent
+check_users || ((errcnt++))
+
+check_dirs || ((errcnt++))
+
+check_ambari_agent || ((errcnt++))
+
+(( errcnt > 0 )) && exit 1
+[[ -z "$QUIET" ]] && echo "$NODE is ready for Hadoop workloads"
+exit 0
