@@ -11,14 +11,13 @@
 #
 # Assumption: the node running this script has access to the gluster cli.
 
-QUIET=''
-errcnt=0
+errcnt=0; q=''
 
 # parse cmd opts
 while getopts ':q' opt; do
     case "$opt" in
       q)
-        QUIET='-q'
+        QUIET=true # else, undefined
         shift
         ;;
       \?) # invalid option
@@ -31,17 +30,19 @@ VOLNAME="$1"
 PREFIX="$(dirname $(readlink -f $0))"
 [[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
+[[ -z "$QUIET" ]] && q='-q'
+
 NODES="$($PREFIX/find_nodes.sh $VOLNAME)"
 
 for node in $NODES; do
     scp $PREFIX/check_node.sh $node:/tmp
-    ssh $node /tmp/check_node.sh
+    ssh $node /tmp/check_node.sh $q
 done
 
-$PREFIX/check_vol_mount.sh $QUIET $VOLNAME $NODES
+$PREFIX/check_vol_mount.sh $q $VOLNAME $NODES
 (( $? != 0 )) && ((errcnt++))
 
-$PREFIX/check_vol_perf.sh $QUIET $VOLNAME
+$PREFIX/check_vol_perf.sh $q $VOLNAME
 (( $? != 0 )) && ((errcnt++))
 
 (( errcnt > 0 )) && exit 1

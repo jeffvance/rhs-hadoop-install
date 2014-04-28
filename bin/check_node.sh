@@ -34,6 +34,7 @@ function check_open_ports() {
       proto=${port#*:} # remove port #
       port=${port%:*}  # remove protocol, port can be a range or single number
       [[ "$proto" == 'udp' ]] && proto='-u' || proto=''
+      # attempt to bind to this port or to any port in a range of ports
       out="$(nc -z $proto localhost $port)"
       [[ -z "$QUIET" ]] && echo "$out"
       if (( $? != 0 )) ; then
