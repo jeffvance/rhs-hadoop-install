@@ -34,7 +34,8 @@ PREFIX="$(dirname $(readlink -f $0))"
 NODES="$($PREFIX/find_nodes.sh $VOLNAME)"
 
 for node in $NODES; do
-    echo "*** $PREFIX/check_node.sh $node"
+    scp $PREFIX/check_node.sh $node:/tmp
+    ssh $node /tmp/check_node.sh
 done
 
 $PREFIX/check_vol_mount.sh $QUIET $VOLNAME $NODES
