@@ -15,12 +15,16 @@
 
 opts='nodes,blk-devs,brick-mnt,vol-mnt-prefix,yarn-server,hadoop-mgmt-server,volume:'
 tmpconf="$(mktemp --suffix _rhs_hadoop_install.conf)"
+# assoc array containing script variable names as keys and config file
+# keywords as values. NOTE: volume= omitted since is has an arg (volname)
+declare -A KEYWORDS=([NODES]='nodes=' [BLKDEVS]='blk-devs=' [BRICKMNT]='brick-mnt=' [YARN]='yarn-server=' [MGMT]='hadoop-mgmt-server=' [VOLMNT]='vol-mnt-prefix=')
 
 # parse cmd opts
 args="$(getopt -o '' --long $opts -- $@)"
 eval set -- "$args" # set up 1st option, if any
 
 while true; do
+    # the vars set to true here must match keys in the KEYWORDS assoc array
     case "$1" in
       --nodes)
 	NODES=true # else, undefined
@@ -67,30 +71,16 @@ CONFIG="$1" # config file
 # the config file
 sed '/^ *#/d;/^ *$/d;s/#.*//' $CONFIG >$tmpconf
 
-[[ -n "$NODES" ]] && {
-  rtn="$(grep '^nodes=' $tmpconf)";
-  echo "${rtn#*nodes=}"; }
+# for each option specified search for its corresponding key= in the conf file
+for opt in ${!KEYWORDS[@]}; do # volume= not in this list
+    if [[ -n "${!opt}" ]] ; then # option seen
+	kw="${KEYWORDS[$opt]}"
+	rtn="$(grep "^$kw" $tmpconf)"
+	echo "${rtn#*$kw}"
+    fi
+done
 
-[[ -n "$BLKDEVS" ]] && {
-  rtn="$(grep '^blk-devs=' $tmpconf)";
-  echo "${rtn#*blk-devs=}"; }
-
-[[ -n "$BRICKMNT" ]] && {
-  rtn="$(grep '^brick-mnt=' $tmpconf)";
-  echo "${rtn#*brick-mnt=}"; }
-
-[[ -n "$VOLMNT" ]] && {
-  rtn="$(grep '^vol-mnt-prefix=' $tmpconf)";
-  echo "${rtn#*vol-mnt-prefix=}"; }
-
-[[ -n "$YARN" ]] && {
-  rtn="$(grep '^yarn-server=' $tmpconf)";
-  echo "${rtn#*yarn-server=}"; }
-
-[[ -n "$MGMT" ]] && {
-  rtn="$(grep '^hadoop-mgmt-server=' $tmpconf)";
-  echo "${rtn#*hadoop-mgmt-server=}"; }
-
+# now do volume=
 [[ -n "$VOL" ]] && {
   rtn="$(grep -A$VOL_SECT_LINES $VOLNAME $tmpconf | \
 	tail -n$VOL_SECT_LINES)"; # omit volume name line

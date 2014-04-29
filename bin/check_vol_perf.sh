@@ -12,13 +12,12 @@ errcnt=0
 VOLINFO_TMPFILE="$(mktemp --suffix '.volinfo')"
 LAST_N=3 # tail records containing vol settings (vol info cmd)
 TAG='Options Reconfigured:'
-PREFETCH='performance.stat-prefetch'
-EAGERLOCK='cluster.eager-lock'
-QUICKREAD='performance.quick-read'
+
+PREFIX="$(dirname $(readlink -f $0))"
+[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
+
 # set assoc array to desired values for the perf config keys
-declare -A settings=([$PREFETCH]='off' \
-                     [$EAGERLOCK]='on' \
-                     [$QUICKREAD]='off')
+declare -A EXPCT_SETTINGS=$($PREFIX/gen_vol_perf_settings.sh)
 
 # parse cmd opts
 while getopts ':q' opt; do
@@ -47,9 +46,9 @@ out="${out//: /:}"
 for setting in $out ; do # "perf-key:value" list
     k=${setting%:*} # strip off the value part
     v=${setting#*:} # strip off the key part
-    if [[ "$v" != "${settings[$k]}" ]] ; then
+    if [[ "$v" != "${EXPCT_SETTINGS[$k]}" ]] ; then
       [[ -z "$QUIET" ]] && \
-	echo "WARN: $k set to \"$v\", expect \"${settings[$k]}\""
+	echo "WARN: $k set to \"$v\", expect \"${EXPCT_SETTINGS[$k]}\""
       ((errcnt++))
     fi
 done
