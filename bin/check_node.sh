@@ -123,9 +123,7 @@ function check_ntp() {
 
   local errcnt=0
 
-  if ! validate_ntp_conf ; then
-    ((errcnt++))
-  fi
+  validate_ntp_conf || ((errcnt++))
 
   # is ntpd configured to run on reboot?
   chkconfig ntpd 
@@ -165,9 +163,7 @@ function check_users() {
   local user; local errcnt=0
 
   for user in $($PREFIX/gen_users.sh); do
-      if id -u $user >& /dev/null ; then
-	continue
-      fi
+      id -u $user >& /dev/null && continue
       [[ -z "$QUIET" ]] && echo "ERROR: $user is missing from $NODE"
       ((errcnt++))
   done

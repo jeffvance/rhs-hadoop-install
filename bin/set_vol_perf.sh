@@ -34,7 +34,7 @@ for setting in ${!VOL_SETTINGS[@]}; do
     val="${VOL_SETTINGS[$setting]}"
     out="$(gluster volume set $VOLNAME $setting $val)"
     err=$?
-    [[ -z "$quiet" ]] && echo "$setting $val: $out"
+    [[ -z "$QUIET" ]] && echo "$setting $val: $out"
     ((errcnt+=err))
 done
 
