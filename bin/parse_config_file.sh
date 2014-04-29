@@ -6,18 +6,18 @@
 # Syntax:
 #  --nodes: nodes= value
 #  --blk-devs: blk-devs= value
-#  --brick-mnt: brick-mnt= value
+#  --brick-mnts: brick-mnts= value
 #  --vol-mnt-prefix: vol-mnt-prefix value
 #  --yarn-server: yarn-server= value
 #  --hadoop-mgmt-server: hadoop-mgmt-server value
 #  --volume <volName>: output the section for this volume
 #  $1=config file
 
-opts='nodes,blk-devs,brick-mnt,vol-mnt-prefix,yarn-server,hadoop-mgmt-server,volume:'
+opts='nodes,blk-devs,brick-mnts,vol-mnt-prefix,yarn-server,hadoop-mgmt-server,volume:'
 tmpconf="$(mktemp --suffix _rhs_hadoop_install.conf)"
 # assoc array containing script variable names as keys and config file
 # keywords as values. NOTE: volume= omitted since is has an arg (volname)
-declare -A KEYWORDS=([NODES]='nodes=' [BLKDEVS]='blk-devs=' [BRICKMNT]='brick-mnt=' [YARN]='yarn-server=' [MGMT]='hadoop-mgmt-server=' [VOLMNT]='vol-mnt-prefix=')
+declare -A KEYWORDS=([NODES]='nodes=' [BLKDEVS]='blk-devs=' [BRICKMNTS]='brick-mnts=' [YARN]='yarn-server=' [MGMT]='hadoop-mgmt-server=' [VOLMNT]='vol-mnt-prefix=')
 
 # parse cmd opts
 args="$(getopt -o '' --long $opts -- $@)"
@@ -34,8 +34,8 @@ while true; do
 	BLKDEVS=true # else, undefined
         shift
 	;;
-      --brick-mnt)
-	BRICKMNT=true # else, undefined
+      --brick-mnts)
+	BRICKMNTS=true # else, undefined
         shift
 	;;
       --vol-mnt-prefix)
@@ -84,6 +84,6 @@ done
 [[ -n "$VOL" ]] && {
   rtn="$(grep -A$VOL_SECT_LINES $VOLNAME $tmpconf | \
 	tail -n$VOL_SECT_LINES)"; # omit volume name line
-  echo "${rtn#*vol-nodes=}"; }
+  echo "${rtn#*vol-bricks=}"; }
 
 exit 0
