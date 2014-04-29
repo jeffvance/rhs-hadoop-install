@@ -38,23 +38,26 @@ function check_dirs() {
       perm=${tuple%:*}; perm=${perm#*:}
       owner=${tuple##*:}
 
-      [[ ! -d $dir ]] && {
- 	[[ -z "$QUIET" ]] && echo "ERROR: $dir is missing from $NODE";
-	((errcnt++));
-	continue; }
+      if [[ ! -d $dir ]] ; then
+ 	[[ -z "$QUIET" ]] && echo "ERROR: $dir is missing from $NODE"
+	((errcnt++))
+	continue
+      fi
 
       # check dir's perms and owner
       out="$(stat -c %a $dir)"
       [[ ${#out} == 3 ]] && out="0$out"; # leading 0
-      [[ $out != $perm ]] && {
+      if [[ $out != $perm ]] ; then
  	[[ -z "$QUIET" ]] && \
-	  echo "ERROR: $dir perms are $out, expected to be: $perm";
-	((errcnt++)); }
+	  echo "ERROR: $dir perms are $out, expected to be: $perm"
+	((errcnt++))
+      fi
       out="$(stat -c %U $dir)"
-      [[ $out != $owner ]] && {
+      if [[ $out != $owner ]] ; then
  	[[ -z "$QUIET" ]] && \
-	  echo "ERROR: $dir owner is $out, expected to be: $owner";
-	((errcnt++)); }
+	  echo "ERROR: $dir owner is $out, expected to be: $owner"
+	((errcnt++))
+      fi
   done
 
   (( errcnt > 0 )) && return 1
