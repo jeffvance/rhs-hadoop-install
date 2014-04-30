@@ -2,6 +2,8 @@
 #
 # setup_datanode.sh sets up this node's (localhost's) environment for hadoop
 # workloads. Everything needed other than volume-specific tasks is done here.
+# It is assumed that localhost has already been validated (eg. check_node.sh
+# has been run) prior to setting up the node.
 # Syntax:
 #  $1=block device path(s)
 #  $2=brick mount path(s)
@@ -17,7 +19,7 @@ PREFIX="$(dirname $(readlink -f $0))"
 function get_ambari_repo(){
  
   local REPO_DIR='/etc/yum.repos.d'
-  local REPO_URL='http://public-repo-1.hortonworks.com/ambari/centos6/1.x/updates/1.4.4.23/ambari.repo'
+  local REPO_URL='http://public-repo-1.hortonworks.com/ambari/centos6/1.x/updates/1.5.1/ambari.repo'
   local out; local err; local errcnt=0
 
   [[ -d $REPO_DIR ]] || mkdir -p $REPO_DIR
@@ -117,7 +119,7 @@ function setup_iptables() {
 # it/them.
 function mount_blkdevs() {
 
-  local i; local err; local out
+  local i; local err; local errcnt=0; local out
   local brkmnt; local blkdev
   local blkdevs=($BLKDEVS); local brickmnts=($BRICKMNTS) # convert to arrays
   local brick_mnt_opts="noatime,inode64"
@@ -129,7 +131,14 @@ function mount_blkdevs() {
       fi
       out="$(mount $brkmnt)" # via fstab entry
       err=$?
+      if (( err != 0 )) ; then
+	[[ -z "$QUIET" ]] && echo "ERROR $err: mount $brkmnt: $out"
+ 	((errcnt++))
+      fi
   done
+
+  (( errcnt > 0 )) && return 1
+  return 0
 }
 
 
@@ -154,7 +163,6 @@ MGMT_NODE="$3" # required
 [[ -n "$QUIET" ]] && q='-q'
 
 setup_xfs          || ((errcnt++))
-setup_ntp          || ((errcnt++))
 setup_selinux      || ((errcnt++))
 setup_iptables     || ((errcnt++))
 setup_ambari_agent || ((errcnt++))

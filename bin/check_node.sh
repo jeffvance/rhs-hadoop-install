@@ -7,7 +7,7 @@
 # etc...
 #
 # Syntax:
-#  $1= volume mount directory prefix
+#  $1= xfs brick mount directory path(s)
 #  -q, if specified, means only set the exit code, do not output anything
 
 # Assumption: the node running this script can passwordless ssh to the node arg.
@@ -30,34 +30,35 @@ function check_ambari_agent() {
 # on this node. Also check that the perms and owner are set correctly.
 function check_dirs() {
 
-  local dir; local perm; local owner; local tuple
+  local dir; local perm; local owner; local tuple; local mnt
   local out; local errcnt=0
 
   for tuple in $($PREFIX/gen_dirs.sh); do
-      dir="$VOLMNT/${tuple%%:*}"
       perm=${tuple%:*}; perm=${perm#*:}
       owner=${tuple##*:}
 
-      if [[ ! -d $dir ]] ; then
- 	[[ -z "$QUIET" ]] && echo "ERROR: $dir is missing from $NODE"
-	((errcnt++))
-	continue
-      fi
-
-      # check dir's perms and owner
-      out="$(stat -c %a $dir)"
-      [[ ${#out} == 3 ]] && out="0$out"; # leading 0
-      if [[ $out != $perm ]] ; then
- 	[[ -z "$QUIET" ]] && \
-	  echo "ERROR: $dir perms are $out, expected to be: $perm"
-	((errcnt++))
-      fi
-      out="$(stat -c %U $dir)"
-      if [[ $out != $owner ]] ; then
- 	[[ -z "$QUIET" ]] && \
-	  echo "ERROR: $dir owner is $out, expected to be: $owner"
-	((errcnt++))
-      fi
+      for mnt in $BRICKMNTS; do # can be 1 or more brick mounts
+	  dir="$mnt/${tuple%%:*}"
+	  if [[ ! -d $dir ]] ; then
+	    [[ -z "$QUIET" ]] && echo "ERROR: $dir is missing on $NODE"
+	    ((errcnt++))
+	    continue # inner for loop
+	  fi
+	  # check dir's perms and owner
+	  out="$(stat -c %a $dir)"
+	  [[ ${#out} == 3 ]] && out="0$out"; # leading 0
+	  if [[ $out != $perm ]] ; then
+	    [[ -z "$QUIET" ]] && \
+		echo "ERROR: $dir perms are $out, expected to be: $perm"
+	    ((errcnt++))
+	  fi
+	  out="$(stat -c %U $dir)"
+	  if [[ $out != $owner ]] ; then
+	    [[ -z "$QUIET" ]] && \
+		echo "ERROR: $dir owner is $out, expected to be: $owner"
+	    ((errcnt++))
+	  fi
+      done
   done
 
   (( errcnt > 0 )) && return 1
@@ -175,6 +176,31 @@ function check_users() {
   return 0
 }
 
+# check_xfs:
+function check_xfs() {
+
+  local err; local out; local mnt; local isize=512
+
+  for mnt in $BRICKMNTS; do # can be 1 or more brick mounts passed in
+      if [[ ! -d $mnt ]] ; then
+	echo "ERROR: directory $mnt missing on $NODE"
+	(errcnt++)
+	continue
+      fi
+      out="$(xfs_info $mnt 2>&1)"
+      err=$?
+      if (( err != 0 )) ; then
+	echo "ERROR $err: xfs_info $mnt: $out"
+	(errcnt++)
+	continue
+      fi
+      out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
+      if (( out != $isize )) ; then
+	echo "WARN: xfs for $mnt on $NODE expected to be $isize in size; instead sized at $out"
+      fi
+  done
+}
+
 
 ## main ##
 NODE="$(hostname)"
@@ -191,21 +217,18 @@ while getopts ':q' opt; do
         ;;
     esac
 done
-VOLMNT="$1"
+#BRICKMNTS="$1"
+BRICKMNTS="$@" # can be more than one brick-mnt path
 
 PREFIX="$(dirname $(readlink -f $0))"
 [[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
-check_selinux || ((errcnt++))
-
-check_open_ports || ((errcnt++))
-
-check_ntp || ((errcnt++))
-
-check_users || ((errcnt++))
-
-check_dirs || ((errcnt++))
-
+check_xfs          || ((errcnt++))
+check_selinux      || ((errcnt++))
+check_open_ports   || ((errcnt++))
+check_ntp          || ((errcnt++))
+check_users        || ((errcnt++))
+check_dirs         || ((errcnt++))
 check_ambari_agent || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
