@@ -16,13 +16,16 @@ errcnt=0
 PREFIX="$(dirname $(readlink -f $0))"
 
 
-# given the passed-in vol mount opts, verify the correct settings.
+# given the passed-in vol mount opts, verify the correct settings. Returns 1 
+# for errors, 2 for warnings, and 0 for neither.
+# Note: cannot return -1, just in case you were wondering...
 function chk_mnt() {
 
-  local opts="$1"; local errcnt=0
+  local opts="$1"; local errcnt=0; local warncnt=0
 
   if ! grep -wq acl <<<$opts; then
     [[ -z "$QUIET" ]] && echo "WARN: missing acl mount option"
+    ((warncnt++))
   fi
   if ! grep -wq "use-readdirp=no" <<<$opts; then
     [[ -z "$QUIET" ]] && echo "ERROR: use-readdirp must be set to 'no'"
@@ -36,7 +39,9 @@ function chk_mnt() {
     [[ -z "$QUIET" ]] && echo "ERROR: entry-timeout must be set to zero"
     ((errcnt++))
   fi
-  (( errcnt > 0 )) && return 1 # 1 or more errors
+
+  (( errcnt > 0 ))  && return 1 # 1 or more errors
+  (( warncnt > 0 )) && return 2 # 1 or more warnings
   return 0
 }
 
@@ -45,12 +50,14 @@ function chk_mnt() {
 # determined by ps, and the "persistent" settings, defined in /etc/fstab.
 function check_vol_mnt_attrs() {
 
-  local errcnt=0; local cnt; local mntopts
+  local rc; local errcnt=0; local warncnt=0; local cnt; local mntopts
 
   # live check
   mntopts="$(ps -ef | grep -w "$VOLNAME" | grep -vwE 'grep|-s')"
   mntopts=${mntopts#*glusterfs} # just the opts
-  chk_mnt "$mntopts" || ((errcnt++))
+  chk_mnt "$mntopts"
+  rc=$?
+  (( rc == 1 )) && ((errcnt++)) || (( rc == 2 )) && ((warncnt++))
 
   # fstab check
   cnt=$(grep -c $VOLNAME /etc/fstab)
@@ -64,8 +71,15 @@ function check_vol_mnt_attrs() {
   else # cnt == 1
     mntopts="$(grep -w $VOLNAME /etc/fstab)"
     mntopts=${mntopts#* glusterfs }
-    chk_mnt "$mntopts" || ((errcnt++))
+    chk_mnt "$mntopts"
+    rc=$?
+    (( rc == 1 )) && ((errcnt++)) || (( rc == 2 )) && ((warncnt++))
   fi
+
+  (( errcnt > 0 )) && return 1
+  [[ -z "$QUIET" ]] && \
+    echo "$VOLNAME mount setup correctly on $NODE with $warncnt warnings"
+  return 0
 }
 
 

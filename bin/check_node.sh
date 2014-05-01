@@ -115,9 +115,9 @@ function check_open_ports() {
       [[ "$proto" == 'udp' ]] && proto='-u' || proto=''
       # attempt to bind to this port or to any port in a range of ports
       out="$(nc -z $proto localhost $port)"
-      [[ -z "$QUIET" ]] && echo "$out"
+      [[ -z "$QUIET" && -n "$out" ]] && echo "$NODE: $out"
       if (( $? != 0 )) ; then
-	[[ -z "$QUIET" ]] && echo "port(s) $port not open"
+	[[ -z "$QUIET" ]] && echo "port(s) $port not open on $NODE"
 	((errcnt++))
       fi
   done
@@ -195,7 +195,7 @@ function check_selinux() {
 
   # report selinux state
   out=$(sestatus | head -n 1 | awk '{print $3}') # enforcing, permissive
-  [[ -z "$QUIET" ]] && echo "selinux is set: $out"
+  [[ -z "$QUIET" ]] && echo "selinux is set on $NODE to: $out"
  
   [[ "$out" != 'enabled' ]] && ((errcnt++))
 
