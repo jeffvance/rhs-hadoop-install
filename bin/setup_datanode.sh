@@ -39,6 +39,32 @@ function get_ambari_repo(){
   return 0
 }
 
+# mount_blkdev: append the xfs brick mount(s) to /etc/fstab and then mount 
+# it/them.
+function mount_blkdevs() {
+
+  local i; local err; local errcnt=0; local out
+  local brkmnt; local blkdev
+  local blkdevs=($BLKDEVS); local brickmnts=($BRICKMNTS) # convert to arrays
+  local brick_mnt_opts="noatime,inode64"
+
+  for (( i=0; i<${#blkdevs}; i++ )) ; do
+      blkdev="${blkdevs[$i]}"; brkmnt="${brickmnts[$i]}"
+      if ! grep -qsw $brkmnt /etc/fstab ; then
+	echo "$blkdev $brkmnt xfs $brick_mnt_opts 0 0" >>/etc/fstab
+      fi
+      out="$(mount $brkmnt)" # via fstab entry
+      err=$?
+      if (( err != 0 )) ; then
+	[[ -z "$QUIET" ]] && echo "ERROR $err: mount $blkdev as $brkmnt: $out"
+ 	((errcnt++))
+      fi
+  done
+
+  (( errcnt > 0 )) && return 1
+  return 0
+}
+
 # setup_ambari_agent: yum install the ambari agent rpm, modify the .ini file
 # to point to the ambari server, start the agent, and set up agent to start
 # automatically after a reboot.
@@ -115,24 +141,46 @@ function setup_iptables() {
   return 0
 }
 
-# mount_blkdev: append the xfs brick mount(s) to /etc/fstab and then mount 
-# it/them.
-function mount_blkdevs() {
+# setup_selinux: if selinux is enabled then set it to permissive. This seems
+# to be a requirement for HDP.
+function setup_selinux() {
 
-  local i; local err; local errcnt=0; local out
-  local brkmnt; local blkdev
-  local blkdevs=($BLKDEVS); local brickmnts=($BRICKMNTS) # convert to arrays
-  local brick_mnt_opts="noatime,inode64"
+  local out; local err
+  local conf='/etc/sysconfig/selinux' # symlink to /etc/selinux/config
+  local selinux_key='SELINUX='
+  local permissive='permissive'
 
-  for (( i=0; i<${#blkdevs}; i++ )) ; do
-      blkdev="${blkdevs[$i]}"; brkmnt="${brickmnts[$i]}"
-      if ! grep -qsw $brkmnt /etc/fstab ; then
-	echo "$blkdev $brkmnt xfs $brick_mnt_opts 0 0" >>/etc/fstab
-      fi
-      out="$(mount $brkmnt)" # via fstab entry
+  # set selinux to permissive (audit errors reported but not enforced)
+  [[ -z "$QUIET" ]] && echo "Setting SELinux to permissive"
+  setenforce $permissive
+
+  # keep selinux permissive on reboots
+  if [[ ! -f $conf ]] ; then
+    [[ -z "$QUIET" ]] && echo "WARN: SELinux config file $conf missing"
+    return # nothing more to do...
+  fi
+
+  # config SELINUX=permissive which takes effect the next reboot
+  out="$(sed -i -e "/^$selinux_key/c\\$selinux_key$permissive" $conf)"
+  err=$?
+  if (( err != 0 )) ; then
+    [[ -z "$QUIET" ]] && echo "ERROR $err: setting selinux permissive in $CONF"
+    return 1
+  fi
+}
+
+# setup_xfs: mkfs.xfs is the brick mount(s) is/are not present.
+function setup_xfs() {
+
+  local blk; local err; local errcnt=0; local out
+  local isize=512
+
+  for blk in $BLKDEVS; do # 1 or more blk devs are supported
+      [[ -d $blk ]] && continue # mount already present
+      out="$(mkfs -t xfs -i size=$isize -f $blk 2>&1)"
       err=$?
       if (( err != 0 )) ; then
-	[[ -z "$QUIET" ]] && echo "ERROR $err: mount $brkmnt: $out"
+	[[ -z "$QUIET" ]] && echo "ERROR $err: mkfs.xfs on $blk: $out"
  	((errcnt++))
       fi
   done
@@ -162,11 +210,11 @@ BRICKMNTS="$2" # required, can be a list or a single value
 MGMT_NODE="$3" # required
 [[ -n "$QUIET" ]] && q='-q'
 
-setup_xfs          || ((errcnt++))
 setup_selinux      || ((errcnt++))
+setup_xfs          || ((errcnt++))
+mount_blkdevs      || ((errcnt++))
 setup_iptables     || ((errcnt++))
 setup_ambari_agent || ((errcnt++))
-mount_blkdevs      || ((errcnt++))
 
 $PREFIX/add_users.sh $q  || ((errcnt++))
 $PREFIX/add_groups.sh $q || ((errcnt++))

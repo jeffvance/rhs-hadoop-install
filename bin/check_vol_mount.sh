@@ -14,7 +14,6 @@
 errcnt=0
 
 PREFIX="$(dirname $(readlink -f $0))"
-[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
 # parse cmd opts
 while getopts ':q' opt; do
@@ -35,7 +34,8 @@ NODES="$@" # optional list of nodes
 
 # copy companion volmnt check script to target node and execute it
 for node in $NODES; do
-    scp -q $PREFIX/check_vol_mnt_attrs.sh $node:/tmp
+    # assume bin/scripts already copied to node
+    ##scp -q $PREFIX/check_vol_mnt_attrs.sh $node:/tmp
     out="$(ssh $node /tmp/check_vol_mnt_attrs.sh $VOLNAME)"
     if (( $? != 0 )) ; then
       [[ -z "$QUIET" ]] && echo "$node: $out"

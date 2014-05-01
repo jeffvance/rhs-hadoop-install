@@ -14,6 +14,27 @@
 
 errcnt=0
 
+
+# check_brick_mount:
+function check_brick_mount() {
+
+  local mnt
+
+  # errors have already been reports by check_xfs() for missing brick mtn dirs
+  for mnt in $BRICKMNTS; do # can be 1 or more brick mounts passed in
+      [[ ! -d $mnt ]] && continue # missing dir error already reported
+      out="$(xfs_info $mnt 2>&1)"
+      err=$?
+      if (( err != 0 )) ; then
+	echo "ERROR $err: $out"
+	((errcnt++))
+	continue
+      fi
+      out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
+  done
+}
+
+# check_ambari_agent: see if the ambari agent is running on this node.
 function check_ambari_agent() {
 
   local ambari_agent_pid='/var/run/ambari-agent/ambari-agent.pid'
@@ -70,7 +91,6 @@ function check_dirs() {
 function check_open_ports() {
 
   local out; local errcnt=0; local port; local proto; local ports
-
   ports="$($PREFIX/gen_ports.sh)"
 
   for port in $ports; do # "port:protocol", eg "49152-49170:tcp"
@@ -184,14 +204,14 @@ function check_xfs() {
   for mnt in $BRICKMNTS; do # can be 1 or more brick mounts passed in
       if [[ ! -d $mnt ]] ; then
 	echo "ERROR: directory $mnt missing on $NODE"
-	(errcnt++)
+	((errcnt++))
 	continue
       fi
       out="$(xfs_info $mnt 2>&1)"
       err=$?
       if (( err != 0 )) ; then
-	echo "ERROR $err: xfs_info $mnt: $out"
-	(errcnt++)
+	echo "ERROR $err: $out"
+	((errcnt++))
 	continue
       fi
       out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
@@ -221,9 +241,9 @@ done
 BRICKMNTS="$@" # can be more than one brick-mnt path
 
 PREFIX="$(dirname $(readlink -f $0))"
-[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
 check_xfs          || ((errcnt++))
+check_brick_mount  || ((errcnt++))
 check_selinux      || ((errcnt++))
 check_open_ports   || ((errcnt++))
 check_ntp          || ((errcnt++))

@@ -7,7 +7,7 @@
 #
 # Syntax:
 #  $1=volume name
-#  $2=volume mount directory prefix, eg. "/mnt/glusterfs"
+#  $2=brick mount directory path(s), eg. "/mnt/brick1" or "/mnt/b1 /mnt/b2"
 #  -q, if specified, means only set the exit code, do not output anything
 #
 # Assumption: the node running this script has access to the gluster cli.
@@ -27,23 +27,20 @@ while getopts ':q' opt; do
     esac
 done
 VOLNAME="$1"
-VOLMNT="$2"
+BRICKMNT="$2"
 
 PREFIX="$(dirname $(readlink -f $0))"
-[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
-
 [[ -z "$QUIET" ]] && q='-q'
 
 NODES="$($PREFIX/find_nodes.sh $VOLNAME)"
 
 for node in $NODES; do
-    scp $PREFIX/check_node.sh $node:/tmp
-    ssh $node /tmp/check_node.sh $q $VOLMNT || ((errcnt++))
+    scp -q $PREFIX/*.sh $node:/tmp # cp all utility scripts to /tmp on node
+    ssh $node "/tmp/check_node.sh $q $BRICKMNT" || ((errcnt++))
 done
 
 $PREFIX/check_vol_mount.sh $q $VOLNAME $NODES || ((errcnt++))
-
-$PREFIX/check_vol_perf.sh $q $VOLNAME || ((errcnt++))
+$PREFIX/check_vol_perf.sh $q $VOLNAME         || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
 [[ -z "$QUIET" ]] && echo "$VOLNAME is ready for Hadoop workloads"
