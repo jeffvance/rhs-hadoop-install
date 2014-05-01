@@ -46,7 +46,7 @@ function check_ambari_agent() {
     [[ -z "$QUIET" ]] && echo "ambari-agent is running on $NODE"
     return 0
   fi
-  [[ -z "$QUIET" ]] && echo "ambari-agent is not running on $NODE"
+  [[ -z "$QUIET" ]] && echo "ERROR: ambari-agent is not running on $NODE"
   return 1
 }
 

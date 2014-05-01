@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-# check_vol.sh verifies that the supplied volume and vol mount are setup 
-# correctly for hadoop workloads. This includes: checking the glusterfs-fuse
-# mount options, the block device mount options, the volume performance settings,
-# and executing bin/check_node.sh for each node spanned by the volume.
+# check_vol.sh verifies that the supplied volume is setup correctly for hadoop
+# workloads. This includes: checking the glusterfs-fuse mount options, the
+# block device mount options, the volume performance settings, and executing
+# bin/check_node.sh for each node spanned by the volume.
 #
 # Syntax:
 #  $1=volume name
@@ -28,7 +28,7 @@ done
 VOLNAME="$1"
 
 PREFIX="$(dirname $(readlink -f $0))"
-[[ -z "$QUIET" ]] && q='-q'
+[[ -n "$QUIET" ]] && q='-q'
 
 BRICKS="$($PREFIX/find_brick_mnts.sh $VOLNAME)"
 
