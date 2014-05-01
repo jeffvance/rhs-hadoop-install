@@ -25,9 +25,6 @@ while getopts ':q' opt; do
     esac
 done
 
-PREFIX="$(dirname $(readlink -f $0))"
-[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
-
 for grp in $GROUPS; do
     if ! getent group $grp >/dev/null ; then
       groupadd --system $grp 2>&1

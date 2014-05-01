@@ -13,7 +13,6 @@
 errcnt=0; q=''
 
 PREFIX="$(dirname $(readlink -f $0))"
-[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
 # get_ambari_repo: wget the ambari repo file in the correct location.
 function get_ambari_repo(){

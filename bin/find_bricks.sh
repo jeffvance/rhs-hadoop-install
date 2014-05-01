@@ -2,10 +2,10 @@
 #
 # find_bricks.sh discovers the bricks for the trusted storage pool, or for the
 # given volume if the <volName> arg is supplied. In either case, the list of
-# bricks (node:/brick-mnt-dir) are output, one brick per line.
+# bricks, "<node>:/<brick-mnt-dir>", are output, one brick per line.
 #
 # Assumption: the node running this script has access to the gluster cli.
-#
+
 VOLNAME="$1" # optional volume name
 
 gluster volume status $VOLNAME | grep -w "Brick" | awk '{print $2}'

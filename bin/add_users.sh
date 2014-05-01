@@ -26,7 +26,6 @@ while getopts ':q' opt; do
 done
 
 PREFIX="$(dirname $(readlink -f $0))"
-[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
 for user in $($PREFIX/gen_users.sh); do
     if ! getent passwd $user >/dev/null ; then

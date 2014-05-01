@@ -11,7 +11,6 @@
 
 errcnt=0
 PREFIX="$(dirname $(readlink -f $0))"
-[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
 # set assoc array to desired values for the perf config keys
 declare -A VOL_SETTINGS=$($PREFIX/gen_vol_perf_settings.sh)

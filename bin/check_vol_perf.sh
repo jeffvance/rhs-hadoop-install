@@ -14,7 +14,6 @@ LAST_N=3 # tail records containing vol settings (vol info cmd)
 TAG='Options Reconfigured:'
 
 PREFIX="$(dirname $(readlink -f $0))"
-[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
 # set assoc array to desired values for the perf config keys
 declare -A EXPCT_SETTINGS=$($PREFIX/gen_vol_perf_settings.sh)

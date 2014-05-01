@@ -37,7 +37,6 @@ GLUSTER_MNT="$1"
   exit -1; }
 
 PREFIX="$(dirname $(readlink -f $0))"
-[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
 for tuple in $($PREFIX/gen_dirs.sh); do
     dir="$GLUSTER_MNT/${tuple%%:*}"; let fill=(32-${#dir})

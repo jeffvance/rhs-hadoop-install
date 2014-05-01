@@ -7,9 +7,7 @@
 # Assumption: the node running this script has access to the gluster cli.
 
 VOLNAME="$1" # optional volume name
-
 PREFIX="$(dirname $(readlink -f $0))"
-[[ ${PREFIX##*/} != 'bin' ]] && PREFIX+='/bin'
 
 for brick in $($PREFIX/find_bricks.sh $VOLNAME); do
     echo "${brick%:*}"
