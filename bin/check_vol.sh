@@ -7,7 +7,6 @@
 #
 # Syntax:
 #  $1=volume name
-#  $2=brick mount directory path(s), eg. "/mnt/brick1" or "/mnt/b1 /mnt/b2"
 #  -q, if specified, means only set the exit code, do not output anything
 #
 # Assumption: the node running this script has access to the gluster cli.
@@ -27,16 +26,17 @@ while getopts ':q' opt; do
     esac
 done
 VOLNAME="$1"
-BRICKMNT="$2"
 
 PREFIX="$(dirname $(readlink -f $0))"
 [[ -z "$QUIET" ]] && q='-q'
 
-NODES="$($PREFIX/find_nodes.sh $VOLNAME)"
+BRICKS="$($PREFIX/find_brick_mnts.sh $VOLNAME)"
 
-for node in $NODES; do
+for brick in $BRICKS; do
+    node=${brick%:*}
+    brkmnt=${brick#*:}
     scp -q $PREFIX/*.sh $node:/tmp # cp all utility scripts to /tmp on node
-    ssh $node "/tmp/check_node.sh $q $BRICKMNT" || ((errcnt++))
+    ssh $node "/tmp/check_node.sh $q $brkmnt" || ((errcnt++))
 done
 
 $PREFIX/check_vol_mount.sh $q $VOLNAME $NODES || ((errcnt++))

@@ -11,5 +11,5 @@ VOLNAME="$1" # optional volume name
 PREFIX="$(dirname $(readlink -f $0))"
 
 for brick in $($PREFIX/find_bricks.sh $VOLNAME); do
-    echo "${brick%*/}" # "node:/brick-mnt-less-volName"
+    echo "${brick%/*}" # "node:/brick-mnt-less-volName"
 done
