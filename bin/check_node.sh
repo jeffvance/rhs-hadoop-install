@@ -17,7 +17,25 @@ PREFIX="$(dirname $(readlink -f $0))"
 NODE="$(hostname)"
 
 
-# check_brick_mount:
+# check_ambari_agent: see if the ambari agent is running on this node.
+function check_ambari_agent() {
+
+  local ambari_agent_pid='/var/run/ambari-agent/ambari-agent.pid'
+  local errcnt=0; local warncnt=0
+
+  if [[ ! -f $ambari_agent_pid ]] ; then
+    [[ -z "$QUIET" ]] && echo "ERROR: ambari-agent is not running on $NODE"
+    ((errcnt++))
+  fi
+
+  (( errcnt > 0 )) && return 1
+  [[ -z "$QUIET" ]] && \
+    echo "ambari-agent is running on $NODE with $warncnt warnings"
+  return 0
+}
+
+# check_brick_mount: use xfs_info to verify the brick mnt is xfs (if not error)
+# and the isize = 512 (if not warning).
 function check_brick_mount() {
 
   local out; local isize=512; local errcnt=0; local warncnt=0
@@ -45,23 +63,6 @@ function check_brick_mount() {
   return 0
 }
 
-# check_ambari_agent: see if the ambari agent is running on this node.
-function check_ambari_agent() {
-
-  local ambari_agent_pid='/var/run/ambari-agent/ambari-agent.pid'
-  local errcnt=0; local warncnt=0
-
-  if [[ ! -f $ambari_agent_pid ]] ; then
-    [[ -z "$QUIET" ]] && echo "ERROR: ambari-agent is not running on $NODE"
-    ((errcnt++))
-  fi
-
-  (( errcnt > 0 )) && return 1
-  [[ -z "$QUIET" ]] && \
-    echo "ambari-agent is running on $NODE with $warncnt warnings"
-  return 0
-}
-
 # check_dirs: check that the required hadoop-specific directories are present
 # on this node. Also check that the perms and owner are set correctly.
 function check_dirs() {
@@ -70,15 +71,16 @@ function check_dirs() {
   local out; local errcnt=0; local warncnt=0
 
   for tuple in $($PREFIX/gen_dirs.sh); do
+      dir="$BRICKMNT/${tuple%%:*}"
       perm=${tuple%:*}; perm=${perm#*:}
       owner=${tuple##*:}
 
-      dir="$BRICKMNT/${tuple%%:*}"
       if [[ ! -d $dir ]] ; then
 	[[ -z "$QUIET" ]] && echo "ERROR: $dir is missing on $NODE"
 	((errcnt++))
 	continue # next dir
       fi
+
       # check dir's perms and owner
       out="$(stat -c %a $dir)"
       [[ ${#out} == 3 ]] && out="0$out"; # leading 0
