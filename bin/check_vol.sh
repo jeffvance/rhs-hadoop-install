@@ -30,7 +30,7 @@ VOLNAME="$1"
 PREFIX="$(dirname $(readlink -f $0))"
 [[ -n "$QUIET" ]] && q='-q'
 
-BRICKS="$($PREFIX/find_brick_mnts.sh $VOLNAME)"
+BRICKS="$($PREFIX/find_bricks.sh $VOLNAME)"
 
 for brick in $BRICKS; do
     node=${brick%:*}

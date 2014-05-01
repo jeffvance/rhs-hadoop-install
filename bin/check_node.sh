@@ -7,18 +7,20 @@
 # etc...
 #
 # Syntax:
-#  $1= xfs brick mount directory path
+#  $1= xfs brick mount directory path including the volume name
 #  -q, if specified, means only set the exit code, do not output anything
 
 # Assumption: the node running this script can passwordless ssh to the node arg.
 
 errcnt=0
+PREFIX="$(dirname $(readlink -f $0))"
+NODE="$(hostname)"
 
 
 # check_brick_mount:
 function check_brick_mount() {
 
-  local out; local isize=512
+  local out; local isize=512; local errcnt=0; local warncnt=0
 
   # errors have already been reported by check_xfs() for missing brick mtn dirs
   [[ ! -d $BRICKMNT ]] && return
@@ -26,28 +28,38 @@ function check_brick_mount() {
   out="$(xfs_info $BRICKMNT 2>&1)"
   err=$?
   if (( err != 0 )) ; then
-    echo "ERROR $err: $out"
-    return 1
+    [[ -z "$QUIET" ]] && echo "ERROR $err: $out"
+    ((errcnt++))
+  else
+    out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
+    if (( out != isize )) ; then
+      [[ -z "$QUIET" ]] && \
+	echo "WARN: xfs size on $BRICKMNT expected to be $isize; found $out"
+	((warncnt++))
+    fi
   fi
 
-  out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
-  if (( out != isize )) ; then
-    echo "WARN: xfs size on $BRICKMNT expected to be $isize; found $out"
-    return 1
-  fi
+  (( errcnt > 0 )) && return 1
+  [[ -z "$QUIET" ]] && \
+    echo "xfs brick mount setup correctly on $NODE with $warncnt warnings"
+  return 0
 }
 
 # check_ambari_agent: see if the ambari agent is running on this node.
 function check_ambari_agent() {
 
   local ambari_agent_pid='/var/run/ambari-agent/ambari-agent.pid'
+  local errcnt=0; local warncnt=0
 
-  if [[ -f $ambari_agent_pid ]] ; then
-    [[ -z "$QUIET" ]] && echo "ambari-agent is running on $NODE"
-    return 0
+  if [[ ! -f $ambari_agent_pid ]] ; then
+    [[ -z "$QUIET" ]] && echo "ERROR: ambari-agent is not running on $NODE"
+    ((errcnt++))
   fi
-  [[ -z "$QUIET" ]] && echo "ERROR: ambari-agent is not running on $NODE"
-  return 1
+
+  (( errcnt > 0 )) && return 1
+  [[ -z "$QUIET" ]] && \
+    echo "ambari-agent is running on $NODE with $warncnt warnings"
+  return 0
 }
 
 # check_dirs: check that the required hadoop-specific directories are present
@@ -55,7 +67,7 @@ function check_ambari_agent() {
 function check_dirs() {
 
   local dir; local perm; local owner; local tuple
-  local out; local errcnt=0
+  local out; local errcnt=0; local warncnt=0
 
   for tuple in $($PREFIX/gen_dirs.sh); do
       perm=${tuple%:*}; perm=${perm#*:}
@@ -84,6 +96,8 @@ function check_dirs() {
   done
 
   (( errcnt > 0 )) && return 1
+  [[ -z "$QUIET" ]] && \
+    echo "all required dirs present on $NODE with $warncnt warnings"
   return 0
 }
 
@@ -91,7 +105,8 @@ function check_dirs() {
 # open.
 function check_open_ports() {
 
-  local out; local errcnt=0; local port; local proto; local ports
+  local out; local port; local proto; local ports
+  local errcnt=0; local warncnt=0
   ports="$($PREFIX/gen_ports.sh)"
 
   for port in $ports; do # "port:protocol", eg "49152-49170:tcp"
@@ -108,14 +123,16 @@ function check_open_ports() {
   done
 
   (( errcnt > 0 )) && return 1
-  [[ -z "$QUIET" ]] && echo "The following ports are all open: $ports"
+  [[ -z "$QUIET" ]] && \
+    echo "all required ports are open on $NODE with $warncnt warnings"
+  return 0
 }
 
 # validate_ntp_conf: validate the ntp config file by ensuring there is at least
 # one time-server suitable for ntp use.
 function validate_ntp_conf(){
 
-  local timeserver; local i=1
+  local timeserver; local i=1; local errcnt=0
   local ntp_conf='/etc/ntp.conf'
   local servers=(); local numServers
 
@@ -124,11 +141,10 @@ function validate_ntp_conf(){
 
   if (( numServers == 0 )) ; then
     [[ -z "$QUIET" ]] && echo "ERROR: no server entries in $ntp_conf"
-    return 1 # can't continue validating this ntp config file
+    ((errcnt++))
   fi
 
   for timeserver in "${servers[@]}" ; do
-      [[ -z "$QUIET" ]] && echo "attempting ntpdate on $timeserver..."
       ntpdate -q $timeserver >& /dev/null
       (( $? == 0 )) && break # exit loop, found valid time-server
       ((i+=1))
@@ -136,25 +152,28 @@ function validate_ntp_conf(){
 
   if (( i > numServers )) ; then
     [[ -z "$QUIET" ]] && \
-	echo "ERROR: no suitable time-servers found in $ntp_conf"
-    return 1
+      echo "ERROR: no suitable time-servers found in $ntp_conf"
+    ((errcnt++))
   fi
+
+  (( errcnt > 0 )) && return 1
   [[ -z "$QUIET" ]] && echo "NTP time-server $timeserver is acceptable"
+  return 0
 }
 
 # check_ntp: verify that ntp is running and the config file has 1 or more
 # suitable server records.
 function check_ntp() {
 
-  local errcnt=0
+  local errcnt=0; local warncnt=0
 
   validate_ntp_conf || ((errcnt++))
 
   # is ntpd configured to run on reboot?
   chkconfig ntpd 
   if (( $? != 0 )); then
-    [[ -z "$QUIET" ]] && echo "ERROR: ntpd not configured to run on reboot"
-    ((errcnt++))
+    [[ -z "$QUIET" ]] && echo "WARN: ntpd not configured to run on reboot"
+    ((warncnt++))
   fi
 
   # verify that ntpd is running
@@ -165,27 +184,31 @@ function check_ntp() {
   fi
 
   (( errcnt > 0 )) && return 1
+  [[ -z "$QUIET" ]] && echo "ntpd is running on $NODE with $warncnt warnings"
   return 0
 }
 
 # check_selinux: if selinux is enabled then set it to permissive.
 function check_selinux() {
 
-  local out
+  local out; local errcnt=0
 
   # report selinux state
   out=$(sestatus | head -n 1 | awk '{print $3}') # enforcing, permissive
-  [[ -z "$QUIET" ]] && echo "SElinux is set: $out"
+  [[ -z "$QUIET" ]] && echo "selinux is set: $out"
  
-  [[ "$out" != 'enabled' ]] && return 0 # ok
-  return 1
+  [[ "$out" != 'enabled' ]] && ((errcnt++))
+
+  (( errcnt > 0 )) && return 1
+  [[ -z "$QUIET" ]] && echo "selinux configured correctly on $NODE"
+  return 0
 }
 
 # check_users: check that the required hadoop-specific users are present on
 # this node. This function does NOT check for UID consistency across the pool.
 function check_users() {
 
-  local user; local errcnt=0
+  local user; local errcnt=0; local warncnt=0
 
   for user in $($PREFIX/gen_users.sh); do
       id -u $user >& /dev/null && continue
@@ -194,36 +217,44 @@ function check_users() {
   done
 
   (( errcnt > 0 )) && return 1
+  [[ -z "$QUIET" ]] && \
+    echo "all required users present on $NODE with $warncnt warnings"
   return 0
 }
 
 # check_xfs:
 function check_xfs() {
 
-  local err; local out; local isize=512
+  local err; local errcnt=0; local warncnt=0
+  local out; local isize=512
 
   if [[ ! -d $BRICKMNT ]] ; then
-    echo "ERROR: directory $BRICKMNT missing on $NODE"
+    [[ -z "$QUIET" ]] && echo "ERROR: directory $BRICKMNT missing on $NODE"
     ((errcnt++))
-    continue
+  else
+    out="$(xfs_info $BRICKMNT 2>&1)"
+    err=$?
+    if (( err != 0 )) ; then
+      [[ -z "$QUIET" ]] && echo "ERROR $err: $out"
+      ((errcnt++))
+    else
+      out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
+      if (( out != $isize )) ; then
+        [[ -z "$QUIET" ]] && \
+	  echo "WARN: xfs for $BRICKMNT on $NODE expected to be $isize in size; instead sized at $out"
+	((warncnt++))
+      fi
+    fi
   fi
-  out="$(xfs_info $BRICKMNT 2>&1)"
-  err=$?
-  if (( err != 0 )) ; then
-    echo "ERROR $err: $out"
-    ((errcnt++))
-    continue
-  fi
-  out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
-  if (( out != $isize )) ; then
-    echo "WARN: xfs for $BRICKMNT on $NODE expected to be $isize in size; instead sized at $out"
-  fi
+
+  (( errcnt > 0 )) && return 1
+  [[ -z "$QUIET" ]] && \
+    echo "xfs setup correctly on $NODE with $warncnt warnings"
+  return 0
 }
 
 
 ## main ##
-NODE="$(hostname)"
-
 # parse cmd opts
 while getopts ':q' opt; do
     case "$opt" in
@@ -236,9 +267,8 @@ while getopts ':q' opt; do
         ;;
     esac
 done
-BRICKMNT="$1"
 
-PREFIX="$(dirname $(readlink -f $0))"
+BRICKMNT="$1" # includes the vol name in path
 
 check_xfs          || ((errcnt++))
 check_brick_mount  || ((errcnt++))
