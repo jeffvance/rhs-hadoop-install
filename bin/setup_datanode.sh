@@ -5,8 +5,8 @@
 # It is assumed that localhost has already been validated (eg. check_node.sh
 # has been run) prior to setting up the node.
 # Syntax:
-#  $1=block device path(s)
-#  $2=brick mount path(s)
+#  $1=block device path
+#  $2=brick mount path
 #  $3=hadoop/ambari management node
 #  -q, if specified, means only set the exit code, do not output anything
 
@@ -38,27 +38,24 @@ function get_ambari_repo(){
   return 0
 }
 
-# mount_blkdev: append the xfs brick mount(s) to /etc/fstab and then mount 
-# it/them.
+# mount_blkdev: append the xfs brick mount to /etc/fstab and then mount it.
 function mount_blkdevs() {
 
-  local i; local err; local errcnt=0; local out
-  local brkmnt; local blkdev
-  local blkdevs=($BLKDEVS); local brickmnts=($BRICKMNTS) # convert to arrays
+  local err; local errcnt=0; local out
   local brick_mnt_opts="noatime,inode64"
 
-  for (( i=0; i<${#blkdevs}; i++ )) ; do
-      blkdev="${blkdevs[$i]}"; brkmnt="${brickmnts[$i]}"
-      if ! grep -qsw $brkmnt /etc/fstab ; then
-	echo "$blkdev $brkmnt xfs $brick_mnt_opts 0 0" >>/etc/fstab
-      fi
-      out="$(mount $brkmnt)" # via fstab entry
-      err=$?
-      if (( err != 0 )) ; then
-	[[ -z "$QUIET" ]] && echo "ERROR $err: mount $blkdev as $brkmnt: $out"
- 	((errcnt++))
-      fi
-  done
+  if ! grep -qsw $BRICKMNT /etc/fstab ; then
+    echo "$BLKDEV $BRICKMNT xfs $brick_mnt_opts 0 0" >>/etc/fstab
+  fi
+
+  if ! grep -qsw $BRICKMNT /proc/mounts ; then
+    out="$(mount $BRICKMNT 2>&1)" # via fstab entry
+    err=$?
+    if (( err != 0 )) ; then
+      [[ -z "$QUIET" ]] && echo "ERROR $err: mount $BLKDEV as $BRICKMNT: $out"
+      ((errcnt++))
+    fi
+  fi
 
   (( errcnt > 0 )) && return 1
   return 0
@@ -150,8 +147,9 @@ function setup_selinux() {
   local permissive='permissive'
 
   # set selinux to permissive (audit errors reported but not enforced)
-  [[ -z "$QUIET" ]] && echo "Setting SELinux to permissive"
-  setenforce $permissive
+  [[ -z "$QUIET" ]] && echo "Setting selinux to permissive"
+  out="$(setenforce $permissive 2>&1)"
+  [[ -z "$QUIET" ]] && echo "$out"
 
   # keep selinux permissive on reboots
   if [[ ! -f $conf ]] ; then
@@ -168,21 +166,20 @@ function setup_selinux() {
   fi
 }
 
-# setup_xfs: mkfs.xfs is the brick mount(s) is/are not present.
+# setup_xfs: mkfs.xfs on the block device.
 function setup_xfs() {
 
   local blk; local err; local errcnt=0; local out
   local isize=512
 
-  for blk in $BLKDEVS; do # 1 or more blk devs are supported
-      [[ -d $blk ]] && continue # mount already present
-      out="$(mkfs -t xfs -i size=$isize -f $blk 2>&1)"
-      err=$?
-      if (( err != 0 )) ; then
-	[[ -z "$QUIET" ]] && echo "ERROR $err: mkfs.xfs on $blk: $out"
- 	((errcnt++))
-      fi
-  done
+  if ! xfs_info $BLKDEV >& /dev/null ; then
+    out="$(mkfs -t xfs -i size=$isize -f $BLKDEV 2>&1)"
+    err=$?
+    if (( err != 0 )) ; then
+      [[ -z "$QUIET" ]] && echo "ERROR $err: mkfs.xfs on $BLKDEV: $out"
+      ((errcnt++))
+    fi
+  fi
 
   (( errcnt > 0 )) && return 1
   return 0
@@ -203,10 +200,21 @@ while getopts ':q' opt; do
 done
 shift $((OPTIND-1))
 
-BLKDEVS="$1"   # required, can be a list or a single value
-BRICKMNTS="$2" # required, can be a list or a single value
-MGMT_NODE="$3" # required
+BLKDEV="$1"
+BRICKMNT="$2"
+MGMT_NODE="$3"
 [[ -n "$QUIET" ]] && q='-q'
+
+[[ -z "$BLKDEV" || -z "$BRICKMNT" || -z "$MGMT_NODE" ]] && {
+  echo "Syntax error: block dev, brick mount, and hadoop mgmt node are all required";
+  exit -1; }
+
+[[ ! -b $BLKDEV ]] && {
+  echo "ERROR: $BLKDEV does not exist as a directory";
+  exit -1; }
+[[ ! -d $BRICKMNT ]] && {
+  echo "ERROR: $BRICKMNT does not exist as a directory";
+  exit -1; }
 
 setup_selinux      || ((errcnt++))
 setup_xfs          || ((errcnt++))
@@ -214,9 +222,9 @@ mount_blkdevs      || ((errcnt++))
 setup_iptables     || ((errcnt++))
 setup_ambari_agent || ((errcnt++))
 
-$PREFIX/add_users.sh $q  || ((errcnt++))
-$PREFIX/add_groups.sh $q || ((errcnt++))
-$PREFIX/add_dirs.sh $q   || ((errcnt++))
+$PREFIX/add_users.sh $q             || ((errcnt++))
+$PREFIX/add_groups.sh $q            || ((errcnt++))
+$PREFIX/add_dirs.sh -l $q $BRICKMNT || ((errcnt++)) # just local dirs
 
 (( errcnt > 0 )) && exit 1
 [[ -z "$QUIET" ]] && echo "${#VOL_SETTINGS[@]} volume settings successfully set"
