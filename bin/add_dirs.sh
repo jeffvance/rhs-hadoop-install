@@ -1,25 +1,34 @@
 #!/bin/bash
 #
-# add_dirs.sh adds the required, distributed hadoop directories and assigns the
-# correct perms and owners. This only needs to be done once since the dirs are
-# distributed by adding them to the glusterfs mount dir, which is required.
+# add_dirs.sh adds the required hadoop directories and assigns the correct perms
+# and owners. This only needs to be done once for the pool when -d is specified.
+# It needs to be done per-node if -l is specified.
 # Note: the hadoop users and group need to have the same UID and GID across
 #   all nodes in the storage pool and on the mgmt and yarn-master servers.
 #
 # Syntax:
-#  $1=gluster mount path (required)
+#  $1=distributed (gluster) or brick mount (per-node) path -- required
 #  -q, if specified, means only set the exit code, do not output anything
-#
-# Assumption: the node running this script contains the glusterfs mount dir.
+#  -d, output only the distributed dirs, skip local dirs
+#  -l, output only the local dirs, skip distributed dirs
 
 errcnt=0; cnt=0
 HADOOP_G='hadoop'
+PREFIX="$(dirname $(readlink -f $0))"
 
 # parse cmd opts
-while getopts ':q' opt; do
+while getopts ':qadl' opt; do
     case "$opt" in
       q)
         QUIET=true # else, undefined
+        shift
+        ;;
+      d) # only distributed dirs
+        DIST=true # else, undefined
+        shift
+        ;;
+      l) # only local dirs
+        LOCAL=true # else, undefined
         shift
         ;;
       \?) # invalid option
@@ -28,18 +37,25 @@ while getopts ':q' opt; do
     esac
 done
 
-GLUSTER_MNT="$1"
-[[ -z "$GLUSTER_MNT" ]] && {
-  echo "ERROR: gluster mount path is required";
+MNT="$1"
+[[ -z "$MNT" ]] && {
+  echo "ERROR: mount path is required";
   exit -1; }
-[[ ! -d "$GLUSTER_MNT" ]] && {
-  echo "ERROR: $GLUSTER_MNT is not a directory";
+[[ ! -d "$MNT" ]] && {
+  echo "ERROR: $MNT is not a directory";
   exit -1; }
 
-PREFIX="$(dirname $(readlink -f $0))"
+if [[ -n "$DIST" ]] ; then
+  opt='-d'
+elif [[ -n "$LOCAL" ]] ; then
+  opt='-l'
+else
+  echo "Syntax error: -d or -l options are required";
+  exit -1
+fi
 
-for tuple in $($PREFIX/gen_dirs.sh); do
-    dir="$GLUSTER_MNT/${tuple%%:*}"; let fill=(32-${#dir})
+for tuple in $($PREFIX/gen_dirs.sh $opt); do
+    dir="$MNT/${tuple%%:*}"; let fill=(32-${#dir})
     dir+="$(printf ' %.0s' $(seq $fill))" # left-justified for nicer output
     perm=${tuple%:*}; perm=${perm#*:}
     owner=${tuple##*:}

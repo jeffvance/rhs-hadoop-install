@@ -11,8 +11,8 @@
 #  -q, if specified, means only set the exit code, do not output anything
 
 errcnt=0; q=''
-
 PREFIX="$(dirname $(readlink -f $0))"
+
 
 # get_ambari_repo: wget the ambari repo file in the correct location.
 function get_ambari_repo(){
