@@ -11,21 +11,19 @@
 # note: all users/owners belong to the hadoop group for now
 HADOOP_G='hadoop'
 errcnt=0; cnt=0
+PREFIX="$(dirname $(readlink -f $0))"
 
 # parse cmd opts
 while getopts ':q' opt; do
     case "$opt" in
       q)
         QUIET=true # else, undefined
-        shift
         ;;
       \?) # invalid option
-        shift # silently ignore opt
         ;;
     esac
 done
-
-PREFIX="$(dirname $(readlink -f $0))"
+shift $((OPTIND-1))
 
 for user in $($PREFIX/gen_users.sh); do
     if ! getent passwd $user >/dev/null ; then

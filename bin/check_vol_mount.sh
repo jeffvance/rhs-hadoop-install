@@ -12,7 +12,7 @@
 # Assumption: the node running this script has access to the gluster cli unless
 #   the nodes spanned by the volume are passed to this script.
 
-errcnt=0
+errcnt=0; cnt=0
 PREFIX="$(dirname $(readlink -f $0))"
 
 
@@ -90,23 +90,27 @@ while getopts ':q' opt; do
     case "$opt" in
       q)
 	QUIET=true  # else, undefined
-        shift
 	;;
       \?) # invalid option
-	shift # silently ignore opt
 	;;
     esac
 done
+shift $((OPTIND-1))
 
 VOLNAME="$1"; shift
+[[ -z "$VOLNAME" ]] && {
+  echo "Syntax error: volume name is required";
+  exit -1; }
+
 NODES="$@" # optional list of nodes
 [[ -z "$NODES" ]] && NODES="$($PREFIX/find_nodes.sh $VOLNAME)" 
 
-for node in $NODES; do
+for NODE in $NODES; do
+    ((cnt++)) # num of nodes
     check_vol_mnt_attrs || ((errcnt++))
 done
 
 (( errcnt > 0 )) && exit 1
 [[ -z "$QUIET" ]] && echo \
-  "All nodes spanned by $VOLNAME have the correct volume mount settings"
+   "The $cnt nodes spanned by $VOLNAME have the correct vol mount settings"
 exit 0

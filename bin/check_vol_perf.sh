@@ -23,14 +23,17 @@ while getopts ':q' opt; do
     case "$opt" in
       q)
 	QUIET=true  # else, undefined
-        shift
 	;;
       \?) # invalid option
-	shift # silently ignore opt
 	;;
     esac
 done
+shift $((OPTIND-1))
+
 VOLNAME="$1"
+[[ -z "$VOLNAME" ]] && {
+  echo "Syntax error: volume name is required";
+  exit -1; }
 
 gluster volume info $VOLNAME >$VOLINFO_TMPFILE 2>&1
 err=$?

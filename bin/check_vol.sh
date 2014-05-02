@@ -12,22 +12,25 @@
 # Assumption: the node running this script has access to the gluster cli.
 
 errcnt=0; q=''
+PREFIX="$(dirname $(readlink -f $0))"
 
 # parse cmd opts
 while getopts ':q' opt; do
     case "$opt" in
       q)
         QUIET=true # else, undefined
-        shift
         ;;
       \?) # invalid option
-        shift # silently ignore opt
         ;;
     esac
 done
-VOLNAME="$1"
+shift $((OPTIND-1))
 
-PREFIX="$(dirname $(readlink -f $0))"
+VOLNAME="$1"
+[[ -z "$VOLNAME" ]] && {
+  echo "Syntax error: volume name is required";
+  exit -1; }
+
 [[ -n "$QUIET" ]] && q='-q'
 
 BRICKS="$($PREFIX/find_bricks.sh $VOLNAME)"

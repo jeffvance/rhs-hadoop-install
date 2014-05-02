@@ -10,22 +10,21 @@
 # Assumption: the node running this script has access to the gluster cli.
 
 NODES=()
+PREFIX="$(dirname $(readlink -f $0))"
 
 # parse cmd opts
 while getopts ':u' opt; do
     case "$opt" in
       u)
         UNIQ=true # else, undefined
-        shift
         ;;
       \?) # invalid option
-        shift # silently ignore opt
         ;;
     esac
 done
+shift $((OPTIND-1))
 
 VOLNAME="$1" # optional volume name
-PREFIX="$(dirname $(readlink -f $0))"
 
 for brick in $($PREFIX/find_bricks.sh $VOLNAME); do
     NODES+=(${brick%:*})

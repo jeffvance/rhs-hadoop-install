@@ -70,7 +70,8 @@ function check_dirs() {
   local dir; local perm; local owner; local tuple
   local out; local errcnt=0; local warncnt=0
 
-  for tuple in $($PREFIX/gen_dirs.sh); do
+  for tuple in $($PREFIX/gen_dirs.sh -a); do # "all" dirs
+      # note: the distributed dirs will be under brickmnt on each node also
       dir="$BRICKMNT/${tuple%%:*}"
       perm=${tuple%:*}; perm=${perm#*:}
       owner=${tuple##*:}
@@ -262,15 +263,17 @@ while getopts ':q' opt; do
     case "$opt" in
       q)
         QUIET='-q'
-        shift
         ;;
       \?) # invalid option
-        shift # silently ignore opt
         ;;
     esac
 done
+shift $((OPTIND-1))
 
 BRICKMNT="$1" # includes the vol name in path
+[[ -z "$BRICKMNT" ]] && {
+  echo "Syntax error: xfs brick mount path is required";
+  exit -1; }
 
 check_xfs          || ((errcnt++))
 check_brick_mount  || ((errcnt++))

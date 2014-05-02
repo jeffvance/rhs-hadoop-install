@@ -196,13 +196,12 @@ while getopts ':q' opt; do
     case "$opt" in
       q)
         QUIET=true # else, undefined
-        shift
         ;;
       \?) # invalid option
-        shift # silently ignore opt
         ;;
     esac
 done
+shift $((OPTIND-1))
 
 BLKDEVS="$1"   # required, can be a list or a single value
 BRICKMNTS="$2" # required, can be a list or a single value

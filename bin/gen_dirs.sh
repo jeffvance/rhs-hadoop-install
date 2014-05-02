@@ -12,21 +12,18 @@ while getopts ':adl' opt; do
     case "$opt" in
       a) # all dirs
         DIST=true; LOCAL=true
-        shift
         ;;
       d) # only distributed dirs
         DIST=true # else, undefined
-        shift
         ;;
       l) # only local dirs
         LOCAL=true # else, undefined
-        shift
         ;;
       \?) # invalid option
-        shift # silently ignore opt
         ;;
     esac
 done
+shift $((OPTIND-1))
 
 [[ -z "$DIST" && -z "$LOCAL" ]] && {
   echo "Syntax error: -a, -d or -l options are required";
@@ -39,6 +36,6 @@ mr-history/tmp:1777:yarn mr-history/done:0770:yarn job-staging-yarn:0770:yarn \
 app-logs:1777:yarn hbase:0770:hbase apps:0775:hive apps/webhcat:0775:hcat "
 
 [[ -n "$LOCAL" ]] && \
-  echo -n "mapredlocal:755:root "
+  echo -n "mapredlocal:0755:root "
 
 echo # flush line

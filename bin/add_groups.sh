@@ -17,13 +17,12 @@ while getopts ':q' opt; do
     case "$opt" in
       q)
         QUIET=true # else, undefined
-        shift
         ;;
       \?) # invalid option
-        shift # silently ignore opt
         ;;
     esac
 done
+shift $((OPTIND-1))
 
 for grp in $GROUPS; do
     if ! getent group $grp >/dev/null ; then
