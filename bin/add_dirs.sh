@@ -17,25 +17,22 @@ HADOOP_G='hadoop'
 PREFIX="$(dirname $(readlink -f $0))"
 
 # parse cmd opts
-while getopts ':qadl' opt; do
+while getopts ':qdl' opt; do
     case "$opt" in
       q)
         QUIET=true # else, undefined
-        shift
         ;;
       d) # only distributed dirs
         DIST=true # else, undefined
-        shift
         ;;
       l) # only local dirs
         LOCAL=true # else, undefined
-        shift
         ;;
       \?) # invalid option
-        shift # silently ignore opt
         ;;
     esac
 done
+shift $((OPTIND-1))
 
 MNT="$1"
 [[ -z "$MNT" ]] && {
@@ -50,7 +47,7 @@ if [[ -n "$DIST" ]] ; then
 elif [[ -n "$LOCAL" ]] ; then
   opt='-l'
 else
-  echo "Syntax error: -d or -l options are required";
+  echo "Syntax error: -d or -l options are required"
   exit -1
 fi
 
