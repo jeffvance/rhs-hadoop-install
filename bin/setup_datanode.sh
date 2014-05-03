@@ -120,7 +120,7 @@ function setup_iptables() {
       port=${port%:*}
       [[ "$port" =~ [0-9]\- ]] && port=${port/-/:} # use iptables range syntax
       # open this port or range of port numbers for the target protocol
-      out="$(iptables -A RHS-Firewall-1-INPUT -m state --state NEW -m $proto \
+      out="$(iptables -A INPUT -m state --state NEW -m $proto \
 	-p $proto --dport $port -j ACCEPT)"
       err=$?
       if (( err != 0 )) ; then
