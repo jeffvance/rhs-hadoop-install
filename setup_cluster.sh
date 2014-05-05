@@ -25,40 +25,102 @@
 #     brick mount and block dev then each one is proceded by a ":", following
 #     the node name.
 
+
+# yesno: prompts $1 to stdin and returns 0 if user answers yes, else returns 1.
+# The default (just hitting <enter>) is specified by $2.
+# $1=prompt (required),
+# $2=default (optional): 'y' or 'n' with 'n' being the default default.
+function yesno() {
+
+  local prompt="$1"; local default="${2:-n}" # default is no
+  local yn
+
+   while true ; do
+       read -p "$prompt" yn
+       case $yn in
+         [Yy])         return 0;;
+         [Yy][Ee][Ss]) return 0;;
+         [Nn])         return 1;;
+         [Nn][Oo])     return 1;;
+         '') # default
+           [[ "$default" != 'y' ]] && return 1 || return 0
+         ;;
+         *) # unexpected...
+           echo "Expecting a yes/no response, not \"$yn\""
+         ;;
+       esac
+   done
+}
+
+# parse_cmd: use get_opt to parse the command line. Exits on errors.
+# Sets globals:
+#   YARN_NODE
+#   MGMT_NODE
+#   AUTO_YES
+#   NODE_SPEC
+#
+function parse_cmd() {
+
+  local opts='y'
+  local long_opts='yarn-master:,hadoop-mgmt-node:'
+
+  eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
+
+  while true; do
+      case "$1" in
+	-y)
+	  AUTO_YES='y'; shift; continue
+	;;
+	--yarn-master)
+	  YARN_NODE="$2"; shift 2; continue
+	;;
+	--hadoop-mgmt-node)
+	  MGMT_NODE="$2"; shift 2; continue
+	;;
+	--)
+	  shift; break
+	;;
+      esac
+  done
+
+  NODE_SPEC=($@) # array of nodes, brick-mnts, blk-devs -- each separated by ":"
+  [[ -z "$NODE_SPEC" || ${#NODE_SPEC[@]} < 2 ]] && {
+    echo "Syntax error: expect list of 2 or more nodes plus brick mount(s) and block dev(s)";
+    exit -1; }
+
+  [[ -z "$YARN_NODE" || -z "$MGMT_NODE" ]] && {
+    echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
+    exit -1; }
+}
+
+
+## main ##
+
 BRKMNT=(); BLKDEV=()
-opts='yarn-master:,hadoop-mgmt-node:'
 
-# parse cmd opts
-eval set -- "$(getopt -o '' --long $opts -- $@)"
-
-while true; do
-    case "$1" in
-      --yarn-master)
-	YARN_NODE="$2"; shift 2
-	;;
-      --hadoop-mgmt-node)
-	MGMT_NODE="$2"; shift 2
-	;;
-      --)
-        shift; break
-	;;
-    esac
-done
-
-NODE_SPEC=($@) # array of nodes, brick-mnts, blk-devs -- each separated by ":"
-[[ -z "$NODE_SPEC" || ${#NODE_SPEC[@]} < 2 ]] && {
-  echo "Syntax error: expect list of 2 or more nodes plus brick mount(s) and block dev(s)";
-  exit -1; }
-
-[[ -z "$YARN_NODE" || -z "$MGMT_NODE" ]] && {
-  echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
-  exit -1; }
+parse_cmd $@
 
 # parse out list of nodes, format: "node:brick-mnt:blk-dev"
 NODES=()
 for node_spec in ${NODE_SPEC[@]}; do
-    NODES+=(${node_spec%%:*})
+    node=(${node_spec%%:*}); NODES+=($node)
+    [[ "$node" == "$YARN_NODE" ]] && yarn_inside="$node"
+    [[ "$node" == "$MGMT_NODE" ]] && mgmt_inside="$node"
 done
+
+# warning if mgmt or yarn-master nodes are inside the storage pool
+if [[ -n "$mgmt_inside" || -n "$yarn_inside" ]] ; then
+  if [[ -n "$mgmt_inside" && -n "$yarn_inside" ]] ; then
+    echo -n "WARN: the yarn-master and hadoop management nodes are inside the storage pool which is sub-optimal."
+  elif [[ -n "$mgmt_inside" ]] ; then
+    echo -n "WARN: the hadoop management node is inside the storage pool which is sub-optimal."
+  else
+    echo -n "WARN: the yarn-master node is inside the storage pool which is sub-optimal."
+  fi
+  if [[ -z "$AUTO_YES" ]] && ! yesno  " Continue? [y|N] " ; then
+    exit 0
+  fi
+fi
 
 # extract the required brick-mnt and blk-dev from the 1st node-spec entry
 node_spec=(${NODE_SPEC[0]//:/ }) # split after subst : with space
