@@ -34,10 +34,10 @@ eval set -- "$(getopt -o '' --long $opts -- $@)"
 while true; do
     case "$1" in
       --yarn-master)
-	YARN_NODE="$2"; shift
+	YARN_NODE="$2"; shift 2
 	;;
       --hadoop-mgmt-node)
-	MGMT_NODE="$2"; shift
+	MGMT_NODE="$2"; shift 2
 	;;
       --)
         shift; break
@@ -50,25 +50,29 @@ NODE_SPEC=($@) # array of nodes, brick-mnts, blk-devs -- each separated by ":"
   echo "Syntax error: expect list of 2 or more nodes plus brick mount(s) and block dev(s)";
   exit -1; }
 
+[[ -z "$YARN_NODE" || -z "$MGMT_NODE" ]] && {
+  echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
+  exit -1; }
+
 # parse out list of nodes, format: "node:brick-mnt:blk-dev"
-NODES=''
+NODES=()
 for node_spec in ${NODE_SPEC[@]}; do
-    NODES+="${node_spec%%:*} "
+    NODES+=(${node_spec%%:*})
 done
 
 # extract the required brick-mnt and blk-dev from the 1st node-spec entry
 node_spec=(${NODE_SPEC[0]//:/ }) # split after subst : with space
 BRKMNT=(${node_spec[1]})
 BLKDEV=(${node_spec[2]})
-[[ -z "$brkmnt" || -z "$blkdev" ]] &&
-  echo "Syntax error: expect a brick mount and block device to immediately follw the first node (each separated by a \":\"";
+[[ -z "$BRKMNT" || -z "$BLKDEV" ]] && {
+  echo "Syntax error: expect a brick mount and block device to immediately follow the first node (each separated by a \":\")";
   exit -1; }
-BRKMNTS+=($brkmnt); BLKDEVS+=($blkdev)
+BRKMNTS+=($BRKMNT); BLKDEVS+=($BLKDEV)
 
 # fill in missing brk-mnts and/or blk-devs
 for (( i=1; i<${#NODE_SPEC[@]}; i++ )); do # starting at 2nd entry
     node_spec=${NODE_SPEC[$i]}
-    case $(grep -o ':' <<<$node_spec | grep -c) in # num of ":"s
+    case "$(grep -o ':' <<<"$node_spec" | wc -l)" in # num of ":"s
 	0) # brkmnt and blkdev omitted
 	   BRKMNTS+=($BRKMNT)
 	   BLKDEVS+=($BLKDEV)
@@ -81,7 +85,7 @@ for (( i=1; i<${#NODE_SPEC[@]}; i++ )); do # starting at 2nd entry
 	   blkdev="${node_spec##*:}"
 	   BLKDEVS+=($blkdev)
 	   brkmnts=(${node_spec//:/ }) # array
-	   if [[ "${brkmnts[1]}" == "${blkdev}" ]] ; then # "::", empty brkmnt
+	   if [[ "${brkmnts[1]}" == "$blkdev" ]] ; then # "::", empty brkmnt
 	     BRKMNTS+=($BRKMNT) # default
 	   else
 	     BRKMNTS+=(${brkmnts[1]})
@@ -90,9 +94,13 @@ for (( i=1; i<${#NODE_SPEC[@]}; i++ )); do # starting at 2nd entry
         *) 
 	   echo "Syntax error: improperly specified node-list"
 	   exit -1
-	   ;;;
+	   ;;
     esac
 done
 
+echo
+echo "****NODES=${NODES[@]}"
+echo "****BRKMNTS=${BRKMNTS[@]}"
+echo "****BLKDEVS=${BLKDEVS[@]}"
 
 exit 0
