@@ -8,6 +8,7 @@
 # Each node is also setup for hadoop workloads: ntp config is verified, required
 # ports are checked to be open, selinux is set to permissive, etc.
 # Syntax:
+#  -y: auto answer "yes" to any prompts
 #  --yarn-master: hostname or ip of the yarn-master server (expected to be out-
 #       side of the storage pool)
 #  --hadoop-mgmt-node: hostname or ip of the hadoop mgmt server (expected to
@@ -128,6 +129,14 @@ function parse_nodes() {
       exit 0
     fi
   fi
+
+  # warning if yarn-master == mgmt node
+  if [[ "$YARN_NODE" == "$MGMT_NODE" ]] ; then
+    echo -n "WARN: the yarn-master and hadoop-mgmt-nodes are the same which is sub-optimal."
+    if [[ -z "$AUTO_YES" ]] && ! yesno  " Continue? [y|N] " ; then
+      exit 0
+    fi
+  fi
 }
 
 # parse_brkmnts_and_blkdevs: extracts the brick mounts and block devices from
@@ -189,6 +198,7 @@ function parse_brkmnts_and_blkdevs() {
 ## main ##
 
 BRKMNT=(); BLKDEV=(); NODES=()
+PREFIX="$(dirname $(readlink -f $0))"
 
 parse_cmd $@
 
@@ -196,10 +206,18 @@ parse_nodes
 
 parse_brkmnts_and_blkdevs
 
-
 echo
 echo "****NODES=${NODES[@]}"
 echo "****BRKMNTS=${BRKMNTS[@]}"
 echo "****BLKDEVS=${BLKDEVS[@]}"
+
+# setup each node for hadoop workloads
+for (( i=0; i<${#NODES[@]}; i++ )); do
+    node=${NODES[$i]}
+    brkmnt=${BRKMNTS[$i]}
+    blkdev=${BLKDEVS[$i]}
+    scp -r -q $PREFIX/bin $node:/tmp
+    ssh $node "/tmp/bin/setup_datanode.sh $blkdev $brkmnt $YARN_NODE"
+done
 
 exit 0
