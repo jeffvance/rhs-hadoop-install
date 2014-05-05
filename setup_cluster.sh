@@ -119,21 +119,21 @@ function parse_nodes() {
   # warning if mgmt or yarn-master nodes are inside the storage pool
   if [[ -n "$mgmt_inside" || -n "$yarn_inside" ]] ; then
     if [[ -n "$mgmt_inside" && -n "$yarn_inside" ]] ; then
-      echo -n "WARN: the yarn-master and hadoop management nodes are inside the storage pool which is sub-optimal."
+      echo "WARN: the yarn-master and hadoop management nodes are inside the storage pool which is sub-optimal."
     elif [[ -n "$mgmt_inside" ]] ; then
-      echo -n "WARN: the hadoop management node is inside the storage pool which is sub-optimal."
+      echo "WARN: the hadoop management node is inside the storage pool which is sub-optimal."
     else
-      echo -n "WARN: the yarn-master node is inside the storage pool which is sub-optimal."
+      echo "WARN: the yarn-master node is inside the storage pool which is sub-optimal."
     fi
-    if [[ -z "$AUTO_YES" ]] && ! yesno  " Continue? [y|N] " ; then
+    if [[ -z "$AUTO_YES" ]]  && ! yesno  "  Continue? [y|N] " ; then
       exit 0
     fi
   fi
 
   # warning if yarn-master == mgmt node
   if [[ "$YARN_NODE" == "$MGMT_NODE" ]] ; then
-    echo -n "WARN: the yarn-master and hadoop-mgmt-nodes are the same which is sub-optimal."
-    if [[ -z "$AUTO_YES" ]] && ! yesno  " Continue? [y|N] " ; then
+    echo "WARN: the yarn-master and hadoop-mgmt-nodes are the same which is sub-optimal."
+    if [[ -z "$AUTO_YES" ]] && ! yesno  "  Continue? [y|N] " ; then
       exit 0
     fi
   fi
@@ -199,6 +199,7 @@ function parse_brkmnts_and_blkdevs() {
 
 BRKMNT=(); BLKDEV=(); NODES=()
 PREFIX="$(dirname $(readlink -f $0))"
+errnodes=''; errcnt=0
 
 parse_cmd $@
 
@@ -210,14 +211,28 @@ echo
 echo "****NODES=${NODES[@]}"
 echo "****BRKMNTS=${BRKMNTS[@]}"
 echo "****BLKDEVS=${BLKDEVS[@]}"
+echo
 
 # setup each node for hadoop workloads
 for (( i=0; i<${#NODES[@]}; i++ )); do
     node=${NODES[$i]}
     brkmnt=${BRKMNTS[$i]}
     blkdev=${BLKDEVS[$i]}
+
     scp -r -q $PREFIX/bin $node:/tmp
-    ssh $node "/tmp/bin/setup_datanode.sh $blkdev $brkmnt $YARN_NODE"
+    ssh $node "/tmp/bin/setup_datanode.sh -q $blkdev $brkmnt $YARN_NODE"
+    err=$?
+
+    if (( err != 0 )) ; then
+      errnodes+="$node "
+      errcnt++
+    fi
 done
 
+echo
+if (( errcnt > 0 )) ; then
+  echo "$errcnt errors on nodes: ${errnodes[@]}"
+  exit 1
+fi
+echo "${#NODES[@]} nodes setup for hadoop workloads with no errors"
 exit 0

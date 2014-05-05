@@ -123,15 +123,28 @@ function setup_iptables() {
       out="$(iptables -A INPUT -m state --state NEW -m $proto \
 	-p $proto --dport $port -j ACCEPT)"
       err=$?
+      [[ -z "$QUIET" ]] && echo "iptables: $out"
       if (( err != 0 )) ; then
-	[[ -z "$QUIET" ]] && echo "ERROR $err: iptables port $port: $out"
+	[[ -z "$QUIET" ]] && echo "ERROR $err: iptables port $port"
  	((errcnt++))
       fi
   done
   
   # save and restart iptables
-  service iptables save
-  service iptables restart
+  out="$(service iptables save)"
+  err=$?
+  [[ -z "$QUIET" ]] && echo "iptables save: $out"
+  if (( err != 0 )) ; then
+    [[ -z "$QUIET" ]] && echo "ERROR $err: iptables save"
+    ((errcnt++))
+  fi
+  out="$(service iptables restart)"
+  err=$?
+  [[ -z "$QUIET" ]] && echo "iptables restart: $out"
+  if (( err != 0 )) ; then
+    [[ -z "$QUIET" ]] && echo "ERROR $err: iptables restart"
+    ((errcnt++))
+  fi
 
   (( errcnt > 0 )) && return 1
   return 0
