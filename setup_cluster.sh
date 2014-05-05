@@ -26,6 +26,8 @@
 #     the node name.
 
 
+## funtions ##
+
 # yesno: prompts $1 to stdin and returns 0 if user answers yes, else returns 1.
 # The default (just hitting <enter>) is specified by $2.
 # $1=prompt (required),
@@ -58,7 +60,6 @@ function yesno() {
 #   MGMT_NODE
 #   AUTO_YES
 #   NODE_SPEC
-#
 function parse_cmd() {
 
   local opts='y'
@@ -93,72 +94,108 @@ function parse_cmd() {
     exit -1; }
 }
 
+# parse_nodes: set the global NODES array from NODE_SPEC and report warnings
+# if the yarn-master or mgmt nodes are inside the storage pool, and prompts
+# the user to continue unless AUTO_YES is set. Exits if user answers no.
+# Uses globals:
+#   NODE_SPEC
+#   YARN_NODE
+#   MGMT_NODE
+# Sets globals:
+#   NODES
+function parse_nodes() {
+
+  local mgmt_inside; local yarn_inside
+  local node_spec; local node
+
+  # parse out list of nodes, format: "node:brick-mnt:blk-dev"
+  for node_spec in ${NODE_SPEC[@]}; do
+      node=(${node_spec%%:*}); NODES+=($node)
+      [[ "$node" == "$YARN_NODE" ]] && yarn_inside="$node"
+      [[ "$node" == "$MGMT_NODE" ]] && mgmt_inside="$node"
+  done
+
+  # warning if mgmt or yarn-master nodes are inside the storage pool
+  if [[ -n "$mgmt_inside" || -n "$yarn_inside" ]] ; then
+    if [[ -n "$mgmt_inside" && -n "$yarn_inside" ]] ; then
+      echo -n "WARN: the yarn-master and hadoop management nodes are inside the storage pool which is sub-optimal."
+    elif [[ -n "$mgmt_inside" ]] ; then
+      echo -n "WARN: the hadoop management node is inside the storage pool which is sub-optimal."
+    else
+      echo -n "WARN: the yarn-master node is inside the storage pool which is sub-optimal."
+    fi
+    if [[ -z "$AUTO_YES" ]] && ! yesno  " Continue? [y|N] " ; then
+      exit 0
+    fi
+  fi
+}
+
+# parse_brkmnts_and_blkdevs: extracts the brick mounts and block devices from
+# the global NODE_SPEC array. Fills in default brkmnts and blkdevs based on
+# the values included on the first node (required). Exits on syntax errors.
+# Uses globals:
+#   NODE_SPEC
+# Sets globals:
+#   BRKMNTS
+#   BLKMNTS
+function parse_brkmnts_and_blkdevs() {
+
+  local brkmnt; local brkmnts; local blkdev
+  local node_spec; local i
+
+  # extract the required brick-mnt and blk-dev from the 1st node-spec entry
+  node_spec=(${NODE_SPEC[0]//:/ }) # split after subst : with space
+  brkmnt=(${node_spec[1]})
+  blkdev=(${node_spec[2]})
+
+  if [[ -z "$brkmnt" || -z "$blkdev" ]] ; then
+    echo "Syntax error: expect a brick mount and block device to immediately follow the first node (each separated by a \":\")"
+    exit -1
+  fi
+
+  BRKMNTS+=($brkmnt); BLKDEVS+=($blkdev) # set globals
+
+  # fill in missing brk-mnts and/or blk-devs
+  for (( i=1; i<${#NODE_SPEC[@]}; i++ )); do # starting at 2nd entry
+      node_spec=${NODE_SPEC[$i]}
+      case "$(grep -o ':' <<<"$node_spec" | wc -l)" in # num of ":"s
+	  0) # brkmnt and blkdev omitted
+	     BRKMNTS+=($brkmnt)
+	     BLKDEVS+=($blkdev)
+          ;;
+	  1) # only brkmnt specified
+	     BLKDEVS+=($blkdev)
+	     BRKMNTS+=(${node_spec#*:})
+          ;;
+	  2) # either both brkmnt and blkdev specified, or just blkdev specified
+	     blkdev="${node_spec##*:}"
+	     BLKDEVS+=($blkdev)
+	     brkmnts=(${node_spec//:/ }) # array
+	     if [[ "${brkmnts[1]}" == "$blkdev" ]] ; then # "::", empty brkmnt
+	       BRKMNTS+=($brkmnt) # default
+	     else
+	       BRKMNTS+=(${brkmnts[1]})
+	     fi
+          ;;
+          *) 
+	     echo "Syntax error: improperly specified node-list"
+	     exit -1
+	  ;;
+      esac
+  done
+}
+
 
 ## main ##
 
-BRKMNT=(); BLKDEV=()
+BRKMNT=(); BLKDEV=(); NODES=()
 
 parse_cmd $@
 
-# parse out list of nodes, format: "node:brick-mnt:blk-dev"
-NODES=()
-for node_spec in ${NODE_SPEC[@]}; do
-    node=(${node_spec%%:*}); NODES+=($node)
-    [[ "$node" == "$YARN_NODE" ]] && yarn_inside="$node"
-    [[ "$node" == "$MGMT_NODE" ]] && mgmt_inside="$node"
-done
+parse_nodes
 
-# warning if mgmt or yarn-master nodes are inside the storage pool
-if [[ -n "$mgmt_inside" || -n "$yarn_inside" ]] ; then
-  if [[ -n "$mgmt_inside" && -n "$yarn_inside" ]] ; then
-    echo -n "WARN: the yarn-master and hadoop management nodes are inside the storage pool which is sub-optimal."
-  elif [[ -n "$mgmt_inside" ]] ; then
-    echo -n "WARN: the hadoop management node is inside the storage pool which is sub-optimal."
-  else
-    echo -n "WARN: the yarn-master node is inside the storage pool which is sub-optimal."
-  fi
-  if [[ -z "$AUTO_YES" ]] && ! yesno  " Continue? [y|N] " ; then
-    exit 0
-  fi
-fi
+parse_brkmnts_and_blkdevs
 
-# extract the required brick-mnt and blk-dev from the 1st node-spec entry
-node_spec=(${NODE_SPEC[0]//:/ }) # split after subst : with space
-BRKMNT=(${node_spec[1]})
-BLKDEV=(${node_spec[2]})
-[[ -z "$BRKMNT" || -z "$BLKDEV" ]] && {
-  echo "Syntax error: expect a brick mount and block device to immediately follow the first node (each separated by a \":\")";
-  exit -1; }
-BRKMNTS+=($BRKMNT); BLKDEVS+=($BLKDEV)
-
-# fill in missing brk-mnts and/or blk-devs
-for (( i=1; i<${#NODE_SPEC[@]}; i++ )); do # starting at 2nd entry
-    node_spec=${NODE_SPEC[$i]}
-    case "$(grep -o ':' <<<"$node_spec" | wc -l)" in # num of ":"s
-	0) # brkmnt and blkdev omitted
-	   BRKMNTS+=($BRKMNT)
-	   BLKDEVS+=($BLKDEV)
-           ;;
-	1) # only brkmnt specified
-	   BLKDEVS+=($BLKDEV)
-	   BRKMNTS+=(${node_spec#*:})
-           ;;
-	2) # either both brkmnt and blkdev specified, or just blkdev specified
-	   blkdev="${node_spec##*:}"
-	   BLKDEVS+=($blkdev)
-	   brkmnts=(${node_spec//:/ }) # array
-	   if [[ "${brkmnts[1]}" == "$blkdev" ]] ; then # "::", empty brkmnt
-	     BRKMNTS+=($BRKMNT) # default
-	   else
-	     BRKMNTS+=(${brkmnts[1]})
-	   fi
-           ;;
-        *) 
-	   echo "Syntax error: improperly specified node-list"
-	   exit -1
-	   ;;
-    esac
-done
 
 echo
 echo "****NODES=${NODES[@]}"
