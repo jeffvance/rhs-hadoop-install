@@ -2,9 +2,9 @@
 #
 # create_vol.sh accepts a volume name, volume mount path prefix, and a list of
 # two or more "node:brick_mnt" pairs and creates a new volume. Each node spanned
-# by the new volume is setup for hadoop workloads and some volume settings are
-# set needed for hadoop tasks. The volume is mounted with the correct glusterfs-
-# fuse mount options.
+# by the new volume is checked that it is setup for hadoop workloads, and that
+# hadoop volume performance settings are set. The volume is mounted with the
+# correct glusterfs-fuse mount options.
 # Syntax:
 #  volName: name of the new volume
 #  vol-mnt-prefix: path of the glusterfs-fuse mount point, eg. /mnt/glusterfs.
@@ -148,7 +148,26 @@ function chk_nodes() {
   echo "${#NODES[@]} passed check for hadoop workloads"
 }
 
+# add_distributed_dirs: create, if needed, the distributed hadoop directories.
+# Note: the gluster-fuse mount, by convention is the VOLMNT prefix with the
+#   volume name appended.
+# Uses globals:
+#   VOLNAME
+#   VOLMNT
+#   PREFIX
+function add_distributed_dirs() {
 
+  local err
+
+  # add the required distributed hadoop dirs
+  $PREFIX/bin/add_dirs -d "$VOLMNT/$VOLNAME"
+  err=$?
+  if (( err != 0 )) ; then
+    echo "ERROR $err: add_dirs -d $VOLMNT/$VOLNAME"
+  fi
+}
+
+ 
 ## main ##
 
 BRKMNT=(); NODES=()
@@ -172,8 +191,10 @@ echo
 # verify that each node is prepped for hadoop workloads
 chk_nodes
 
-# add distrib dirs per node
-# create gluster vol mount, per node
+#### create gluster-fuse mount, per node
+
+# add the distributed hadoop dirs
+add_distributed_dirs
 
 # create the gluster volume, replica 2 is hard-coded for now
 for (( i=0; i<${#NODES[@]}; i++ )); do

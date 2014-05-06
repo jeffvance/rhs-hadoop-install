@@ -196,6 +196,65 @@ function parse_brkmnts_and_blkdevs() {
   done
 }
 
+# setup_nodes: setup each node for hadoop workloads by invoking
+# bin/setup_datanodes.sh. Exits on errors.
+# Uses globals:
+#   NODES
+#   BRKMNTS
+#   BLKDEVS
+#   PREFIX
+function setup_nodes() {
+
+  local i; local err; local errcnt=0; local errnodes=''
+  local node; local brkmnt; local blkdev
+
+  for (( i=0; i<${#NODES[@]}; i++ )); do
+      node=${NODES[$i]}
+      brkmnt=${BRKMNTS[$i]}
+      blkdev=${BLKDEVS[$i]}
+
+      scp -r -q $PREFIX/bin $node:/tmp
+      ssh $node "/tmp/bin/setup_datanode.sh -q $blkdev $brkmnt $YARN_NODE"
+      err=$?
+
+      if (( err != 0 )) ; then
+	echo "ERROR $err: setup_datanode failed on $node"
+	errnodes+="$node "
+	((errcnt++))
+      fi
+  done
+
+  if (( errcnt > 0 )) ; then
+    echo "$errcnt setup node errors on nodes: $errnodes"
+    exit 1
+  fi
+}
+
+# create_pool: create the trusted pool, even if the pool already exists.
+# Note: gluster peer probe returns 0 if the node is already in the pool. It
+#   returns 1 if the node is unknown.
+# Note: not needed to probe "yourself" but not an error either, and this way we
+#   don't need to know which storage node this script is being executed from
+function create_pool() {
+
+  local node; local err; local errcnt=0; local errnodes=''
+
+  for node in ${NODES[@]}; do
+      gluster peer probe $node >& /dev/null
+      err=$?
+      if (( err != 0 )) ; then
+	echo "ERROR $err: peer probe failed on $node"
+	errnodes+="$node "
+	((errcnt++))
+      fi
+  done
+
+  if (( errcnt > 0 )) ; then
+    echo "$errcnt peer probe errors on nodes: $errnodes"
+    exit 1
+  fi
+}
+
 
 ## main ##
 
@@ -216,46 +275,10 @@ echo "****BLKDEVS=${BLKDEVS[@]}"
 echo
 
 # setup each node for hadoop workloads
-for (( i=0; i<${#NODES[@]}; i++ )); do
-    node=${NODES[$i]}
-    brkmnt=${BRKMNTS[$i]}
-    blkdev=${BLKDEVS[$i]}
+setup_nodes
 
-    scp -r -q $PREFIX/bin $node:/tmp
-    ssh $node "/tmp/bin/setup_datanode.sh -q $blkdev $brkmnt $YARN_NODE"
-    err=$?
-
-    if (( err != 0 )) ; then
-      echo "ERROR $err: setup_datanode failed on $node"
-      errnodes+="$node "
-      ((errcnt++))
-    fi
-done
-
-if (( errcnt > 0 )) ; then
-  echo "$errcnt setup node errors on nodes: $errnodes"
-  exit 1
-fi
-
-# create the trusted pool, even if the pool already exists
-# note: gluster peer probe returns 0 if the node is already in the pool. It
-#   returns 1 if the node is unknown.
-# note: not needed to probe "yourself" but not an error either, and this way we
-#   don't need to know which storage node this script is being executed from
-for node in ${NODES[@]}; do
-    gluster peer probe $node >& /dev/null
-    err=$?
-    if (( err != 0 )) ; then
-      echo "ERROR $err: peer probe failed on $node"
-      errnodes+="$node "
-      ((errcnt++))
-    fi
-done
-
-if (( errcnt > 0 )) ; then
-  echo "$errcnt peer probe errors on nodes: $errnodes"
-  exit 1
-fi
+# create the trusted storage pool
+create_pool
 
 echo "${#NODES[@]} nodes setup for hadoop workloads with no errors"
 exit 0
