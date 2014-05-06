@@ -117,19 +117,22 @@ function setup_iptables() {
 
   local err; local errcnt=0; local out
   local port; local proto
+  local iptables_conf='/etc/sysconfig/iptables'
 
   for port in $($PREFIX/gen_ports.sh); do
       proto=${port#*:}
-      port=${port%:*}
-      [[ "$port" =~ [0-9]\- ]] && port=${port/-/:} # use iptables range syntax
-      # open this port or range of port numbers for the target protocol
-      out="$(iptables -A INPUT -m state --state NEW -m $proto \
-	-p $proto --dport $port -j ACCEPT)"
-      err=$?
-      [[ -z "$QUIET" ]] && echo "iptables: $out"
-      if (( err != 0 )) ; then
-	[[ -z "$QUIET" ]] && echo "ERROR $err: iptables port $port"
- 	((errcnt++))
+      port=${port%:*}; port=${port/-/:} # use iptables range syntax
+      # open this port or port range for the target protocol ONLY if not
+      # already opened
+      if ! grep -qs -E "^-A .* -p $proto .* $port .*ACCEPT" $iptables_conf; then
+	out="$(iptables -A INPUT -m state --state NEW -m $proto \
+		-p $proto --dport $port -j ACCEPT)"
+	err=$?
+	[[ -z "$QUIET" ]] && echo "iptables: $out"
+	if (( err != 0 )) ; then
+	  [[ -z "$QUIET" ]] && echo "ERROR $err: iptables port $port"
+ 	  ((errcnt++))
+	fi
       fi
   done
   

@@ -101,7 +101,7 @@ function parse_brkmnts() {
   done
 }
 
-# chk_vol: invokes gluster vol status to see if VOLNAME already exists. Exists
+# chk_vol: invokes gluster vol status to see if VOLNAME already exists. Exits
 # on errors.
 # Uses globals:
 #   VOLNAME
@@ -118,7 +118,7 @@ function chk_vol() {
 }
 
 # chk_nodes: verify that each node that will be spanned by the new volume is 
-# prepped for hadoop workloads by invoking bin/check_node.sh.
+# prepped for hadoop workloads by invoking bin/check_node.sh. Exits on errors.
 # Uses globals:
 #   NODES
 #   BRKMNTS
@@ -127,24 +127,20 @@ function chk_vol() {
 function chk_nodes() {
 
   local i; local node
-  local err; local errcnt=0; local errnodes=''
+  local err; local out
 
   # verify that each node is prepped for hadoop workloads
   for (( i=0; i<${#NODES[@]}; i++ )); do
       node=${NODES[$i]}
       scp -r -q $PREFIX/bin $node:/tmp
-      ssh $node "/tmp/bin/check_node.sh ${BRKMNTS[$i]}"
+      out="$(ssh $node "/tmp/bin/check_node.sh ${BRKMNTS[$i]}")"
       err=$?
       if (( err != 0 )) ; then
-        errnodes+="$node "
-        ((errcnt++))
+	echo "ERROR on $node: $out"
+	exit 1
       fi
   done
 
-  if (( errcnt > 0 )) ; then
-    echo "$errcnt errors on nodes: $errnodes"
-    exit 1
-  fi
   echo "${#NODES[@]} passed check for hadoop workloads"
 }
 
@@ -167,6 +163,7 @@ function mk_volmnt() {
 	mkdir -p $volmnt
 	# append mount to fstab, if not present
 	if ! grep -qs $volmnt /etc/fstab ; then
+echo "***** mk_mount: appending to fstab: $volmnt"
 	  echo '$node:/$VOLNAME $volmnt glusterfs $mntopts 0 0' >>/etc/fstab
 	fi
 	mount $volmnt # mount via fstab
@@ -191,6 +188,7 @@ function add_distributed_dirs() {
 
   local err
 
+echo "**** add_distr_dirs: $VOLMNT/$VOLNAME"
   # add the required distributed hadoop dirs
   $PREFIX/bin/add_dirs -d "$VOLMNT/$VOLNAME"
   err=$?
@@ -199,12 +197,36 @@ function add_distributed_dirs() {
   fi
 }
 
+# create_vol: gluster vol create VOLNAME with a hard-codes replica 2. Exits on
+# errors.
+# Uses globals:
+#   NODES
+#   BRKMNTS
+#   VOLNAME
+function create_vol() {
+
+  local bricks=''; local err; local i
+
+  # create the gluster volume, replica 2 is hard-coded for now
+  for (( i=0; i<${#NODES[@]}; i++ )); do
+      bricks+="${NODES[$i]}:${BRKMNTS[$i]} "
+  done
+echo "***** bricks=$bricks"
+
+  gluster volume create $VOLNAME replica 2 $bricks
+  err=$?
+  if (( err != 0 )) ; then
+    echo "ERROR $err: gluster vol create $VOLNAME $bricks"
+    exit 1
+  fi
+}
+
  
 ## main ##
 
 BRKMNTS=(); NODES=()
 PREFIX="$(dirname $(readlink -f $0))"
-bricks=''; errcnt=0
+errcnt=0
 
 parse_cmd $@
 
@@ -229,11 +251,8 @@ mk_volmnt
 # add the distributed hadoop dirs
 add_distributed_dirs
 
-# create the gluster volume, replica 2 is hard-coded for now
-for (( i=0; i<${#NODES[@]}; i++ )); do
-    bricks+="${NODES[$i]}:${BRKMNTS[$i]} "
-done
-gluster volume create $VOLNAME replica 2 $bricks
+# create a replica 2 volume
+create_vol
 
 # set vol performance settings
 $PREFIX/bin/set_vol_perf.sh $VOLNAME

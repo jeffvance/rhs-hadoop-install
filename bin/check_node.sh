@@ -12,10 +12,6 @@
 
 # Assumption: the node running this script can passwordless ssh to the node arg.
 
-errcnt=0
-PREFIX="$(dirname $(readlink -f $0))"
-NODE="$(hostname)"
-
 
 # check_ambari_agent: see if the ambari agent is running on this node.
 function check_ambari_agent() {
@@ -104,22 +100,25 @@ function check_dirs() {
 }
 
 # check_open_ports: verify that the ports needed by gluster and ambari are all
-# open.
+# open, both "live" (iptables) and persisted (iptables conf file).
 function check_open_ports() {
 
-  local out; local port; local proto; local ports
+  local out; local port; local proto
   local errcnt=0; local warncnt=0
-  ports="$($PREFIX/gen_ports.sh)"
+  local iptables_conf='/etc/sysconfig/iptables'
 
-  for port in $ports; do # "port:protocol", eg "49152-49170:tcp"
-      proto=${port#*:} # remove port #
-      port=${port%:*}  # remove protocol, port can be a range or single number
-      [[ "$proto" == 'udp' ]] && proto='-u' || proto=''
-      # attempt to bind to this port or to any port in a range of ports
-      out="$(nc -z $proto localhost $port)"
-      [[ -z "$QUIET" && -n "$out" ]] && echo "$NODE: $out"
-      if (( $? != 0 )) ; then
-	[[ -z "$QUIET" ]] && echo "port(s) $port not open on $NODE"
+  for port in $($PREFIX/gen_ports.sh); do # "port:proto", eg "49152-49170:tcp"
+      proto=${port#*:}
+      port=${port%:*}  # port can be a range or single number
+      port=${port/-/:} # use iptables range syntax
+      # live check
+      if ! iptables -n -L | grep -qs -E "^ACCEPT *$proto .*:$port"; then
+	[[ -z "$QUIET" ]] && echo "ERROR on $NODE: iptables: port(s) $port not open"
+	((errcnt++))
+      fi
+      # file check
+      if ! grep -qs -E "^-A .* -p $proto .* $port .*ACCEPT" $iptables_conf; then
+	[[ -z "$QUIET" ]] && echo "ERROR on $NODE: $iptables_conf: port(s) $port not open"
 	((errcnt++))
       fi
   done
@@ -199,7 +198,7 @@ function check_selinux() {
   out=$(sestatus | head -n 1 | awk '{print $3}') # enforcing, permissive
   [[ -z "$QUIET" ]] && echo "selinux on $NODE is set to: $out"
  
-  [[ "$out" != 'enabled' ]] && ((errcnt++))
+  [[ "$out" == 'enabled' ]] && ((errcnt++))
 
   (( errcnt > 0 )) && return 1
   [[ -z "$QUIET" ]] && echo "selinux configured correctly on $NODE"
@@ -257,6 +256,11 @@ function check_xfs() {
 
 
 ## main ##
+
+errcnt=0
+PREFIX="$(dirname $(readlink -f $0))"
+NODE="$(hostname)"
+
 # parse cmd opts
 while getopts ':q' opt; do
     case "$opt" in
