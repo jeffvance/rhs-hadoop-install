@@ -148,6 +148,38 @@ function chk_nodes() {
   echo "${#NODES[@]} passed check for hadoop workloads"
 }
 
+# mk_volmnt: create gluster-fuse mount, per node, using the correct mount
+# options. The volume mount is the VOLMNT prefix with VOLNAME appended. The
+# mount is persisted in /etc/fstab.
+# Assumptions: the bin scripts have been copied to each node in /tmp/bin.
+# Uses globals:
+#   NODES
+#   VOLNAME
+#   VOLMNT
+function mk_volmnt() {
+
+  local err; local i; local node
+  local volmnt"$VOLMNT/$VOLNAME"
+  local mntopts='entry-timeout=0,attribute-timeout=0,use-readdirp=no,acl,_netdev'
+
+  for node in ${NODES[@]}; do
+      ssh $node "
+	mkdir -p $volmnt
+	# append mount to fstab, if not present
+	if ! grep -qs $volmnt /etc/fstab ; then
+	  echo '$node:/$VOLNAME $volmnt glusterfs $mntopts 0 0' >>/etc/fstab
+	fi
+	mount $volmnt # mount via fstab
+      "
+  done
+  err=$?
+  
+  if (( err != 0 )) ; then
+    echo "ERROR $err: mounting $volmnt"
+    exit 1
+  fi
+}
+
 # add_distributed_dirs: create, if needed, the distributed hadoop directories.
 # Note: the gluster-fuse mount, by convention is the VOLMNT prefix with the
 #   volume name appended.
@@ -191,7 +223,8 @@ echo
 # verify that each node is prepped for hadoop workloads
 chk_nodes
 
-#### create gluster-fuse mount, per node
+# create gluster-fuse mount, per node
+mk_volmnt
 
 # add the distributed hadoop dirs
 add_distributed_dirs
