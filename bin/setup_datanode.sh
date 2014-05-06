@@ -38,14 +38,17 @@ function get_ambari_repo(){
   return 0
 }
 
-# mount_blkdev: append the xfs brick mount to /etc/fstab and then mount it.
+# mount_blkdev: create the brick-mnt dir if needed, append the xfs brick mount
+# to /etc/fstab, and then mount it.
 function mount_blkdevs() {
 
   local err; local errcnt=0; local out
-  local brick_mnt_opts="noatime,inode64"
+  local mntopts="noatime,inode64"
+
+  [[ ! -e $BRICKMNT ]] && mkdir -p $BRICKMNT
 
   if ! grep -qsw $BRICKMNT /etc/fstab ; then
-    echo "$BLKDEV $BRICKMNT xfs $brick_mnt_opts 0 0" >>/etc/fstab
+    echo "$BLKDEV $BRICKMNT xfs $mntopts 0 0" >>/etc/fstab
   fi
 
   if ! grep -qsw $BRICKMNT /proc/mounts ; then
@@ -223,10 +226,7 @@ MGMT_NODE="$3"
   exit -1; }
 
 [[ ! -b $BLKDEV ]] && {
-  echo "ERROR: $BLKDEV does not exist as a directory";
-  exit -1; }
-[[ ! -d $BRICKMNT ]] && {
-  echo "ERROR: $BRICKMNT does not exist as a directory";
+  echo "ERROR: $BLKDEV does not exist as a block device";
   exit -1; }
 
 setup_selinux      || ((errcnt++))
