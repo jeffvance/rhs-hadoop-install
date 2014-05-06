@@ -6,7 +6,8 @@
 # and mgmt nodes are expected to be outside of the pool. On each node the blk-
 # device is setup as an xfs file system and mounted to the brick mount dir.
 # Each node is also setup for hadoop workloads: ntp config is verified, required
-# ports are checked to be open, selinux is set to permissive, etc.
+# ports are checked to be open, selinux is set to permissive, hadoop required
+# users are created, and required local are created.
 # Syntax:
 #  -y: auto answer "yes" to any prompts
 #  --yarn-master: hostname or ip of the yarn-master server (expected to be out-
@@ -111,7 +112,8 @@ function parse_nodes() {
 
   # parse out list of nodes, format: "node:brick-mnt:blk-dev"
   for node_spec in ${NODE_SPEC[@]}; do
-      node=(${node_spec%%:*}); NODES+=($node)
+      node=${node_spec%%:*}
+      NODES+=($node)
       [[ "$node" == "$YARN_NODE" ]] && yarn_inside="$node"
       [[ "$node" == "$MGMT_NODE" ]] && mgmt_inside="$node"
   done
@@ -154,8 +156,8 @@ function parse_brkmnts_and_blkdevs() {
 
   # extract the required brick-mnt and blk-dev from the 1st node-spec entry
   node_spec=(${NODE_SPEC[0]//:/ }) # split after subst : with space
-  brkmnt=(${node_spec[1]})
-  blkdev=(${node_spec[2]})
+  brkmnt=${node_spec[1]}
+  blkdev=${node_spec[2]}
 
   if [[ -z "$brkmnt" || -z "$blkdev" ]] ; then
     echo "Syntax error: expect a brick mount and block device to immediately follow the first node (each separated by a \":\")"
@@ -197,7 +199,7 @@ function parse_brkmnts_and_blkdevs() {
 
 ## main ##
 
-BRKMNT=(); BLKDEV=(); NODES=()
+BRKMNTS=(); BLKDEVS=(); NODES=()
 PREFIX="$(dirname $(readlink -f $0))"
 errnodes=''; errcnt=0
 
@@ -224,15 +226,36 @@ for (( i=0; i<${#NODES[@]}; i++ )); do
     err=$?
 
     if (( err != 0 )) ; then
+      echo "ERROR $err: setup_datanode failed on $node"
       errnodes+="$node "
-      errcnt++
+      ((errcnt++))
     fi
 done
 
-echo
 if (( errcnt > 0 )) ; then
-  echo "$errcnt errors on nodes: ${errnodes[@]}"
+  echo "$errcnt setup node errors on nodes: $errnodes"
   exit 1
 fi
+
+# create the trusted pool, even if the pool already exists
+# note: gluster peer probe returns 0 if the node is already in the pool. It
+#   returns 1 if the node is unknown.
+# note: not needed to probe "yourself" but not an error either, and this way we
+#   don't need to know which storage node this script is being executed from
+for node in ${NODES[@]}; do
+    gluster peer probe $node >& /dev/null
+    err=$?
+    if (( err != 0 )) ; then
+      echo "ERROR $err: peer probe failed on $node"
+      errnodes+="$node "
+      ((errcnt++))
+    fi
+done
+
+if (( errcnt > 0 )) ; then
+  echo "$errcnt peer probe errors on nodes: $errnodes"
+  exit 1
+fi
+
 echo "${#NODES[@]} nodes setup for hadoop workloads with no errors"
 exit 0
