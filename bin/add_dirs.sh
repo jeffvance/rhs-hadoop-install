@@ -52,7 +52,7 @@ else
 fi
 
 for tuple in $($PREFIX/gen_dirs.sh $opt); do
-    dir="$MNT/${tuple%%:*}"; let fill=(32-${#dir})
+    dir="$MNT/${tuple%%:*}"; let fill=(42-${#dir})
     dir+="$(printf ' %.0s' $(seq $fill))" # left-justified for nicer output
     perm=${tuple%:*}; perm=${perm#*:}
     owner=${tuple##*:}

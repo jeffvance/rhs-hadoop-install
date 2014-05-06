@@ -122,15 +122,15 @@ function setup_iptables() {
   for port in $($PREFIX/gen_ports.sh); do
       proto=${port#*:}
       port=${port%:*}; port=${port/-/:} # use iptables range syntax
-      # open this port or port range for the target protocol ONLY if not
-      # already opened
+      # open up this port or port range for the target protocol ONLY if not
+      # already open
       if ! grep -qs -E "^-A .* -p $proto .* $port .*ACCEPT" $iptables_conf; then
 	out="$(iptables -A INPUT -m state --state NEW -m $proto \
 		-p $proto --dport $port -j ACCEPT)"
 	err=$?
-	[[ -z "$QUIET" ]] && echo "iptables: $out"
+	[[ -z "$QUIET" ]] && echo "$NODE: iptables: $out"
 	if (( err != 0 )) ; then
-	  [[ -z "$QUIET" ]] && echo "ERROR $err: iptables port $port"
+	  [[ -z "$QUIET" ]] && echo "ERROR $err on $NODE: iptables port $port"
  	  ((errcnt++))
 	fi
       fi
@@ -243,5 +243,5 @@ $PREFIX/add_groups.sh $q            || ((errcnt++))
 $PREFIX/add_dirs.sh -l $q $BRICKMNT || ((errcnt++)) # just local dirs
 
 (( errcnt > 0 )) && exit 1
-[[ -z "$QUIET" ]] && echo "${#VOL_SETTINGS[@]} volume settings successfully set"
+[[ -z "$QUIET" ]] && echo "${#VOL_SETTINGS[@]} volume perf settings set"
 exit 0

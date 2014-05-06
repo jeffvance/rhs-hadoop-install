@@ -141,12 +141,12 @@ function chk_nodes() {
       fi
   done
 
-  echo "${#NODES[@]} passed check for hadoop workloads"
+  echo "All nodes passed check for hadoop workloads"
 }
 
 # mk_volmnt: create gluster-fuse mount, per node, using the correct mount
 # options. The volume mount is the VOLMNT prefix with VOLNAME appended. The
-# mount is persisted in /etc/fstab.
+# mount is persisted in /etc/fstab. Exits on errors.
 # Assumptions: the bin scripts have been copied to each node in /tmp/bin.
 # Uses globals:
 #   NODES
@@ -154,27 +154,29 @@ function chk_nodes() {
 #   VOLMNT
 function mk_volmnt() {
 
-  local err; local i; local node
+  local err; local out; local i; local node
   local volmnt="$VOLMNT/$VOLNAME"
   local mntopts='entry-timeout=0,attribute-timeout=0,use-readdirp=no,acl,_netdev'
 
   for node in ${NODES[@]}; do
-      ssh $node "
+      out="$(ssh $node "
 	mkdir -p $volmnt
 	# append mount to fstab, if not present
 	if ! grep -qs $volmnt /etc/fstab ; then
-echo "***** mk_mount: appending to fstab: $volmnt"
 	  echo '$node:/$VOLNAME $volmnt glusterfs $mntopts 0 0' >>/etc/fstab
 	fi
 	mount $volmnt # mount via fstab
-      "
+	rc=\$?
+	if (( rc != 0 && rc != 32 )) ; then # 32=already mounted
+	  echo Error \$rc: mounting $volmnt with $mntopts options
+	  exit 1
+	fi
+      ")"
+      if (( $? != 0 )) ; then
+	echo "ERROR on $node: $out"
+	exit 1
+      fi
   done
-  err=$?
-  
-  if (( err != 0 )) ; then
-    echo "ERROR $err: mounting $volmnt"
-    exit 1
-  fi
 }
 
 # add_distributed_dirs: create, if needed, the distributed hadoop directories.
@@ -188,17 +190,16 @@ function add_distributed_dirs() {
 
   local err
 
-echo "**** add_distr_dirs: $VOLMNT/$VOLNAME"
   # add the required distributed hadoop dirs
-  $PREFIX/bin/add_dirs -d "$VOLMNT/$VOLNAME"
+  $PREFIX/bin/add_dirs.sh -d "$VOLMNT/$VOLNAME"
   err=$?
   if (( err != 0 )) ; then
     echo "ERROR $err: add_dirs -d $VOLMNT/$VOLNAME"
   fi
 }
 
-# create_vol: gluster vol create VOLNAME with a hard-codes replica 2. Exits on
-# errors.
+# create_vol: gluster vol create VOLNAME with a hard-codes replica 2 and set
+# its performance settings. Exits on errors.
 # Uses globals:
 #   NODES
 #   BRKMNTS
@@ -207,11 +208,15 @@ function create_vol() {
 
   local bricks=''; local err; local i
 
+  if gluster volume info $VOLNAME >& /dev/null ; then
+    echo "\"$VOLNAME\" volume already exists..."
+    return  # vol already exists
+  fi
+
   # create the gluster volume, replica 2 is hard-coded for now
   for (( i=0; i<${#NODES[@]}; i++ )); do
-      bricks+="${NODES[$i]}:${BRKMNTS[$i]} "
+      bricks+="${NODES[$i]}:${BRKMNTS[$i]}/$VOLNAME "
   done
-echo "***** bricks=$bricks"
 
   gluster volume create $VOLNAME replica 2 $bricks
   err=$?
@@ -219,6 +224,9 @@ echo "***** bricks=$bricks"
     echo "ERROR $err: gluster vol create $VOLNAME $bricks"
     exit 1
   fi
+
+  # set vol performance settings
+  $PREFIX/bin/set_vol_perf.sh $VOLNAME
 }
 
  
@@ -245,16 +253,14 @@ echo
 # verify that each node is prepped for hadoop workloads
 chk_nodes
 
-# create gluster-fuse mount, per node
-mk_volmnt
+# create and start the replica 2 volume and set perf settings
+create_vol
+start_vol
 
 # add the distributed hadoop dirs
 add_distributed_dirs
 
-# create a replica 2 volume
-create_vol
-
-# set vol performance settings
-$PREFIX/bin/set_vol_perf.sh $VOLNAME
+# create gluster-fuse mount, per node
+mk_volmnt
 
 exit 0
