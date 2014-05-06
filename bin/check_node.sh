@@ -3,8 +3,8 @@
 # check_node.sh verifies that the node running the script (localhost) is setup
 # correctly for hadoop workloads. This includes everything other than volume-
 # specific checks. So, we check: ntp config, required gluster and ambari ports
-# being open, ambari agent running, selinux not enabled, hadoop users and dirs,
-# etc...
+# being open, ambari agent running, selinux not enabled, hadoop users and local
+# hadoop directories exits.
 #
 # Syntax:
 #  $1= xfs brick mount directory path including the volume name
@@ -63,15 +63,14 @@ function check_brick_mount() {
   return 0
 }
 
-# check_dirs: check that the required hadoop-specific directories are present
-# on this node. Also check that the perms and owner are set correctly.
+# check_dirs: check that the required hadoop local directories are present on
+# this node. Also check that the perms and owner are set correctly.
 function check_dirs() {
 
   local dir; local perm; local owner; local tuple
   local out; local errcnt=0; local warncnt=0
 
-  for tuple in $($PREFIX/gen_dirs.sh -a); do # "all" dirs
-      # note: the distributed dirs will be under brickmnt on each node also
+  for tuple in $($PREFIX/gen_dirs.sh -l); do # only local dirs
       dir="$BRICKMNT/${tuple%%:*}"
       perm=${tuple%:*}; perm=${perm#*:}
       owner=${tuple##*:}
@@ -198,7 +197,7 @@ function check_selinux() {
 
   # report selinux state
   out=$(sestatus | head -n 1 | awk '{print $3}') # enforcing, permissive
-  [[ -z "$QUIET" ]] && echo "selinux is set on $NODE to: $out"
+  [[ -z "$QUIET" ]] && echo "selinux on $NODE is set to: $out"
  
   [[ "$out" != 'enabled' ]] && ((errcnt++))
 

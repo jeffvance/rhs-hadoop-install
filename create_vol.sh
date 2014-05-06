@@ -74,7 +74,7 @@ function parse_brkmnts() {
   local node_spec; local i
 
   # extract the required brick-mnt from the 1st node-spec entry
-  brkmnt=${NODE_SPEC[0]%:*}
+  brkmnt=${NODE_SPEC[0]#*:}
 
   if [[ -z "$brkmnt" ]] ; then
     echo "Syntax error: expect a brick mount, preceded by a \":\", to immediately follow the first node"
@@ -137,7 +137,7 @@ function chk_nodes() {
       err=$?
       if (( err != 0 )) ; then
         errnodes+="$node "
-        errcnt++
+        ((errcnt++))
       fi
   done
 
@@ -159,7 +159,7 @@ function chk_nodes() {
 function mk_volmnt() {
 
   local err; local i; local node
-  local volmnt"$VOLMNT/$VOLNAME"
+  local volmnt="$VOLMNT/$VOLNAME"
   local mntopts='entry-timeout=0,attribute-timeout=0,use-readdirp=no,acl,_netdev'
 
   for node in ${NODES[@]}; do
@@ -202,7 +202,7 @@ function add_distributed_dirs() {
  
 ## main ##
 
-BRKMNT=(); NODES=()
+BRKMNTS=(); NODES=()
 PREFIX="$(dirname $(readlink -f $0))"
 bricks=''; errcnt=0
 
