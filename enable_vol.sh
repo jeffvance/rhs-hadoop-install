@@ -182,7 +182,7 @@ echo
 # make sure the volume exists
 vol_exists
 
-# verify that the volume is setup for hadoop workload
+# verify that the volume is setup for hadoop workload and potentiall fix
 if ! $PREFIX/bin/check_vol.sh $VOLNAME ; then # 1 or more problems
   echo
   echo "One or more nodes spanned by $VOLNAME has issues"
@@ -193,6 +193,6 @@ if ! $PREFIX/bin/check_vol.sh $VOLNAME ; then # 1 or more problems
 fi
 
 echo "Enable $VOLNAME in all core-site.xml files..."
-$PREFIX/bin/setup_glusterfs_uri.sh -h $MGMT_NODE $VOLNAME
+$PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE $VOLNAME
 
 exit 0
