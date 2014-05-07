@@ -1,17 +1,16 @@
 #!/bin/bash
 #
 # create_vol.sh accepts a volume name, volume mount path prefix, and a list of
-# two or more "node:brick_mnt" pairs and creates a new volume. Each node spanned
-# by the new volume is checked that it is setup for hadoop workloads, and that
-# hadoop volume performance settings are set. The volume is mounted with the
-# correct glusterfs-fuse mount options.
+# two or more "node:brick_mnt" pairs, and creates a new volume with the
+# appropriate performance setting set. Each node spanned by the new volume is
+# checked that it is setup for hadoop workloads by invoking check_nodes.sh. The
+# new volume is started. The volume is mounted with the correct glusterfs-fuse
+# mount options. Lastly, distributed, hadoop-specific directories are created.
 #
 # Syntax (all positional):
 #  $1=volName: name of the new volume
-#
 #  $2=vol-mnt-prefix: path of the glusterfs-fuse mount point, eg. /mnt/glusterfs.
 #     Note: the volume name will be appended to this mount point.
-#
 #  $3=node-list: a list of (minimally) 2 nodes and 1 brick mount path. For
 #     example: "create_vol.sh HadoopVol /mnt/glusterfs rhs21-1:/mnt/brick1 
 #                rhs21-2"

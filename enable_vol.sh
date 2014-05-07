@@ -140,6 +140,26 @@ function setup_nodes() {
   fi
 }
 
+# chk_and_fix_nodes: calls check_vol.sh to verify that VOLNAME has been setup
+# for hadoop workloads, including each node spanned by the volume. If setup
+# issues are detected then the user is optionally prompted to fix the problems.
+# Uses globals:
+#   AUTO_YES
+#   PREFIX
+#   VOLNAME
+function chk_and_fix_nodes() {
+
+  # verify that the volume is setup for hadoop workload and potentiall fix
+  if ! $PREFIX/bin/check_vol.sh $VOLNAME ; then # 1 or more problems
+    echo
+    echo "One or more nodes spanned by $VOLNAME has issues"
+    if [[ -n "$AUTO_YES" ]] || yesno "  Correct above issues? [y|N] " ; then
+      setup_nodes
+      $PREFIX/bin/set_vol_perf.sh $VOLNAME
+    fi
+  fi
+}
+
 
 ## main ##
 
@@ -159,15 +179,7 @@ echo
 # make sure the volume exists
 vol_exists
 
-# verify that the volume is setup for hadoop workload and potentiall fix
-if ! $PREFIX/bin/check_vol.sh $VOLNAME ; then # 1 or more problems
-  echo
-  echo "One or more nodes spanned by $VOLNAME has issues"
-  if [[ -n "$AUTO_YES" ]] || yesno "  Correct above issues? [y|N] " ; then
-    setup_nodes
-    $PREFIX/bin/set_vol_perf.sh $VOLNAME
-  fi
-fi
+chk_and_fix_nodes
 
 echo "Enable $VOLNAME in all core-site.xml files..."
 $PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE -u $MGMT_USER \
