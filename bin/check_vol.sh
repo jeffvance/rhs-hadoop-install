@@ -33,13 +33,13 @@ VOLNAME="$1"
 
 [[ -n "$QUIET" ]] && q='-q'
 
-BRICKS="$($PREFIX/find_bricks.sh $VOLNAME)"
+BRKMNTS="$($PREFIX/find_brick_mnts.sh $VOLNAME)"
 
-for brick in $BRICKS; do
+for brick in $BRKMNTS; do
     node=${brick%:*}
     brkmnt=${brick#*:}
-    scp -q $PREFIX/*.sh $node:/tmp # cp all utility scripts to /tmp on node
-    ssh $node "/tmp/check_node.sh $q $brkmnt" || ((errcnt++))
+    scp -q -r $PREFIX/../bin $node:/tmp # cp all utility scripts to /tmp/bin
+    ssh $node "/tmp/bin/check_node.sh $q $brkmnt" || ((errcnt++))
 done
 
 $PREFIX/check_vol_mount.sh $q $VOLNAME $NODES || ((errcnt++))
