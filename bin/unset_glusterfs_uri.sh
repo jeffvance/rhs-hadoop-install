@@ -113,7 +113,7 @@ PARAMS=`echo $PARAMS | sed "s/\"//g"`
 DEBUG echo "########## PARAMS = "$PARAMS	
 
 if (($# == 1)); then
-  DEBUG "sh ./ambari_config.sh $PARAMS $1"
+  DEBUG echo "sh ./ambari_config.sh $PARAMS $1"
   sh ./ambari_config.sh $PARAMS $1	
 else
   usage
