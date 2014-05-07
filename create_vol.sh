@@ -242,6 +242,8 @@ function start_vol() {
       echo "ERROR $err: gluster vol start $VOLNAME: $out"
       exit 1
     fi
+  else
+    echo "\"$VOLNAME\" volume started"
   fi
 }
 
