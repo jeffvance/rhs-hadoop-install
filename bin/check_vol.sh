@@ -9,7 +9,8 @@
 #  $1=volume name
 #  -q, if specified, means only set the exit code, do not output anything
 #
-# Assumption: the node running this script has access to the gluster cli.
+# Assumption: the node running this script has access to the gluster cli, and
+#   needed scripts under bin/ are in place on this node.
 
 errcnt=0; q=''
 PREFIX="$(dirname $(readlink -f $0))"
@@ -38,7 +39,6 @@ BRKMNTS="$($PREFIX/find_brick_mnts.sh $VOLNAME)"
 for brick in $BRKMNTS; do
     node=${brick%:*}
     brkmnt=${brick#*:}
-    scp -q -r $PREFIX/../bin $node:/tmp # cp all utility scripts to /tmp/bin
     ssh $node "/tmp/bin/check_node.sh $q $brkmnt" || ((errcnt++))
 done
 

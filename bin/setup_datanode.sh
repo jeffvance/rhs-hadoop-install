@@ -19,7 +19,7 @@
 # parse_cmd: use get_opt to parse the command line. Exits on errors.
 # Sets globals:
 #   BLKDEV
-#   BRKMNT
+#   BRICKMNT
 #   MGMT_NODE
 #   YARN_NODE
 #   QUIET
@@ -40,7 +40,7 @@ function parse_cmd() {
           BLKDEV="$2"; shift 2; continue
         ;;
         --brkmnt)
-          BRKMNT="$2"; shift 2; continue
+          BRICKMNT="$2"; shift 2; continue
         ;;
         --hadoop-mgmt-node)
           MGMT_NODE="$2"; shift 2; continue
@@ -58,7 +58,7 @@ function parse_cmd() {
   [[ -z "$BLKDEV" ]] && {
     echo "Syntax error: the block device path is required";
     ((errcnt++)); }
-  [[ -z "$BRKMNT" ]] && {
+  [[ -z "$BRICKMNT" ]] && {
     echo "Syntax error: the brick mount path is required";
     ((errcnt++)); }
   [[ -z "$YARN_NODE" || -z "$MGMT_NODE" ]] && {
