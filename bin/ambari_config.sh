@@ -78,7 +78,32 @@ function DEBUG()
  [ "$_DEBUG" == "on" ] &&  $@
 }
 
+###################
+## startService()
+###################
+startService () {
+  DEBUG echo "########## service = "$1
+  if curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/services/$1" | grep state | cut -d : -f 2 | grep -q "STARTED" ; then
+    echo "$1 already started."
+  else
+    echo "Starting $1 service"
+    curl -u $USERID:$PASSWD -X PUT  -H "X-Requested-By: rhs" "$AMBARIURL/api/v1/clusters/$CLUSTER/services?ServiceInfo/state=INSTALLED&ServiceInfo/service_name=$1" --data "{\"RequestInfo\": {\"context\" :\"Start $1 Service\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"STARTED\"}}}";
+  fi
+}
 
+
+###################
+## stopService()
+###################
+stopService () {
+  DEBUG echo "########## service = "$1
+  if curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/services/$1" | grep state | cut -d : -f 2 | grep -q "INSTALLED" ; then
+    echo "$1 already stopped."
+  else
+    echo "Stopping $1 service"
+    curl -u $USERID:$PASSWD -X PUT  -H "X-Requested-By: rhs" "$AMBARIURL/api/v1/clusters/$CLUSTER/services?ServiceInfo/state=STARTED&ServiceInfo/service_name=$1" --data "{\"RequestInfo\": {\"context\" :\"Start $1 Service\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"INSTALLED\"}}}";
+  fi
+}
 ###################
 ## currentSiteTag()
 ###################
