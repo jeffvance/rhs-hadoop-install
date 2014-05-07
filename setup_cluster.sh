@@ -58,14 +58,15 @@ function yesno() {
 
 # parse_cmd: use get_opt to parse the command line. Exits on errors.
 # Sets globals:
-#   YARN_NODE
-#   MGMT_NODE
 #   AUTO_YES
+#   MGMT_NODE
 #   NODE_SPEC
+#   YARN_NODE
 function parse_cmd() {
 
   local opts='y'
   local long_opts='yarn-master:,hadoop-mgmt-node:'
+  local errcnt=0
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
 
@@ -86,14 +87,16 @@ function parse_cmd() {
       esac
   done
 
+  # check required args
   NODE_SPEC=($@) # array of nodes, brick-mnts, blk-devs -- each separated by ":"
   [[ -z "$NODE_SPEC" || ${#NODE_SPEC[@]} < 2 ]] && {
     echo "Syntax error: expect list of 2 or more nodes plus brick mount(s) and block dev(s)";
-    exit -1; }
-
+    ((errcnt++)); }
   [[ -z "$YARN_NODE" || -z "$MGMT_NODE" ]] && {
     echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
-    exit -1; }
+    ((errcnt++)); }
+
+  (( errcnt > 0 )) && exit 1
 }
 
 # parse_nodes: set the global NODES array from NODE_SPEC and report warnings
@@ -199,11 +202,11 @@ function parse_brkmnts_and_blkdevs() {
 # setup_nodes: setup each node for hadoop workloads by invoking
 # bin/setup_datanodes.sh. Exits on errors.
 # Uses globals:
-#   NODES
-#   BRKMNTS
 #   BLKDEVS
-#   YARN_NODE
+#   BRKMNTS
+#   NODES
 #   PREFIX
+#   YARN_NODE
 function setup_nodes() {
 
   local i; local err; local errcnt=0; local errnodes=''
@@ -215,7 +218,10 @@ function setup_nodes() {
       blkdev=${BLKDEVS[$i]}
 
       scp -r -q $PREFIX/bin $node:/tmp
-      ssh $node "/tmp/bin/setup_datanode.sh -q $blkdev $brkmnt $YARN_NODE"
+      ssh $node "/tmp/bin/setup_datanode.sh --blkdev $blkdev \
+                --brkmnt $brkmnt \
+                --yarn-master $YARN_NODE \
+                --hadoop-mgmt-node $MGMT_NODE"
       err=$?
 
       if (( err != 0 )) ; then

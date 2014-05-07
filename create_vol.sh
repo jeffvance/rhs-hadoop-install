@@ -35,19 +35,24 @@
 #   NODE_SPEC (node:brkmnt)
 function parse_cmd() {
 
+  local errcnt=0
+
   VOLNAME="$1"; shift
   VOLMNT="$1"; shift
   NODE_SPEC=($@) # array of nodes:brick-mnts.
 
+  # check required args
   [[ -z "$VOLNAME" ]] && {
     echo "Syntax error: volume name is required";
-    exit -1; }
+    ((errcnt++)); }
   [[ -z "$VOLMNT" ]] && {
     echo "Syntax error: volume mount path prefix is required";
-    exit -1; }
+    ((errcnt++)); }
   [[ -z "$NODE_SPEC" || ${#NODE_SPEC[@]} < 2 ]] && {
     echo "Syntax error: expect list of 2 or more nodes plus brick mount(s)";
-    exit -1; }
+    ((errcnt++)); }
+
+  (( errcnt > 0 )) && exit 1
 }
 
 # parse_nodes: set the global NODES array from NODE_SPEC.

@@ -5,14 +5,68 @@
 # It is assumed that localhost has already been validated (eg. check_node.sh
 # has been run) prior to setting up the node.
 # Syntax:
-#  $1=block device path
-#  $2=brick mount path
-#  $3=hadoop/ambari management node
+#  --blkdev: block device path (required)
+#  --brkmnt: brick mount path (required)
+#  --yarn-master: hostname or ip of the yarn-master server (expected to be out-
+#       side of the storage pool) (required)
+#  --hadoop-mgmt-node: hostname or ip of the hadoop mgmt server (expected to
+#       be outside of the storage pool) (required)
 #  -q, if specified, means only set the exit code, do not output anything
 
-errcnt=0; q=''
-PREFIX="$(dirname $(readlink -f $0))"
 
+## functions ##
+
+# parse_cmd: use get_opt to parse the command line. Exits on errors.
+# Sets globals:
+#   BLKDEV
+#   BRKMNT
+#   MGMT_NODE
+#   YARN_NODE
+#   QUIET
+function parse_cmd() {
+
+  local opts='q'
+  local long_opts='blkdev:,brkmnt:,yarn-master:,hadoop-mgmt-node:'
+  local errcnt=0
+
+  eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
+
+  while true; do
+      case "$1" in
+        -q)
+          QUIET=true; shift; continue
+        ;;
+        --blkdev)
+          BLKDEV="$2"; shift 2; continue
+        ;;
+        --brkmnt)
+          BRKMNT="$2"; shift 2; continue
+        ;;
+        --hadoop-mgmt-node)
+          MGMT_NODE="$2"; shift 2; continue
+        ;;
+        --yarn-master)
+          YARN_NODE="$2"; shift 2; continue
+        ;;
+        --)
+          shift; break
+        ;;
+      esac
+  done
+
+  # check required args
+  [[ -z "$BLKDEV" ]] && {
+    echo "Syntax error: the block device path is required";
+    ((errcnt++)); }
+  [[ -z "$BRKMNT" ]] && {
+    echo "Syntax error: the brick mount path is required";
+    ((errcnt++)); }
+  [[ -z "$YARN_NODE" || -z "$MGMT_NODE" ]] && {
+    echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
+    ((errcnt++)); }
+
+  (( errcnt > 0 )) && exit 1
+}
 
 # get_ambari_repo: wget the ambari repo file in the correct location.
 function get_ambari_repo(){
@@ -207,30 +261,11 @@ function setup_xfs() {
 
 ## main ##
 
-# parse cmd opts
-while getopts ':q' opt; do
-    case "$opt" in
-      q)
-        QUIET=true # else, undefined
-        ;;
-      \?) # invalid option
-        ;;
-    esac
-done
-shift $((OPTIND-1))
+errcnt=0; q=''
+PREFIX="$(dirname $(readlink -f $0))"
 
-BLKDEV="$1"
-BRICKMNT="$2"
-MGMT_NODE="$3"
+parse_cmd $@
 [[ -n "$QUIET" ]] && q='-q'
-
-[[ -z "$BLKDEV" || -z "$BRICKMNT" || -z "$MGMT_NODE" ]] && {
-  echo "Syntax error: block dev, brick mount, and hadoop mgmt node are all required";
-  exit -1; }
-
-[[ ! -b $BLKDEV ]] && {
-  echo "ERROR: $BLKDEV does not exist as a block device";
-  exit -1; }
 
 setup_selinux      || ((errcnt++))
 setup_xfs          || ((errcnt++))
