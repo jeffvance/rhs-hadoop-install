@@ -193,6 +193,7 @@ if ! $PREFIX/bin/check_vol.sh $VOLNAME ; then # 1 or more problems
 fi
 
 echo "Enable $VOLNAME in all core-site.xml files..."
-$PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE $VOLNAME
+$PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE -u $MGMT_USER \
+	-p $MGMT_PASS -port $MGMT_PORT $VOLNAME
 
 exit 0
