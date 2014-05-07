@@ -101,7 +101,7 @@ function parse_brkmnts() {
   done
 }
 
-# chk_vol: invokes gluster vol status to see if VOLNAME already exists. Exits
+# chk_vol: invokes gluster vol info to see if VOLNAME already exists. Exits
 # on errors.
 # Uses globals:
 #   VOLNAME
@@ -109,10 +109,10 @@ function chk_vol() {
 
   local err
 
-  gluster volume status $VOLNAME >& /dev/null
+  gluster volume info $VOLNAME >& /dev/null
   err=$?
   if (( err == 0 )) ; then
-    echo "ERROR: volume $VOLNAME already exists"
+    echo "ERROR: volume \"$VOLNAME\" already exists"
     exit 1
   fi
 }
@@ -156,7 +156,8 @@ function mk_volmnt() {
 
   local err; local out; local i; local node
   local volmnt="$VOLMNT/$VOLNAME"
-  local mntopts='entry-timeout=0,attribute-timeout=0,use-readdirp=no,acl,_netdev'
+  local \
+    mntopts='entry-timeout=0,attribute-timeout=0,use-readdirp=no,acl,_netdev'
 
   for node in ${NODES[@]}; do
       out="$(ssh $node "
@@ -206,30 +207,45 @@ function add_distributed_dirs() {
 #   VOLNAME
 function create_vol() {
 
-  local bricks=''; local err; local i
-
-  if gluster volume info $VOLNAME >& /dev/null ; then
-    echo "\"$VOLNAME\" volume already exists..."
-    return  # vol already exists
-  fi
+  local bricks=''; local err; local i; local out
 
   # create the gluster volume, replica 2 is hard-coded for now
   for (( i=0; i<${#NODES[@]}; i++ )); do
       bricks+="${NODES[$i]}:${BRKMNTS[$i]}/$VOLNAME "
   done
 
-  gluster volume create $VOLNAME replica 2 $bricks
+  out="$(gluster volume create $VOLNAME replica 2 $bricks 2>&1)"
   err=$?
   if (( err != 0 )) ; then
-    echo "ERROR $err: gluster vol create $VOLNAME $bricks"
+    echo "ERROR $err: gluster vol create $VOLNAME $bricks: $out"
     exit 1
   fi
+  echo "\"$VOLNAME\" created"
 
   # set vol performance settings
   $PREFIX/bin/set_vol_perf.sh $VOLNAME
 }
 
- 
+# start_vol: gluster vol start VOLNAME. Exits on errors.
+# Uses globals:
+#   VOLNAME
+function start_vol() {
+
+  local err; local out
+
+  out="$(gluster --mode=script volume start $VOLNAME 2>&1)"
+  err=$?
+  if (( err != 0 )) ; then # serious error or vol already started
+    if grep -qs ' already started' <<<$out ; then
+      echo "\"$VOLNAME\" volume already started..."
+    else
+      echo "ERROR $err: gluster vol start $VOLNAME: $out"
+      exit 1
+    fi
+  fi
+}
+
+
 ## main ##
 
 BRKMNTS=(); NODES=()
@@ -242,13 +258,13 @@ parse_nodes
 
 parse_brkmnts
 
-# make sure the volume doesn't already exist
-chk_vol
-
 echo
 echo "****NODES=${NODES[@]}"
 echo "****BRKMNTS=${BRKMNTS[@]}"
 echo
+
+# make sure the volume doesn't already exist
+chk_vol
 
 # verify that each node is prepped for hadoop workloads
 chk_nodes
@@ -257,10 +273,10 @@ chk_nodes
 create_vol
 start_vol
 
-# add the distributed hadoop dirs
-add_distributed_dirs
-
 # create gluster-fuse mount, per node
 mk_volmnt
+
+# add the distributed hadoop dirs
+add_distributed_dirs
 
 exit 0
