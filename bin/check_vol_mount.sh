@@ -12,9 +12,6 @@
 # Assumption: the node running this script has access to the gluster cli unless
 #   the nodes spanned by the volume are passed to this script.
 
-errcnt=0; cnt=0
-PREFIX="$(dirname $(readlink -f $0))"
-
 
 # given the passed-in vol mount opts, verify the correct settings. Returns 1 
 # for errors, 2 for warnings, and 0 for neither.
@@ -84,6 +81,9 @@ function check_vol_mnt_attrs() {
 
 
 ## main ## 
+
+errcnt=0; cnt=0
+PREFIX="$(dirname $(readlink -f $0))"
 
 # parse cmd opts
 while getopts ':q' opt; do

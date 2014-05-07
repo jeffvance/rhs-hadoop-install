@@ -1,30 +1,19 @@
 #!/bin/bash
 #
-# create_vol.sh accepts a volume name, volume mount path prefix, and a list of
-# two or more "node:brick_mnt" pairs and creates a new volume. Each node spanned
-# by the new volume is checked that it is setup for hadoop workloads, and that
-# hadoop volume performance settings are set. The volume is mounted with the
-# correct glusterfs-fuse mount options.
+# enable_vol.sh accepts a volume name, checks the volume mount and each node
+# spanned by the volume to be sure they are setup for hadoop workloads, and
+# then updates the core-site files on all nodes to contain the volume. 
 #
-# Syntax (all positional):
+# Syntax:
 #  $1=volName: name of the new volume
-#
-#  $2=vol-mnt-prefix: path of the glusterfs-fuse mount point, eg. /mnt/glusterfs.
-#     Note: the volume name will be appended to this mount point.
-#
-#  $3=node-list: a list of (minimally) 2 nodes and 1 brick mount path. For
-#     example: "create_vol.sh HadoopVol /mnt/glusterfs rhs21-1:/mnt/brick1 
-#                rhs21-2"
-#     the glusterfs-fuse mount on node rhs21-1 will be "/mnt/glusterfs/HadoopVol"
-#     The general syntax is: <node1>:<brkmnt1> <node1>[:<brkmnt2>] ... 
-#       <nodeN>[:<brkmntN>]
-#     The first <brkmnt> is required. If all the nodes use the same path to
-#     their brick mounts then there is no need to repeat the brick mount point.
-#     If a node uses a different brick mount then it is defined following a
-#     ":" after the node name.
+#  $2=vol-mnt-prefix: path of the glusterfs-fuse mount point, eg:
+#       /mnt/glusterfs. Note: volume name is appended to this mount point.
+#  --yarn-master: hostname or ip of the yarn-master server
+#  --hadoop-mgmt-node: hostname or ip of the hadoop mgmt server
 #
 # Assumption: script must be executed from a node that has access to the 
 #  gluster cli.
+
 
 ## funtions ##
 
@@ -32,12 +21,31 @@
 # Sets globals:
 #   VOLNAME
 #   VOLMNT
-#   NODE_SPEC (node:brkmnt)
+#   YARN_NODE
+#   MGMT_NODE
 function parse_cmd() {
 
-  VOLNAME="$1"; shift
-  VOLMNT="$1"; shift
-  NODE_SPEC=($@) # array of nodes:brick-mnts.
+  local opts=''
+  local long_opts='yarn-master:,hadoop-mgmt-node:'
+
+  eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
+
+  while true; do
+      case "$1" in
+        --yarn-master)
+          YARN_NODE="$2"; shift 2; continue
+        ;;
+        --hadoop-mgmt-node)
+          MGMT_NODE="$2"; shift 2; continue
+        ;;
+        --)
+          shift; break
+        ;;
+      esac
+  done
+
+  VOLNAME="$1"
+  VOLMNT="$2"
 
   [[ -z "$VOLNAME" ]] && {
     echo "Syntax error: volume name is required";
@@ -45,68 +53,12 @@ function parse_cmd() {
   [[ -z "$VOLMNT" ]] && {
     echo "Syntax error: volume mount path prefix is required";
     exit -1; }
-  [[ -z "$NODE_SPEC" || ${#NODE_SPEC[@]} < 2 ]] && {
-    echo "Syntax error: expect list of 2 or more nodes plus brick mount(s)";
+  [[ -z "$YARN_NODE" || -z "$MGMT_NODE" ]] && {
+    echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
     exit -1; }
 }
 
-# parse_nodes: set the global NODES array from NODE_SPEC.
-# Uses globals:
-#   NODE_SPEC
-# Sets globals:
-#   NODES
-function parse_nodes() {
-
-  local node_spec
-
-  # parse out list of nodes, format: "node:brick-mnt"
-  for node_spec in ${NODE_SPEC[@]}; do
-      NODES+=(${node_spec%%:*})
-  done
-}
-
-# parse_brkmnts: extracts the brick mounts from the global NODE_SPEC array.
-# Fills in default brkmnts based on the values included on the first node
-# (required). Exits on syntax errors.
-# Uses globals:
-#   NODE_SPEC
-# Sets globals:
-#   BRKMNTS
-function parse_brkmnts() {
-
-  local brkmnt; local brkmnts
-  local node_spec; local i
-
-  # extract the required brick-mnt from the 1st node-spec entry
-  brkmnt=${NODE_SPEC[0]#*:}
-
-  if [[ -z "$brkmnt" ]] ; then
-    echo "Syntax error: expect a brick mount, preceded by a \":\", to immediately follow the first node"
-    exit -1
-  fi
-
-  BRKMNTS+=($brkmnt) # set global
-
-  # fill in missing brk-mnts
-  for (( i=1; i<${#NODE_SPEC[@]}; i++ )); do # starting at 2nd entry
-      node_spec=${NODE_SPEC[$i]}
-      case "$(grep -o ':' <<<"$node_spec" | wc -l)" in # num of ":"s
-	  0) # brkmnt omitted
-	     BRKMNTS+=($brkmnt) # default
-          ;;
-	  1) # brkmnt specified
-	     BRKMNTS+=(${node_spec#*:})
-          ;;
-          *) 
-	     echo "Syntax error: improperly specified node-list"
-	     exit -1
-	  ;;
-      esac
-  done
-}
-
-# chk_vol: invokes gluster vol info to see if VOLNAME already exists. Exits
-# on errors.
+# chk_vol: invokes gluster vol info to see if VOLNAME exists. Exits on errors.
 # Uses globals:
 #   VOLNAME
 function chk_vol() {
@@ -115,8 +67,8 @@ function chk_vol() {
 
   gluster volume info $VOLNAME >& /dev/null
   err=$?
-  if (( err == 0 )) ; then
-    echo "ERROR: volume \"$VOLNAME\" already exists"
+  if (( err != 0 )) ; then
+    echo "ERROR $err: volume \"$VOLNAME\" error, volume may not exits"
     exit 1
   fi
 }
@@ -254,23 +206,22 @@ function start_vol() {
 
 ## main ##
 
-BRKMNTS=(); NODES=()
 PREFIX="$(dirname $(readlink -f $0))"
 errcnt=0
 
 parse_cmd $@
 
-parse_nodes
-
-parse_brkmnts
+NODES=($($PREFIX/bin/find_nodes.sh $VOLNAME)) # arrays
+BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh $VOLNAME))
 
 echo
 echo "****NODES=${NODES[@]}"
 echo "****BRKMNTS=${BRKMNTS[@]}"
 echo
 
-# make sure the volume doesn't already exist
+# make sure the volume exists
 chk_vol
+exit ###!!!!!!!!!!!
 
 # verify that each node is prepped for hadoop workloads
 chk_nodes
