@@ -1,13 +1,10 @@
 #!/bin/bash
 #
-# enable_vol.sh accepts a volume name, checks the volume mount and each node
-# spanned by the volume to be sure they are setup for hadoop workloads, and
-# then updates the core-site files, on all nodes, to contain the volume. 
+# disable_vol.sh accepts a volume name and removes this volume from core-site
+# on all relevant nodes.
 #
 # Syntax:
 #  $1=volName: gluster volume name
-#  $2=vol-mnt-prefix: path of the glusterfs-fuse mount point, eg:
-#       /mnt/glusterfs. Note: volume name is appended to this mount point.
 #  -y: auto answer "yes" to any prompts
 #  --yarn-master: hostname or ip of the yarn-master server (required)
 #  --hadoop-mgmt-node: hostname or ip of the hadoop mgmt server (required)
@@ -54,7 +51,6 @@ function yesno() {
 #   MGMT_PASS
 #   MGMT_PORT
 #   MGMT_USER
-#   VOLMNT
 #   VOLNAME
 #   YARN_NODE
 function parse_cmd() {
@@ -92,14 +88,10 @@ function parse_cmd() {
   done
 
   VOLNAME="$1"
-  VOLMNT="$2"
 
   # check for required args and options
   [[ -z "$VOLNAME" ]] && {
     echo "Syntax error: volume name is required";
-    ((errcnt++)); }
-  [[ -z "$VOLMNT" ]] && {
-    echo "Syntax error: volume mount path prefix is required";
     ((errcnt++)); }
   [[ -z "$YARN_NODE" || -z "$MGMT_NODE" ]] && {
     echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
@@ -124,44 +116,6 @@ function vol_exists() {
   fi
 }
 
-# setup_nodes: setup each node for hadoop workloads by invoking
-# bin/setup_datanodes.sh. Exits on errors.
-# Uses globals:
-#   BLKDEVS
-#   BRKMNTS
-#   MGMT_NODE
-#   NODES
-#   PREFIX
-#   YARN_NODE
-function setup_nodes() {
-
-  local i; local err; local errcnt=0; local errnodes=''
-  local node; local brkmnt; local blkdev
-
-  for (( i=0; i<${#NODES[@]}; i++ )); do
-      node=${NODES[$i]}
-      brkmnt=${BRKMNTS[$i]}
-      blkdev=${BLKDEVS[$i]}
-
-      scp -r -q $PREFIX/bin $node:/tmp
-      ssh $node "/tmp/bin/setup_datanode.sh --blkdev $blkdev \
-		--brkmnt $brkmnt \
-		--yarn-master $YARN_NODE \
-		--hadoop-mgmt-node $MGMT_NODE"
-      err=$?
-      if (( err != 0 )) ; then
-        echo "ERROR $err: setup_datanode failed on $node"
-        errnodes+="$node "
-        ((errcnt++))
-      fi
-  done
-
-  if (( errcnt > 0 )) ; then
-    echo "$errcnt setup node errors on nodes: $errnodes"
-    exit 1
-  fi
-}
-
 
 ## main ##
 
@@ -170,30 +124,20 @@ errcnt=0
 
 parse_cmd $@
 
-NODES=($($PREFIX/bin/find_nodes.sh $VOLNAME)) # arrays
-BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh $VOLNAME))
-BLKDEVS=($($PREFIX/bin/find_blocks.sh $VOLNAME))
+NODES=($($PREFIX/bin/find_nodes.sh $VOLNAME)) # array
 
 echo
 echo "****NODES=${NODES[@]}"
-echo "****BRKMNTS=${BRKMNTS[@]}"
 echo
 
 # make sure the volume exists
 vol_exists
 
-# verify that the volume is setup for hadoop workload and potentiall fix
-if ! $PREFIX/bin/check_vol.sh $VOLNAME ; then # 1 or more problems
-  echo
-  echo "One or more nodes spanned by $VOLNAME has issues"
-  if [[ -n "$AUTO_YES" ]] || yesno "  Correct above issues? [y|N] " ; then
-    setup_nodes
-    $PREFIX/bin/set_vol_perf.sh $VOLNAME
-  fi
-fi
-
-echo "Enable $VOLNAME in all core-site.xml files..."
-$PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE -u $MGMT_USER \
+echo "$VOLNAME will be removed from all hadoop config files and thus will not be available for any hadoop workloads"
+if [[ -n "$AUTO_YES" ]] || yesno "  Continue? [y|N] " ; then
+  echo "Disabling $VOLNAME in all core-site.xml files..."
+  $PREFIX/bin/unset_glusterfs_uri.sh -h $MGMT_NODE -u $MGMT_USER \
 	-p $MGMT_PASS -port $MGMT_PORT $VOLNAME
+fi
 
 exit 0
