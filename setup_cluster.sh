@@ -202,6 +202,7 @@ function parse_brkmnts_and_blkdevs() {
 #   NODES
 #   BRKMNTS
 #   BLKDEVS
+#   YARN_NODE
 #   PREFIX
 function setup_nodes() {
 

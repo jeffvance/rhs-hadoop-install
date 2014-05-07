@@ -46,5 +46,5 @@ $PREFIX/check_vol_mount.sh $q $VOLNAME $NODES || ((errcnt++))
 $PREFIX/check_vol_perf.sh $q $VOLNAME         || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
-[[ -z "$QUIET" ]] && echo "$VOLNAME is ready for Hadoop workloads"
+[[ -z "$QUIET" ]] && echo "$VOLNAME is ready for hadoop workloads"
 exit 0
