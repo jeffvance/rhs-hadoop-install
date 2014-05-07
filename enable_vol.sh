@@ -2,7 +2,7 @@
 #
 # enable_vol.sh accepts a volume name, checks the volume mount and each node
 # spanned by the volume to be sure they are setup for hadoop workloads, and
-# then updates the core-site files on all nodes to contain the volume. 
+# then updates the core-site files, on all nodes, to contain the volume. 
 #
 # Syntax:
 #  $1=volName: name of the new volume
@@ -28,7 +28,7 @@ function parse_cmd() {
   local opts=''
   local long_opts='yarn-master:,hadoop-mgmt-node:'
 
-  eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
+  eval set -- "$(getopt -o '' --long $long_opts -- $@)"
 
   while true; do
       case "$1" in
@@ -68,7 +68,7 @@ function chk_vol() {
   gluster volume info $VOLNAME >& /dev/null
   err=$?
   if (( err != 0 )) ; then
-    echo "ERROR $err: volume \"$VOLNAME\" error, volume may not exits"
+    echo "ERROR $err: vol info error on \"$VOLNAME\", volume may not exits"
     exit 1
   fi
 }
