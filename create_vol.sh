@@ -26,7 +26,10 @@
 # Assumption: script must be executed from a node that has access to the 
 #  gluster cli.
 
-## funtions ##
+PREFIX="$(dirname $(readlink -f $0))"
+
+
+## functions ##
 
 # parse_cmd: simple positional parsing. Exits on errors.
 # Sets globals:
@@ -79,11 +82,10 @@ function parse_nodes() {
 #   BRKMNTS
 function parse_brkmnts() {
 
-  local brkmnt; local brkmnts
+  local brkmnts
   local node_spec; local i
-
   # extract the required brick-mnt from the 1st node-spec entry
-  brkmnt=${NODE_SPEC[0]#*:}
+  local brkmnt=${NODE_SPEC[0]#*:}
 
   if [[ -z "$brkmnt" ]] ; then
     echo "Syntax error: expect a brick mount, preceded by a \":\", to immediately follow the first node"
@@ -260,7 +262,6 @@ function start_vol() {
 ## main ##
 
 BRKMNTS=(); NODES=()
-PREFIX="$(dirname $(readlink -f $0))"
 errcnt=0
 
 parse_cmd $@

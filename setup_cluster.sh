@@ -27,34 +27,12 @@
 #     brick mount and block dev then each one is proceded by a ":", following
 #     the node name.
 
+PREFIX="$(dirname $(readlink -f $0))"
 
-## funtions ##
 
-# yesno: prompts $1 to stdin and returns 0 if user answers yes, else returns 1.
-# The default (just hitting <enter>) is specified by $2.
-# $1=prompt (required),
-# $2=default (optional): 'y' or 'n' with 'n' being the default default.
-function yesno() {
+## functions ##
 
-  local prompt="$1"; local default="${2:-n}" # default is no
-  local yn
-
-   while true ; do
-       read -p "$prompt" yn
-       case $yn in
-         [Yy])         return 0;;
-         [Yy][Ee][Ss]) return 0;;
-         [Nn])         return 1;;
-         [Nn][Oo])     return 1;;
-         '') # default
-           [[ "$default" != 'y' ]] && return 1 || return 0
-         ;;
-         *) # unexpected...
-           echo "Expecting a yes/no response, not \"$yn\""
-         ;;
-       esac
-   done
-}
+source $PREFIX/yesno
 
 # parse_cmd: use get_opt to parse the command line. Exits on errors.
 # Sets globals:
@@ -154,13 +132,11 @@ function parse_nodes() {
 #   BLKMNTS
 function parse_brkmnts_and_blkdevs() {
 
-  local brkmnt; local brkmnts; local blkdev
-  local node_spec; local i
-
+  local brkmnts; local i
   # extract the required brick-mnt and blk-dev from the 1st node-spec entry
-  node_spec=(${NODE_SPEC[0]//:/ }) # split after subst : with space
-  brkmnt=${node_spec[1]}
-  blkdev=${node_spec[2]}
+  local node_spec=(${NODE_SPEC[0]//:/ }) # split after subst : with space
+  local brkmnt=${node_spec[1]}
+  local blkdev=${node_spec[2]}
 
   if [[ -z "$brkmnt" || -z "$blkdev" ]] ; then
     echo "Syntax error: expect a brick mount and block device to immediately follow the first node (each separated by a \":\")"
@@ -266,7 +242,6 @@ function create_pool() {
 ## main ##
 
 BRKMNTS=(); BLKDEVS=(); NODES=()
-PREFIX="$(dirname $(readlink -f $0))"
 errnodes=''; errcnt=0
 
 parse_cmd $@

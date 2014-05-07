@@ -15,34 +15,12 @@
 # Assumption: script must be executed from a node that has access to the 
 #  gluster cli.
 
+PREFIX="$(dirname $(readlink -f $0))"
 
-## funtions ##
 
-# yesno: prompts $1 to stdin and returns 0 if user answers yes, else returns 1.
-# The default (just hitting <enter>) is specified by $2.
-# $1=prompt (required),
-# $2=default (optional): 'y' or 'n' with 'n' being the default default.
-function yesno() {
+## functions ##
 
-  local prompt="$1"; local default="${2:-n}" # default is no
-  local yn
-
-   while true ; do
-       read -p "$prompt" yn
-       case $yn in
-         [Yy])         return 0;;
-         [Yy][Ee][Ss]) return 0;;
-         [Nn])         return 1;;
-         [Nn][Oo])     return 1;;
-         '') # default
-           [[ "$default" != 'y' ]] && return 1 || return 0
-         ;;
-         *) # unexpected...
-           echo "Expecting a yes/no response, not \"$yn\""
-         ;;
-       esac
-   done
-}
+source $PREFIX/yesno
 
 # parse_cmd: simple positional parsing. Exits on errors.
 # Sets globals:
@@ -119,7 +97,6 @@ function vol_exists() {
 
 ## main ##
 
-PREFIX="$(dirname $(readlink -f $0))"
 errcnt=0
 
 parse_cmd $@
