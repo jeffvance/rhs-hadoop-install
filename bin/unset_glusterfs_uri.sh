@@ -11,7 +11,7 @@ CLUSTER_NAME=""
 
 
 usage () {
-  echo "Usage: unset_glusterfs_uri.sh [-u userId] [-p password] [-port port] <AMBARI_HOST> <VOLUME_ID>";
+  echo "Usage: unset_glusterfs_uri.sh [-u userId] [-p password] [-port port] [-h ambari_host] <VOLUME_ID>";
   echo "";
   echo "       [-u userId]: Optional user ID to use for authentication. Default is 'admin'.";
   echo "       [-p password]: Optional password to use for authentication. Default is 'admin'.";
