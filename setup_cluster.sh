@@ -17,6 +17,8 @@
 # hadoop management and yarn-master nodes, unless they are also part of the
 # storage pool.
 #
+# Last, the ambari-server is installed and started on the supplied mgmt-node.
+#
 # Tasks related to volumes or ambari setup are not done here.
 #
 # Syntax:
@@ -290,6 +292,10 @@ setup_nodes
 
 # create the trusted storage pool
 create_pool
+
+# install and start the ambari server on the MGMT_NODE
+scp -r -q $PREFIX/bin $MGMT_NODE:/tmp
+ssh $MGMT_NODE "/tmp/bin/setup_ambari_server.sh 
 
 echo "${#NODES[@]} nodes setup for hadoop workloads with no errors"
 exit 0
