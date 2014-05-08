@@ -36,11 +36,15 @@ function parse_cmd() {
         -q)
           QUIET=true; shift; continue
         ;;
-        --blkdev)
-          BLKDEV="$2"; shift 2; continue
+        --blkdev) # optional
+	  shift
+	  [[ "${1:0:2}" == '--' ]] && continue # missing option value
+          BLKDEV="$1"; shift; continue
         ;;
-        --brkmnt)
-          BRICKMNT="$2"; shift 2; continue
+        --brkmnt) # optional
+	  shift
+	  [[ "${1:0:2}" == '--' ]] && continue # missing option value
+          BRICKMNT="$1"; shift; continue
         ;;
         --hadoop-mgmt-node)
           MGMT_NODE="$2"; shift 2; continue
@@ -261,17 +265,21 @@ PREFIX="$(dirname $(readlink -f $0))"
 parse_cmd $@
 [[ -n "$QUIET" ]] && q='-q'
 
-if [[ -n "$BLKDEV" && -n "$BRICKMNT" ]] ; then # need both to xfs and mount
+if [[ -n "$BLKDEV" ]] ; then # need for xfs 
   setup_xfs        || ((errcnt++))
+fi
+if [[ -n "$BLKDEV" && -n "$BRICKMNT" ]] ; then # need both for brick mount
   mount_blkdev     || ((errcnt++))
 fi
 setup_selinux      || ((errcnt++))
 setup_iptables     || ((errcnt++))
 setup_ambari_agent || ((errcnt++))
 
-$PREFIX/add_users.sh $q             || ((errcnt++))
-$PREFIX/add_groups.sh $q            || ((errcnt++))
-$PREFIX/add_dirs.sh -l $q $BRICKMNT || ((errcnt++)) # just local dirs
+$PREFIX/add_users.sh $q               || ((errcnt++))
+$PREFIX/add_groups.sh $q              || ((errcnt++))
+if [[ -n "$BRICKMNT" ]] ; then # need brick mount prefix
+  $PREFIX/add_dirs.sh -l $q $BRICKMNT || ((errcnt++)) # just local dirs
+fi
 
 (( errcnt > 0 )) && exit 1
 [[ -z "$QUIET" ]] && echo "${#VOL_SETTINGS[@]} volume perf settings set"
