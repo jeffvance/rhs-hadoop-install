@@ -70,7 +70,7 @@ function parse_cmd() {
 function get_ambari_repo(){
  
   local REPO_DIR='/etc/yum.repos.d'
-  local REPO_URL='http://public-repo-1.hortonworks.com/ambari/centos6/1.x/updates/1.5.1/ambari.repo'
+  local REPO_URL='http://public-repo-1.hortonworks.com/ambari/centos6/1.x/updates/1.4.4.23/ambari.repo'
   local out; local err; local errcnt=0
 
   [[ -d $REPO_DIR ]] || mkdir -p $REPO_DIR

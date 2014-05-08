@@ -12,12 +12,12 @@
 # created, and the required hadoop local directories are created (note: the
 # required distributed dirs are not created here).
 
-# Also, on all nodes (assumed to be storage- data-nodes) the ambari agent is
-# installed (updated if present) and started. The same is also done for the
-# hadoop management and yarn-master nodes, unless they are also part of the
-# storage pool.
+# Also, on all nodes (assumed to be storage- data-nodes) and on the yarn-master
+# server node, the ambari agent is installed (updated if present) and started.
+# If the hadoop management node is outside of the storage pool then it will not
+# have the agent installed.
 #
-# Last, the ambari-server is installed and started on the supplied mgmt-node.
+# Last, the ambari-server is installed and started on the mgmt-node.
 #
 # Tasks related to volumes or ambari setup are not done here.
 #
@@ -47,7 +47,7 @@ PREFIX="$(dirname $(readlink -f $0))"
 
 source $PREFIX/yesno
 
-# parse_cmd: use get_opt to parse the command line. Exits on errors.
+# parse_cmd: use get_opt to parse the command line. Returns 1 on errors.
 # Sets globals:
 #   AUTO_YES
 #   MGMT_NODE
@@ -64,7 +64,7 @@ function parse_cmd() {
   while true; do
       case "$1" in
 	-y)
-	  AUTO_YES='y'; shift; continue
+	  AUTO_YES=1; shift; continue
 	;;
 	--yarn-master)
 	  YARN_NODE="$2"; shift 2; continue
@@ -87,57 +87,62 @@ function parse_cmd() {
     echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
     ((errcnt++)); }
 
-  (( errcnt > 0 )) && exit 1
+  (( errcnt > 0 )) && return 1
+
+  return 0
 }
 
 # parse_nodes: set the global NODES array from NODE_SPEC and report warnings
 # if the yarn-master or mgmt nodes are inside the storage pool, and prompts
-# the user to continue unless AUTO_YES is set. Exits if user answers no.
+# the user to continue unless AUTO_YES is set. Returns 1 if user answers no.
 # Uses globals:
 #   NODE_SPEC
 #   YARN_NODE
 #   MGMT_NODE
 # Sets globals:
+#   MGMT_INSIDE
 #   NODES
+#   YARN_INSIDE
 function parse_nodes() {
 
-  local mgmt_inside; local yarn_inside
   local node_spec; local node
 
   # parse out list of nodes, format: "node:brick-mnt:blk-dev"
   for node_spec in ${NODE_SPEC[@]}; do
       node=${node_spec%%:*}
       NODES+=($node)
-      [[ "$node" == "$YARN_NODE" ]] && yarn_inside="$node"
-      [[ "$node" == "$MGMT_NODE" ]] && mgmt_inside="$node"
+      [[ "$node" == "$YARN_NODE" ]] && YARN_INSIDE=1 # true
+      [[ "$node" == "$MGMT_NODE" ]] && MGMT_INSIDE=1 # true
   done
 
   # warning if mgmt or yarn-master nodes are inside the storage pool
-  if [[ -n "$mgmt_inside" || -n "$yarn_inside" ]] ; then
-    if [[ -n "$mgmt_inside" && -n "$yarn_inside" ]] ; then
+  if (( MGMT_INSIDE || YARN_INSIDE )) ; then
+    if (( MGMT_INSIDE && YARN_INSIDE )) ; then
       echo "WARN: the yarn-master and hadoop management nodes are inside the storage pool which is sub-optimal."
-    elif [[ -n "$mgmt_inside" ]] ; then
+    elif (( MGMT_INSIDE )) ; then
       echo "WARN: the hadoop management node is inside the storage pool which is sub-optimal."
     else
       echo "WARN: the yarn-master node is inside the storage pool which is sub-optimal."
     fi
-    if [[ -z "$AUTO_YES" ]]  && ! yesno  "  Continue? [y|N] " ; then
-      exit 0
+    if (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " ; then
+      return 1
     fi
   fi
 
   # warning if yarn-master == mgmt node
   if [[ "$YARN_NODE" == "$MGMT_NODE" ]] ; then
     echo "WARN: the yarn-master and hadoop-mgmt-nodes are the same which is sub-optimal."
-    if [[ -z "$AUTO_YES" ]] && ! yesno  "  Continue? [y|N] " ; then
-      exit 0
+    if (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " ; then
+      return 1
     fi
   fi
+
+  return 0
 }
 
 # parse_brkmnts_and_blkdevs: extracts the brick mounts and block devices from
 # the global NODE_SPEC array. Fills in default brkmnts and blkdevs based on
-# the values included on the first node (required). Exits on syntax errors.
+# the values included on the first node (required). Returns 1 on syntax errors.
 # Uses globals:
 #   NODE_SPEC
 # Sets globals:
@@ -153,7 +158,7 @@ function parse_brkmnts_and_blkdevs() {
 
   if [[ -z "$brkmnt" || -z "$blkdev" ]] ; then
     echo "Syntax error: expect a brick mount and block device to immediately follow the first node (each separated by a \":\")"
-    exit -1
+    return 1
   fi
 
   BRKMNTS+=($brkmnt); BLKDEVS+=($blkdev) # set globals
@@ -182,34 +187,37 @@ function parse_brkmnts_and_blkdevs() {
           ;;
           *) 
 	     echo "Syntax error: improperly specified node-list"
-	     exit -1
+	     return 1
 	  ;;
       esac
   done
+
+  return 0
 }
 
-# setup_nodes: setup each node for hadoop workloads by invoking
-# bin/setup_datanodes.sh, which is also run for the mgmt-node and for the
-# yarn-master node, assuming they are outside of the storage pool.
-# Exits on errors.
+# setup_nodes: setup each node for hadoop workloads by invoking bin/
+# setup_datanodes.sh, which is also run for the yarn-master node if it is
+# outside of the storage pool. Note: if the hadoop mgmt-node is outside of the
+# storage pool then it will not have the agent installed. Returns 1 on errors.
 # Uses globals:
 #   BLKDEVS
 #   BRKMNTS
 #   NODES
 #   PREFIX
+#   YARN_INSIDE
 #   YARN_NODE
 function setup_nodes() {
 
   local i=0; local errcnt=0; local errnodes=''
   local node; local brkmnt; local blkdev
-  local do_mgmt=1; local do_yarn=1 # assume both outside pool
-
 
   # nested function to call setup_datanodes on a passed-in node, blkdev and
   # brick-mnt.
   function do_node() {
 
-    local node="$1"; local blkdev="$2"; local brkmnt="$3"
+    local node="$1"
+    local blkdev="$2" # can be blank
+    local brkmnt="$3" # can be blank
 
     scp -r -q $PREFIX/bin $node:/tmp
     ssh $node "/tmp/bin/setup_datanode.sh --blkdev $blkdev --brkmnt $brkmnt \
@@ -226,25 +234,23 @@ function setup_nodes() {
       do_node "$node" "$blkdev" "$brkmnt" || {
 	  errnodes+="$node ";
 	  ((errcnt++)); }
-      [[ "$node" == "$MGMT_NODE" ]] && do_mgmt=0 # false
-      [[ "$node" == "$YARN_NODE" ]] && do_yarn=0 # false
       ((i++))
   done
 
-  if (( do_mgmt )) ; then
-    do_node $MGMT_NODE || ((errcnt++)) # blkdev and brkmnt are blank
-  fi
-  if (( do_yarn )) ; then
+  if (( ! YARN_INSIDE )) ; then
     do_node $YARN_NODE || ((errcnt++)) # blkdev and brkmnt are blank
   fi
 
   if (( errcnt > 0 )) ; then
     echo "$errcnt setup node errors on nodes: $errnodes"
-    exit 1
+    return 1
   fi
+
+  return 0
 }
 
 # create_pool: create the trusted pool, even if the pool already exists.
+# Returns 1 on errors.
 # Note: gluster peer probe returns 0 if the node is already in the pool. It
 #   returns 1 if the node is unknown.
 # Note: not needed to probe "yourself" but not an error either, and this way we
@@ -265,21 +271,47 @@ function create_pool() {
 
   if (( errcnt > 0 )) ; then
     echo "$errcnt peer probe errors on nodes: $errnodes"
-    exit 1
+    return 1
   fi
+
+  return 0
+}
+
+# ambari_server: install and start the ambari server on the MGMT_NODE. Returns
+# 1 on errors.
+# Uses globals:
+#   MGMT_INSIDE
+#   MGMT_NODE
+function ambari_server() {
+
+  echo "Installing the ambari-server on $MGMT_NODE..."
+
+  # if the mgmt-node is inside the storage pool then all bin scripts have been
+  # copied, else need to copy the setup_ambari_server script
+  if (( ! MGMT_INSIDE )) ; then
+    ssh $MGMT_NODE "mkdir -p /tmp/bin"
+    scp -q $PREFIX/bin/setup_ambari_server.sh $MGMT_NODE:/tmp/bin
+  fi
+
+  ssh $MGMT_NODE "/tmp/bin/setup_ambari_server.sh" || return 1
+
+  return 0 
 }
 
 
 ## main ##
 
 BRKMNTS=(); BLKDEVS=(); NODES=()
+MGMT_INSIDE=0 # assume false
+YARN_INSIDE=0 # assume false
+AUTO_YES=0    # assume false
 errnodes=''; errcnt=0
 
-parse_cmd $@
+parse_cmd $@ || exit -1
 
-parse_nodes
+parse_nodes || exit 1
 
-parse_brkmnts_and_blkdevs
+parse_brkmnts_and_blkdevs || exit 1
 
 echo
 echo "****NODES=${NODES[@]}"
@@ -288,14 +320,13 @@ echo "****BLKDEVS=${BLKDEVS[@]}"
 echo
 
 # setup each node for hadoop workloads
-setup_nodes
+setup_nodes || exit 1
 
 # create the trusted storage pool
-create_pool
+create_pool || exit 1
 
 # install and start the ambari server on the MGMT_NODE
-scp -r -q $PREFIX/bin/setup_ambari_server.sh $MGMT_NODE:/tmp
-ssh $MGMT_NODE "/tmp/setup_ambari_server.sh 
+ambari_server || exit 1
 
 echo "${#NODES[@]} nodes setup for hadoop workloads with no errors"
 exit 0

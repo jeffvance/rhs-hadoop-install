@@ -10,7 +10,7 @@ PREFIX="$(dirname $(readlink -f $0))"
 warncnt=0
 AMBARI_SERVER_PID='/var/run/ambari-server/ambari-server.pid'
 METAINFO_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.0.6.GlusterFS/metainfo.xml'
-ACTIVE_FALSE='<active>false<'; local ACTIVE_TRUE='<active>true<'
+ACTIVE_FALSE='<active>false<'; ACTIVE_TRUE='<active>true<'
 
 # parse cmd opts
 while getopts ':q' opt; do
