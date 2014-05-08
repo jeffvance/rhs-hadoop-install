@@ -16,7 +16,7 @@
 
 ## functions ##
 
-# parse_cmd: use get_opt to parse the command line. Exits on errors.
+# parse_cmd: use get_opt to parse the command line. Returns 1 on errors.
 # Sets globals:
 #   BLKDEV
 #   BRICKMNT
@@ -63,7 +63,7 @@ function parse_cmd() {
     echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
     ((errcnt++)); }
 
-  (( errcnt > 0 )) && exit 1
+  (( errcnt > 0 )) && return 1
 }
 
 # get_ambari_repo: wget the ambari repo file in the correct location.
@@ -91,11 +91,13 @@ function get_ambari_repo(){
 }
 
 # mount_blkdev: create the brick-mnt dir if needed, append the xfs brick mount
-# to /etc/fstab, and then mount it.
+# to /etc/fstab, and then mount it. Returns 1 on errors.
 function mount_blkdev() {
 
   local err; local errcnt=0; local out
   local mntopts="noatime,inode64"
+
+  [[ -z "$BLKDEV" || -z "$BRICKMNT" ]] && return 0 # need both for brick mount
 
   [[ ! -e $BRICKMNT ]] && mkdir -p $BRICKMNT
 
@@ -118,7 +120,7 @@ function mount_blkdev() {
 
 # setup_ambari_agent: yum install the ambari agent rpm, modify the .ini file
 # to point to the ambari server, start the agent, and set up agent to start
-# automatically after a reboot.
+# automatically after a reboot. Returns 1 on errors.
 function setup_ambari_agent() {
 
   local out; local err; local errcnt=0
@@ -140,7 +142,7 @@ function setup_ambari_agent() {
   # install agent
   out="$(yum -y install ambari-agent 2>&1)"
   err=$?
-  [[ -z "$QUIET" ]] && echo echo "ambari-agent install: $out"
+  [[ -z "$QUIET" ]] && echo "ambari-agent install: $out"
   if (( err != 0 && err != 1 )) ; then # 1--> nothing-to-do
     [[ -z "$QUIET" ]] && echo echo "ERROR $err: ambari-agent install"
     return 1
@@ -237,11 +239,13 @@ function setup_selinux() {
   fi
 }
 
-# setup_xfs: mkfs.xfs on the block device.
+# setup_xfs: mkfs.xfs on the block device. Returns 1 on error.
 function setup_xfs() {
 
   local blk; local err; local errcnt=0; local out
   local isize=512
+
+  [[ -z "$BLKDEV" ]] && return 0 # nothing to do...
 
   if ! xfs_info $BLKDEV >& /dev/null ; then
     out="$(mkfs -t xfs -i size=$isize -f $BLKDEV 2>&1)"
@@ -262,15 +266,11 @@ function setup_xfs() {
 errcnt=0; q=''
 PREFIX="$(dirname $(readlink -f $0))"
 
-parse_cmd $@
+parse_cmd $@ || exit -1
 [[ -n "$QUIET" ]] && q='-q'
 
-if [[ -n "$BLKDEV" ]] ; then # need for xfs 
-  setup_xfs        || ((errcnt++))
-fi
-if [[ -n "$BLKDEV" && -n "$BRICKMNT" ]] ; then # need both for brick mount
-  mount_blkdev     || ((errcnt++))
-fi
+setup_xfs          || ((errcnt++))
+mount_blkdev       || ((errcnt++))
 setup_selinux      || ((errcnt++))
 setup_iptables     || ((errcnt++))
 setup_ambari_agent || ((errcnt++))

@@ -218,11 +218,18 @@ function setup_nodes() {
     local node="$1"
     local blkdev="$2" # can be blank
     local brkmnt="$3" # can be blank
+    local out; local err
 
     scp -r -q $PREFIX/bin $node:/tmp
-    ssh $node "/tmp/bin/setup_datanode.sh --blkdev $blkdev --brkmnt $brkmnt \
-	--yarn-master $YARN_NODE --hadoop-mgmt-node $MGMT_NODE"
-    (( $? != 0 )) && return 1
+    out="$(ssh $node "/tmp/bin/setup_datanode.sh --blkdev $blkdev \
+	--brkmnt $brkmnt --yarn-master $YARN_NODE \
+	--hadoop-mgmt-node $MGMT_NODE")"
+    err=$?
+    if (( $? != 0 )) ; then
+      echo "ERROR: $err: in setup_datanode: $out"
+      return 1
+    fi
+
     return 0
   }
 
