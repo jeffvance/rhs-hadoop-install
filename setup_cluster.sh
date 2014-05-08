@@ -294,8 +294,8 @@ setup_nodes
 create_pool
 
 # install and start the ambari server on the MGMT_NODE
-scp -r -q $PREFIX/bin $MGMT_NODE:/tmp
-ssh $MGMT_NODE "/tmp/bin/setup_ambari_server.sh 
+scp -r -q $PREFIX/bin/setup_ambari_server.sh $MGMT_NODE:/tmp
+ssh $MGMT_NODE "/tmp/setup_ambari_server.sh 
 
 echo "${#NODES[@]} nodes setup for hadoop workloads with no errors"
 exit 0
