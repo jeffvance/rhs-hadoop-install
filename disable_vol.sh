@@ -22,7 +22,7 @@ PREFIX="$(dirname $(readlink -f $0))"
 
 source $PREFIX/yesno
 
-# parse_cmd: simple positional parsing. Exits on errors.
+# parse_cmd: simple positional parsing. Returns 1 on errors.
 # Sets globals:
 #   AUTO_YES
 #   MGMT_NODE
@@ -42,7 +42,7 @@ function parse_cmd() {
   while true; do
       case "$1" in
         -y)
-          AUTO_YES='y'; shift; continue
+          AUTO_YES=1; shift; continue # true
         ;;
         --yarn-master)
           YARN_NODE="$2"; shift 2; continue
@@ -75,10 +75,11 @@ function parse_cmd() {
     echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
     ((errcnt++)); }
 
-  (( errcnt > 0 )) && exit 1
+  (( errcnt > 0 )) && return 1
+  return 0
 }
 
-# vol_exists: invokes gluster vol info to see if VOLNAME exists. Exits on
+# vol_exists: invokes gluster vol info to see if VOLNAME exists. Returns 1 on
 # errors.
 # Uses globals:
 #   VOLNAME
@@ -89,17 +90,20 @@ function vol_exists() {
   gluster volume info $VOLNAME >& /dev/null
   err=$?
   if (( err != 0 )) ; then
-    echo "ERROR $err: vol info error on \"$VOLNAME\", volume may not exits"
-    exit 1
+    echo "ERROR $err: vol info error on \"$VOLNAME\", volume may not exist"
+    return 1
   fi
+
+  return 0
 }
 
 
 ## main ##
 
 errcnt=0
+AUTO_YES=0 # false
 
-parse_cmd $@
+parse_cmd $@ || exit -1
 
 NODES=($($PREFIX/bin/find_nodes.sh $VOLNAME)) # array
 
@@ -108,13 +112,14 @@ echo "****NODES=${NODES[@]}"
 echo
 
 # make sure the volume exists
-vol_exists
+vol_exists || exit 1
 
 echo "$VOLNAME will be removed from all hadoop config files and thus will not be available for any hadoop workloads"
-if [[ -n "$AUTO_YES" ]] || yesno "  Continue? [y|N] " ; then
+if (( AUTO_YES )) || yesno "  Continue? [y|N] " ; then
   echo "Disabling $VOLNAME in all core-site.xml files..."
   $PREFIX/bin/unset_glusterfs_uri.sh -h $MGMT_NODE -u $MGMT_USER \
-	-p $MGMT_PASS -port $MGMT_PORT $VOLNAME
+	-p $MGMT_PASS -port $MGMT_PORT $VOLNAME && \
+    exit 1
 fi
 
 exit 0
