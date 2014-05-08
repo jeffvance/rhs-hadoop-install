@@ -158,7 +158,8 @@ restartService () {
 	do
 		stopService "$x"
 	done
-	for x in ${services[@]}
+        declare -a services1=("HDFS" "MAPREDUCE2" "YARN" )
+	for x in ${services1[@]}
 	do
 		startService "$x"
 	done
