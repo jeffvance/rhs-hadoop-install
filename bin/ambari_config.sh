@@ -150,6 +150,22 @@ stopService () {
 }
 
 ###################
+## restartService()
+###################
+restartService () {
+	declare -a services=("MAPREDUCE2" "YARN" "HDFS")
+	for x in ${services[@]}
+	do
+		stopService "$x"
+	done
+        declare -a services1=("HDFS" "MAPREDUCE2" "YARN" )
+	for x in ${services1[@]}
+	do
+		startService "$x"
+	done
+}
+
+###################
 ## currentSiteTag()
 ###################
 currentSiteTag () {
@@ -451,6 +467,7 @@ case "$1" in
       CONFIGKEY="fs.glusterfs.volume.fuse."$5
       CONFIGVALUE="/mnt/"$5	
       doConfigUpdate "set"
+      restartService
     else
       usage
     fi
@@ -462,6 +479,7 @@ case "$1" in
       CONFIGKEY="fs.glusterfs.volume.fuse."$5
       CONFIGVALUE="/mnt/"$5
       doConfigUpdate "delete"
+      restartService
     else
       usage
     fi
