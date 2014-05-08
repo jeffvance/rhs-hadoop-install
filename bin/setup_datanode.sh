@@ -5,8 +5,8 @@
 # It is assumed that localhost has already been validated (eg. check_node.sh
 # has been run) prior to setting up the node.
 # Syntax:
-#  --blkdev: block device path (required)
-#  --brkmnt: brick mount path (required)
+#  --blkdev: block device path (optional), skip xfs and blk-mnts if missing
+#  --brkmnt: brick mount path (optional), skip xfs and blk-mnts if missing
 #  --yarn-master: hostname or ip of the yarn-master server (expected to be out-
 #       side of the storage pool) (required)
 #  --hadoop-mgmt-node: hostname or ip of the hadoop mgmt server (expected to
@@ -55,12 +55,6 @@ function parse_cmd() {
   done
 
   # check required args
-  [[ -z "$BLKDEV" ]] && {
-    echo "Syntax error: the block device path is required";
-    ((errcnt++)); }
-  [[ -z "$BRICKMNT" ]] && {
-    echo "Syntax error: the brick mount path is required";
-    ((errcnt++)); }
   [[ -z "$YARN_NODE" || -z "$MGMT_NODE" ]] && {
     echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
     ((errcnt++)); }
@@ -94,7 +88,7 @@ function get_ambari_repo(){
 
 # mount_blkdev: create the brick-mnt dir if needed, append the xfs brick mount
 # to /etc/fstab, and then mount it.
-function mount_blkdevs() {
+function mount_blkdev() {
 
   local err; local errcnt=0; local out
   local mntopts="noatime,inode64"
@@ -267,9 +261,11 @@ PREFIX="$(dirname $(readlink -f $0))"
 parse_cmd $@
 [[ -n "$QUIET" ]] && q='-q'
 
+if [[ -n "$BLKDEV" && -n "$BRICKMNT" ]] ; then # need both to xfs and mount
+  setup_xfs        || ((errcnt++))
+  mount_blkdev     || ((errcnt++))
+fi
 setup_selinux      || ((errcnt++))
-setup_xfs          || ((errcnt++))
-mount_blkdevs      || ((errcnt++))
 setup_iptables     || ((errcnt++))
 setup_ambari_agent || ((errcnt++))
 

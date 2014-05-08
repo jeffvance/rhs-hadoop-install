@@ -2,12 +2,23 @@
 #
 # setup_cluster.sh accepts a list of nodes:brick-mnts:block-devs, along with
 # the name of the yarn-master and hadoop-mgmt servers, and creates a new trusted
-# pool with each node in the node-list being a storage node, while the yarn
-# and mgmt nodes are expected to be outside of the pool. On each node the blk-
-# device is setup as an xfs file system and mounted to the brick mount dir.
-# Each node is also setup for hadoop workloads: ntp config is verified, required
-# ports are checked to be open, selinux is set to permissive, hadoop required
-# users are created, and required local are created.
+# pool with each node in the node-list setup as a storage/data node. The yarn
+# and mgmt nodes are expected to be outside of the pool, and not to be the same
+# server; however these recommendations are not enforced by the script.
+#
+# On each node the blk-device is setup as an xfs file system and mounted to the
+# brick mount dir, ntp config is verified, required gluster & ambari ports are
+# checked to be open, selinux is set to permissive, hadoop required users are
+# created, and the required hadoop local directories are created (note: the
+# required distributed dirs are not created here).
+
+# Also, on all nodes (assumed to be storage- data-nodes) the ambari agent is
+# installed (updated if present) and started. The same is also done for the
+# hadoop management and yarn-master nodes, unless they are also part of the
+# storage pool.
+#
+# Tasks related to volumes or ambari setup are not done here.
+#
 # Syntax:
 #  -y: auto answer "yes" to any prompts
 #  --yarn-master: hostname or ip of the yarn-master server (expected to be out-
@@ -176,7 +187,9 @@ function parse_brkmnts_and_blkdevs() {
 }
 
 # setup_nodes: setup each node for hadoop workloads by invoking
-# bin/setup_datanodes.sh. Exits on errors.
+# bin/setup_datanodes.sh, which is also run for the mgmt-node and for the
+# yarn-master node, assuming they are outside of the storage pool.
+# Exits on errors.
 # Uses globals:
 #   BLKDEVS
 #   BRKMNTS
@@ -185,27 +198,43 @@ function parse_brkmnts_and_blkdevs() {
 #   YARN_NODE
 function setup_nodes() {
 
-  local i; local err; local errcnt=0; local errnodes=''
+  local i=0; local errcnt=0; local errnodes=''
   local node; local brkmnt; local blkdev
+  local do_mgmt=1; local do_yarn=1 # assume both outside pool
 
-  for (( i=0; i<${#NODES[@]}; i++ )); do
-      node=${NODES[$i]}
+
+  # nested function to call setup_datanodes on a passed-in node, blkdev and
+  # brick-mnt.
+  function do_node() {
+
+    local node="$1"; local blkdev="$2"; local brkmnt="$3"
+
+    scp -r -q $PREFIX/bin $node:/tmp
+    ssh $node "/tmp/bin/setup_datanode.sh --blkdev $blkdev --brkmnt $brkmnt \
+	--yarn-master $YARN_NODE --hadoop-mgmt-node $MGMT_NODE"
+    (( $? != 0 )) && return 1
+    return 0
+  }
+
+  # main #
+  for node in ${NODES[@]}; do
       brkmnt=${BRKMNTS[$i]}
       blkdev=${BLKDEVS[$i]}
 
-      scp -r -q $PREFIX/bin $node:/tmp
-      ssh $node "/tmp/bin/setup_datanode.sh --blkdev $blkdev \
-                --brkmnt $brkmnt \
-                --yarn-master $YARN_NODE \
-                --hadoop-mgmt-node $MGMT_NODE"
-      err=$?
-
-      if (( err != 0 )) ; then
-	echo "ERROR $err: setup_datanode failed on $node"
-	errnodes+="$node "
-	((errcnt++))
-      fi
+      do_node "$node" "$blkdev" "$brkmnt" || {
+	  errnodes+="$node ";
+	  ((errcnt++)); }
+      [[ "$node" == "$MGMT_NODE" ]] && do_mgmt=0 # false
+      [[ "$node" == "$YARN_NODE" ]] && do_yarn=0 # false
+      ((i++))
   done
+
+  if (( do_mgmt )) ; then
+    do_node $MGMT_NODE || ((errcnt++)) # blkdev and brkmnt are blank
+  fi
+  if (( do_yarn )) ; then
+    do_node $YARN_NODE || ((errcnt++)) # blkdev and brkmnt are blank
+  fi
 
   if (( errcnt > 0 )) ; then
     echo "$errcnt setup node errors on nodes: $errnodes"
