@@ -25,7 +25,7 @@ PREFIX="$(dirname $(readlink -f $0))"
 
 source $PREFIX/yesno
 
-# parse_cmd: simple positional parsing. Exits on errors.
+# parse_cmd: simple positional parsing. Returns 1 on errors.
 # Sets globals:
 #   AUTO_YES
 #   MGMT_NODE
@@ -46,7 +46,7 @@ function parse_cmd() {
   while true; do
       case "$1" in
         -y)
-          AUTO_YES='y'; shift; continue
+          AUTO_YES=1; shift; continue # true
         ;;
         --yarn-master)
           YARN_NODE="$2"; shift 2; continue
@@ -83,10 +83,11 @@ function parse_cmd() {
     echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
     ((errcnt++)); }
 
-  (( errcnt > 0 )) && exit 1
+  (( errcnt > 0 )) && return 1
+  return 0
 }
 
-# vol_exists: invokes gluster vol info to see if VOLNAME exists. Exits on
+# vol_exists: invokes gluster vol info to see if VOLNAME exists. Returns 1 on
 # errors.
 # Uses globals:
 #   VOLNAME
@@ -97,13 +98,15 @@ function vol_exists() {
   gluster volume info $VOLNAME >& /dev/null
   err=$?
   if (( err != 0 )) ; then
-    echo "ERROR $err: vol info error on \"$VOLNAME\", volume may not exits"
-    exit 1
+    echo "ERROR $err: vol info error on \"$VOLNAME\", volume may not exist"
+    return 1
   fi
+
+  return 0
 }
 
 # setup_nodes: setup each node for hadoop workloads by invoking
-# bin/setup_datanodes.sh. Exits on errors.
+# bin/setup_datanodes.sh. Returns 1 on errors.
 # Uses globals:
 #   BLKDEVS
 #   BRKMNTS
@@ -113,11 +116,10 @@ function vol_exists() {
 #   YARN_NODE
 function setup_nodes() {
 
-  local i; local err; local errcnt=0; local errnodes=''
+  local i=0; local err; local errcnt=0; local errnodes=''
   local node; local brkmnt; local blkdev
 
-  for (( i=0; i<${#NODES[@]}; i++ )); do
-      node=${NODES[$i]}
+  for node in ${NODES[@]}; do
       brkmnt=${BRKMNTS[$i]}
       blkdev=${BLKDEVS[$i]}
 
@@ -132,40 +134,47 @@ function setup_nodes() {
         errnodes+="$node "
         ((errcnt++))
       fi
+      ((i++))
   done
 
   if (( errcnt > 0 )) ; then
     echo "$errcnt setup node errors on nodes: $errnodes"
-    exit 1
+    return 1
   fi
+
+  return 0
 }
 
 # chk_and_fix_nodes: calls check_vol.sh to verify that VOLNAME has been setup
 # for hadoop workloads, including each node spanned by the volume. If setup
 # issues are detected then the user is optionally prompted to fix the problems.
+# Returns 1 for errors.
 # Uses globals:
 #   AUTO_YES
 #   PREFIX
 #   VOLNAME
 function chk_and_fix_nodes() {
 
-  # verify that the volume is setup for hadoop workload and potentiall fix
+  # verify that the volume is setup for hadoop workload and potentially fix
   if ! $PREFIX/bin/check_vol.sh $VOLNAME ; then # 1 or more problems
     echo
     echo "One or more nodes spanned by $VOLNAME has issues"
-    if [[ -n "$AUTO_YES" ]] || yesno "  Correct above issues? [y|N] " ; then
-      setup_nodes
-      $PREFIX/bin/set_vol_perf.sh $VOLNAME
+    if (( AUTO_YES )) || yesno "  Correct above issues? [y|N] " ; then
+      setup_nodes || return 1
+      $PREFIX/bin/set_vol_perf.sh $VOLNAME || return 1
     fi
   fi
+
+  return 0
 }
 
 
 ## main ##
 
 errcnt=0
+AUTO_YES=0 # false
 
-parse_cmd $@
+parse_cmd $@ || exit -1
 
 NODES=($($PREFIX/bin/find_nodes.sh $VOLNAME)) # arrays
 BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh $VOLNAME))
@@ -177,12 +186,13 @@ echo "****BRKMNTS=${BRKMNTS[@]}"
 echo
 
 # make sure the volume exists
-vol_exists
+vol_exists || exit 1
 
-chk_and_fix_nodes
+chk_and_fix_nodes || exit 1
 
 echo "Enable $VOLNAME in all core-site.xml files..."
 $PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE -u $MGMT_USER \
-	-p $MGMT_PASS -port $MGMT_PORT $VOLNAME
+	-p $MGMT_PASS -port $MGMT_PORT $VOLNAME && \
+  exit 1
 
 exit 0
