@@ -30,7 +30,7 @@ PREFIX="$(dirname $(readlink -f $0))"
 
 ## functions ##
 
-# parse_cmd: simple positional parsing. Exits on errors.
+# parse_cmd: simple positional parsing. Returns 1 on errors.
 # Sets globals:
 #   VOLNAME
 #   VOLMNT
@@ -54,7 +54,8 @@ function parse_cmd() {
     echo "Syntax error: expect list of 2 or more nodes plus brick mount(s)";
     ((errcnt++)); }
 
-  (( errcnt > 0 )) && exit 1
+  (( errcnt > 0 )) && return 1
+  return 0
 }
 
 # parse_nodes: set the global NODES array from NODE_SPEC.
@@ -74,7 +75,7 @@ function parse_nodes() {
 
 # parse_brkmnts: extracts the brick mounts from the global NODE_SPEC array.
 # Fills in default brkmnts based on the values included on the first node
-# (required). Exits on syntax errors.
+# (required). Returns 1 on syntax errors.
 # Uses globals:
 #   NODE_SPEC
 # Sets globals:
@@ -88,7 +89,7 @@ function parse_brkmnts() {
 
   if [[ -z "$brkmnt" ]] ; then
     echo "Syntax error: expect a brick mount, preceded by a \":\", to immediately follow the first node"
-    exit -1
+    return 1
   fi
 
   BRKMNTS+=($brkmnt) # set global
@@ -105,13 +106,15 @@ function parse_brkmnts() {
           ;;
           *) 
 	     echo "Syntax error: improperly specified node-list"
-	     exit -1
+	     return 1
 	  ;;
       esac
   done
+
+  return 0
 }
 
-# chk_vol: invokes gluster vol info to see if VOLNAME already exists. Exits
+# chk_vol: invokes gluster vol info to see if VOLNAME already exists. Returns 1
 # on errors.
 # Uses globals:
 #   VOLNAME
@@ -123,12 +126,15 @@ function chk_vol() {
   err=$?
   if (( err == 0 )) ; then
     echo "ERROR: volume \"$VOLNAME\" already exists"
-    exit 1
+    return 1
   fi
+
+  return 0
 }
 
 # chk_nodes: verify that each node that will be spanned by the new volume is 
-# prepped for hadoop workloads by invoking bin/check_node.sh. Exits on errors.
+# prepped for hadoop workloads by invoking bin/check_node.sh. Returns 1 on 
+# errors.
 # Uses globals:
 #   NODES
 #   BRKMNTS
@@ -147,16 +153,17 @@ function chk_nodes() {
       err=$?
       if (( err != 0 )) ; then
 	echo "ERROR on $node: $out"
-	exit 1
+	return 1
       fi
   done
 
   echo "All nodes passed check for hadoop workloads"
+  return 0
 }
 
 # mk_volmnt: create gluster-fuse mount, per node, using the correct mount
 # options. The volume mount is the VOLMNT prefix with VOLNAME appended. The
-# mount is persisted in /etc/fstab. Exits on errors.
+# mount is persisted in /etc/fstab. Returns 1 on errors.
 # Assumptions: the bin scripts have been copied to each node in /tmp/bin.
 # Uses globals:
 #   NODES
@@ -180,17 +187,20 @@ function mk_volmnt() {
 	rc=\$?
 	if (( rc != 0 && rc != 32 )) ; then # 32=already mounted
 	  echo Error \$rc: mounting $volmnt with $mntopts options
-	  exit 1
+	  reurn 1
 	fi
       ")"
       if (( $? != 0 )) ; then
 	echo "ERROR on $node: $out"
-	exit 1
+	reurn 1
       fi
   done
+
+  return 0
 }
 
 # add_distributed_dirs: create, if needed, the distributed hadoop directories.
+# Returns 1 on errors.
 # Note: the gluster-fuse mount, by convention is the VOLMNT prefix with the
 #   volume name appended.
 # Uses globals:
@@ -206,11 +216,14 @@ function add_distributed_dirs() {
   err=$?
   if (( err != 0 )) ; then
     echo "ERROR $err: add_dirs -d $VOLMNT/$VOLNAME"
+    return 1
   fi
+
+  return 0
 }
 
 # create_vol: gluster vol create VOLNAME with a hard-codes replica 2 and set
-# its performance settings. Exits on errors.
+# its performance settings. Returns 1 on errors.
 # Uses globals:
 #   NODES
 #   BRKMNTS
@@ -228,15 +241,17 @@ function create_vol() {
   err=$?
   if (( err != 0 )) ; then
     echo "ERROR $err: gluster vol create $VOLNAME $bricks: $out"
-    exit 1
+    return 1
   fi
   echo "\"$VOLNAME\" created"
 
   # set vol performance settings
   $PREFIX/bin/set_vol_perf.sh $VOLNAME
+
+  return 0
 }
 
-# start_vol: gluster vol start VOLNAME. Exits on errors.
+# start_vol: gluster vol start VOLNAME. Returns 1 on errors.
 # Uses globals:
 #   VOLNAME
 function start_vol() {
@@ -250,11 +265,13 @@ function start_vol() {
       echo "\"$VOLNAME\" volume already started..."
     else
       echo "ERROR $err: gluster vol start $VOLNAME: $out"
-      exit 1
+      return 1
     fi
   else
     echo "\"$VOLNAME\" volume started"
   fi
+
+  return 0
 }
 
 
@@ -263,11 +280,11 @@ function start_vol() {
 BRKMNTS=(); NODES=()
 errcnt=0
 
-parse_cmd $@
+parse_cmd $@ || exit -1
 
 parse_nodes
 
-parse_brkmnts
+parse_brkmnts || exit 1
 
 echo
 echo "****NODES=${NODES[@]}"
@@ -275,19 +292,19 @@ echo "****BRKMNTS=${BRKMNTS[@]}"
 echo
 
 # make sure the volume doesn't already exist
-chk_vol
+chk_vol    || exit 1
 
 # verify that each node is prepped for hadoop workloads
-chk_nodes
+chk_nodes  || exit 1
 
 # create and start the replica 2 volume and set perf settings
-create_vol
-start_vol
+create_vol || exit 1
+start_vol  || exit 1
 
 # create gluster-fuse mount, per node
-mk_volmnt
+mk_volmnt  || exit 1
 
 # add the distributed hadoop dirs
-add_distributed_dirs
+add_distributed_dirs || exit 1
 
 exit 0
