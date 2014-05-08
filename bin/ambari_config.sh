@@ -87,13 +87,36 @@ startService () {
     echo "$1 already started."
   else
     echo "Starting $1 service"
-    curl -u $USERID:$PASSWD -X PUT  -H "X-Requested-By: rhs" "$AMBARIURL/api/v1/clusters/$CLUSTER/services?ServiceInfo/state=INSTALLED&ServiceInfo/service_name=$1" --data "{\"RequestInfo\": {\"context\" :\"Start $1 Service\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"STARTED\"}}}";
-  fi
+    line=`curl -s -u $USERID:$PASSWD -X PUT  -H "X-Requested-By: rhs" "$AMBARIURL/api/v1/clusters/$CLUSTER/services?ServiceInfo/state=INSTALLED&ServiceInfo/service_name=$1" --data "{\"RequestInfo\": {\"context\" :\"Start $1 Service\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"STARTED\"}}}"`;
+    
+    DEBUG echo "########## line = "$line
+    value=`echo $line |cut -d',' -f2 |cut -d":" -f3`
+    value=`echo $value | sed "s/\"//g"`
+    DEBUG echo "########## value = ["$value"]"
+
+		rid=$value
+		while true
+		do
+			output=`curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g"`
+			echo "curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g""
+      DEBUG echo "########## output = "$output 
+			if [ "$output" == "PENDING" ] || [ "$output" == "IN_PROGRESS" ]
+			then
+				DEBUG echo "Request is still $output"
+				sleep 4
+				continue
+			else
+				DEBUG echo "response is $output"
+				break
+			fi
+		done
+
+	fi
 }
 
 
 ###################
-## stopService()
+## stoptService()
 ###################
 stopService () {
   DEBUG echo "########## service = "$1
@@ -101,9 +124,31 @@ stopService () {
     echo "$1 already stopped."
   else
     echo "Stopping $1 service"
-    curl -u $USERID:$PASSWD -X PUT  -H "X-Requested-By: rhs" "$AMBARIURL/api/v1/clusters/$CLUSTER/services?ServiceInfo/state=STARTED&ServiceInfo/service_name=$1" --data "{\"RequestInfo\": {\"context\" :\"Start $1 Service\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"INSTALLED\"}}}";
+    line=`curl -s -u $USERID:$PASSWD -X PUT  -H "X-Requested-By: rhs" "$AMBARIURL/api/v1/clusters/$CLUSTER/services?ServiceInfo/state=STARTED&ServiceInfo/service_name=$1" --data "{\"RequestInfo\": {\"context\" :\"Start $1 Service\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"INSTALLED\"}}}"`;
+
+    DEBUG echo "########## line = "$line
+    value=`echo $line |cut -d',' -f2 |cut -d":" -f3`
+    value=`echo $value | sed "s/\"//g"`
+    DEBUG echo "########## value = ["$value"]"
+  
+		rid=$value
+		while true
+		do
+			output=`curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g"`
+      DEBUG echo "########## output = "$output 
+			if [ "$output" == "PENDING" ] || [ "$output" == "IN_PROGRESS" ]
+			then
+				DEBUG echo "Request is still $output"
+				sleep 4
+				continue
+			else
+				DEBUG echo "response is $output"
+				break
+			fi
+		done
   fi
 }
+
 ###################
 ## currentSiteTag()
 ###################
