@@ -142,12 +142,11 @@ function chk_vol() {
 # Side effect: all scripts under bin/ are copied to each node.
 function chk_nodes() {
 
-  local i; local node
+  local i=0; local node
   local err; local out
 
   # verify that each node is prepped for hadoop workloads
-  for (( i=0; i<${#NODES[@]}; i++ )); do
-      node=${NODES[$i]}
+  for node in ${NODES[@]}; do
       scp -r -q $PREFIX/bin $node:/tmp
       out="$(ssh $node "/tmp/bin/check_node.sh ${BRKMNTS[$i]}")"
       err=$?
@@ -155,6 +154,7 @@ function chk_nodes() {
 	echo "ERROR on $node: $out"
 	return 1
       fi
+      ((i++))
   done
 
   echo "All nodes passed check for hadoop workloads"

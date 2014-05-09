@@ -20,8 +20,8 @@ function check_ambari_agent() {
   local errcnt=0; local warncnt=0
 
   if [[ ! -f $ambari_agent_pid ]] ; then
-    (( ! QUIET )) && echo "ERROR: ambari-agent is not running on $NODE"
-    ((errcnt++))
+    (( ! QUIET )) && echo "WARN: ambari-agent is not running on $NODE"
+    ((warncnt++))
   fi
 
   (( errcnt > 0 )) && return 1
@@ -41,8 +41,9 @@ function check_brick_mount() {
 
   out="$(xfs_info $BRICKMNT 2>&1)"
   err=$?
+  (( ! QUIET )) && echo "xfs_info on $BRICKMNT: $out"
   if (( err != 0 )) ; then
-    (( ! QUIET )) && echo "ERROR $err: $out"
+    echo "ERROR $err: $out"
     ((errcnt++))
   else
     out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
@@ -81,13 +82,13 @@ function check_dirs() {
       out="$(stat -c %a $dir)"
       [[ ${#out} == 3 ]] && out="0$out"; # leading 0
       if [[ $out != $perm ]] ; then
-	(( ! QUIET )) && echo "ERROR: $dir perms are $out, expected to be: $perm"
-	((errcnt++))
+	(( ! QUIET )) && echo "WARN: $dir perms are $out, expected to be: $perm"
+	((warncnt++))
       fi
       out="$(stat -c %U $dir)"
       if [[ $out != $owner ]] ; then
-	(( ! QUIET )) && echo "ERROR: $dir owner is $out, expected to be: $owner"
-	((errcnt++))
+	(( ! QUIET )) && echo "WARN: $dir owner is $out, expected to be: $owner"
+	((warncnt++))
       fi
   done
 
@@ -111,14 +112,14 @@ function check_open_ports() {
       port=${port/-/:} # use iptables range syntax
       # live check
       if ! iptables -n -L | grep -qs -E "^ACCEPT *$proto .*:$port"; then
-	(( ! QUIET )) && echo "ERROR on $NODE: iptables: port(s) $port not open"
-	((errcnt++))
+	(( ! QUIET )) && echo "WARN on $NODE: iptables: port(s) $port not open"
+	((warncnt++))
       fi
       # file check
       if ! grep -qs -E "^-A .* -p $proto .* $port .*ACCEPT" $iptables_conf; then
 	(( ! QUIET )) && \
-	  echo "ERROR on $NODE: $iptables_conf: port(s) $port not open"
-	((errcnt++))
+	  echo "WARN on $NODE: $iptables_conf: port(s) $port not open"
+	((warncnt++))
       fi
   done
 
@@ -140,18 +141,18 @@ function validate_ntp_conf(){
   numServers=${#servers[@]}
 
   if (( numServers == 0 )) ; then
-    (( ! QUIET )) && echo "ERROR: no server entries in $ntp_conf"
+    echo "ERROR: no server entries in $ntp_conf"
     ((errcnt++))
   fi
 
   for timeserver in "${servers[@]}" ; do
       ntpdate -q $timeserver >& /dev/null
       (( $? == 0 )) && break # exit loop, found valid time-server
-      ((i+=1))
+      ((i++))
   done
 
   if (( i > numServers )) ; then
-    (( ! QUIET )) && echo "ERROR: no suitable time-servers found in $ntp_conf"
+    echo "ERROR: no suitable time-servers found in $ntp_conf"
     ((errcnt++))
   fi
 
@@ -178,7 +179,7 @@ function check_ntp() {
   # verify that ntpd is running
   ps -C ntpd >& /dev/null
   if (( $? != 0 )) ; then
-    (( ! QUIET )) && echo "ERROR: ntpd is not running"
+    echo "ERROR: ntpd is not running"
     ((errcnt++))
   fi
 
@@ -211,7 +212,7 @@ function check_users() {
 
   for user in $($PREFIX/gen_users.sh); do
       id -u $user >& /dev/null && continue
-      (( ! QUIET )) && echo "ERROR: $user is missing from $NODE"
+      echo "ERROR: $user is missing from $NODE"
       ((errcnt++))
   done
 
@@ -228,13 +229,14 @@ function check_xfs() {
   local out; local isize=512
 
   if [[ ! -d $BRICKMNT ]] ; then
-    (( ! QUIET )) && echo "ERROR: directory $BRICKMNT missing on $NODE"
+    echo "ERROR: directory $BRICKMNT missing on $NODE"
     ((errcnt++))
   else
     out="$(xfs_info $BRICKMNT 2>&1)"
     err=$?
+    (( ! QUIET )) && echo "xfs_info on $BRICKMNT: $out"
     if (( err != 0 )) ; then
-      (( ! QUIET )) && echo "ERROR $err: $out"
+      echo "ERROR $err: $out"
       ((errcnt++))
     else
       out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value

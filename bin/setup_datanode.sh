@@ -34,7 +34,7 @@ function parse_cmd() {
   while true; do
       case "$1" in
         -q)
-          QUIET=1 # true
+          QUIET=1; shift; continue # true
         ;;
         --blkdev) # optional
 	  shift
@@ -64,6 +64,7 @@ function parse_cmd() {
     ((errcnt++)); }
 
   (( errcnt > 0 )) && return 1
+  return 0
 }
 
 # get_ambari_repo: wget the ambari repo file in the correct location.
@@ -80,7 +81,7 @@ function get_ambari_repo(){
   err=$?
   (( ! QUIET )) && echo "wget ambari repo: $out"
   if (( err != 0 )) ; then
-    (( ! QUIET )) && echo "ERROR $err: ambari repo wget"
+    echo "ERROR $err: ambari repo wget: $out"
     ((errcnt++))
   fi
 
@@ -109,7 +110,7 @@ function mount_blkdev() {
     out="$(mount $BRICKMNT 2>&1)" # via fstab entry
     err=$?
     if (( err != 0 )) ; then
-      (( ! QUIET )) && echo "ERROR $err: mount $BLKDEV as $BRICKMNT: $out"
+      echo "ERROR $err: mount $BLKDEV as $BRICKMNT: $out"
       ((errcnt++))
     fi
   fi
@@ -133,9 +134,9 @@ function setup_ambari_agent() {
   if [[ -f $AMBARI_AGENT_PID ]] ; then
     out="$(ambari-agent stop 2>&1)"
     err=$?
-    (( ! QUIET )) && echo echo "ambari-agent stop: $out"
+    (( ! QUIET )) && echo "ambari-agent stop: $out"
     if (( err != 0 )) ; then
-      (( ! QUIET )) && echo echo "WARN $err: couldn't stop ambari agent"
+      echo "WARN $err: couldn't stop ambari agent: $out"
     fi
   fi
 
@@ -144,7 +145,7 @@ function setup_ambari_agent() {
   err=$?
   (( ! QUIET )) && echo "ambari-agent install: $out"
   if (( err != 0 && err != 1 )) ; then # 1--> nothing-to-do
-    (( ! QUIET )) && echo echo "ERROR $err: ambari-agent install"
+    echo "ERROR $err: ambari-agent install: $out"
     return 1
   fi
 
@@ -156,13 +157,19 @@ function setup_ambari_agent() {
   err=$?
   (( ! QUIET )) && echo "ambari-agent start: $out"
   if (( err != 0 )) ; then
-    (( ! QUIET )) && echo "ERROR $err: ambari-agent start"
+    echo "ERROR $err: ambari-agent start: $out"
     return 1
   fi
 
   # persist the agent after reboot
   out="$(chkconfig ambari-agent on 2>&1)"
+  err=$?
   (( ! QUIET )) && echo "ambari-agent chkconfig on: $out"
+  if (( err != 0 )) ; then
+    echo "ERROR $err: ambari-agent chkconfig on: $out"
+    return 1
+  fi
+
   return 0
 }
 
@@ -182,9 +189,9 @@ function setup_iptables() {
 	out="$(iptables -A INPUT -m state --state NEW -m $proto \
 		-p $proto --dport $port -j ACCEPT)"
 	err=$?
-	(( ! QUIET )) && echo "$NODE: iptables: $out"
+	(( ! QUIET )) && echo "iptables: $out"
 	if (( err != 0 )) ; then
-	  (( ! QUIET )) && echo "ERROR $err on $NODE: iptables port $port"
+	  echo "ERROR $err: iptables port $port: $out"
  	  ((errcnt++))
 	fi
       fi
@@ -195,14 +202,14 @@ function setup_iptables() {
   err=$?
   (( ! QUIET )) && echo "iptables save: $out"
   if (( err != 0 )) ; then
-    (( ! QUIET )) && echo "ERROR $err: iptables save"
+    echo "ERROR $err: iptables save: $out"
     ((errcnt++))
   fi
   out="$(service iptables restart)"
   err=$?
   (( ! QUIET )) && echo "iptables restart: $out"
   if (( err != 0 )) ; then
-    (( ! QUIET )) && echo "ERROR $err: iptables restart"
+    echo "ERROR $err: iptables restart: $out"
     ((errcnt++))
   fi
 
@@ -220,7 +227,6 @@ function setup_selinux() {
   local permissive='permissive'
 
   # set selinux to permissive (audit errors reported but not enforced)
-  (( ! QUIET )) && echo "Setting selinux to permissive"
   out="$(setenforce $permissive 2>&1)"
   (( ! QUIET )) && echo "$out"
 
@@ -250,8 +256,9 @@ function setup_xfs() {
   if ! xfs_info $BLKDEV >& /dev/null ; then
     out="$(mkfs -t xfs -i size=$isize -f $BLKDEV 2>&1)"
     err=$?
+    (( ! QUIET )) && echo "mkfs.xfs on $BLKDEV: $out"
     if (( err != 0 )) ; then
-      (( ! QUIET )) && echo "ERROR $err: mkfs.xfs on $BLKDEV: $out"
+      echo "ERROR $err: mkfs.xfs on $BLKDEV: $out"
       ((errcnt++))
     fi
   fi
