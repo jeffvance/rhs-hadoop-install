@@ -142,13 +142,17 @@ function chk_vol() {
 # Side effect: all scripts under bin/ are copied to each node.
 function chk_nodes() {
 
-  local i=0; local node
-  local err; local out
+  local i=0; local node; local err; local out
+  local ssh; local scp
 
   # verify that each node is prepped for hadoop workloads
   for node in ${NODES[@]}; do
-      scp -r -q $PREFIX/bin $node:/tmp
-      out="$(ssh $node "/tmp/bin/check_node.sh ${BRKMNTS[$i]}")"
+      [[ "$node" == "$LOCALHOST" ]] && { ssh=''; scp='#'; } || \
+				       { ssh="ssh $node"; scp='scp'; }
+      eval "$scp -r -q $PREFIX/bin $node:/tmp"
+      out="$(eval "
+	$ssh /tmp/bin/check_node.sh ${BRKMNTS[$i]}
+      ")"
       err=$?
       if (( err != 0 )) ; then
 	echo "ERROR on $node: $out"
@@ -171,25 +175,29 @@ function chk_nodes() {
 #   VOLMNT
 function mk_volmnt() {
 
-  local err; local out; local node
+  local err; local out; local node; local ssh; local ssh_close
   local volmnt="$VOLMNT/$VOLNAME"
   local \
     mntopts='entry-timeout=0,attribute-timeout=0,use-readdirp=no,acl,_netdev'
 
   for node in ${NODES[@]}; do
-      out="$(ssh $node "
-	mkdir -p $volmnt
-	# append mount to fstab, if not present
-	if ! grep -qs $volmnt /etc/fstab ; then
-	  echo '$node:/$VOLNAME $volmnt glusterfs $mntopts 0 0' >>/etc/fstab
-	fi
-	mount $volmnt # mount via fstab
-	rc=\$?
-	if (( rc != 0 && rc != 32 )) ; then # 32=already mounted
-	  echo Error \$rc: mounting $volmnt with $mntopts options
-	  exit 1 # from ssh
-	fi
-	exit 0 # from ssh
+      [[ "$node" == "$LOCALHOST" ]] && { ssh='('; ssh_close=')'; } \
+			            || { ssh="ssh $node"; ssh_close=''; }
+      out="$(eval "
+	$ssh 
+	  mkdir -p $volmnt
+	  # append mount to fstab, if not present
+	  if ! grep -qs $volmnt /etc/fstab ; then
+	    echo '$node:/$VOLNAME $volmnt glusterfs $mntopts 0 0' >>/etc/fstab
+	  fi
+	  mount $volmnt # mount via fstab
+	  rc=\$?
+	  if (( rc != 0 && rc != 32 )) ; then # 32=already mounted
+	    echo Error \$rc: mounting $volmnt with $mntopts options
+	    exit 1 # from ssh or sub-shell
+	  fi
+	  exit 0 # from ssh or sub-shell
+	$ssh_close
       ")"
       if (( $? != 0 )) ; then
 	echo "ERROR on $node: $out"
@@ -278,6 +286,7 @@ function start_vol() {
 
 ## main ##
 
+LOCALHOST=$(hostname)
 BRKMNTS=(); NODES=()
 errcnt=0
 
