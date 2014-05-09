@@ -14,12 +14,13 @@
 
 errcnt=0; q=''
 PREFIX="$(dirname $(readlink -f $0))"
+QUIET=0 # false (meaning not quiet)
 
 # parse cmd opts
 while getopts ':q' opt; do
     case "$opt" in
       q)
-        QUIET=true # else, undefined
+        QUIET=1 # true
         ;;
       \?) # invalid option
         ;;
@@ -32,7 +33,7 @@ VOLNAME="$1"
   echo "Syntax error: volume name is required";
   exit -1; }
 
-[[ -n "$QUIET" ]] && q='-q'
+(( QUIET )) && q='-q'
 
 BRKMNTS="$($PREFIX/find_brick_mnts.sh $VOLNAME)"
 
@@ -46,5 +47,5 @@ $PREFIX/check_vol_mount.sh $q $VOLNAME $NODES || ((errcnt++))
 $PREFIX/check_vol_perf.sh $q $VOLNAME         || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
-[[ -z "$QUIET" ]] && echo "$VOLNAME is ready for hadoop workloads"
+(( ! QUIET )) && echo "$VOLNAME is ready for hadoop workloads"
 exit 0

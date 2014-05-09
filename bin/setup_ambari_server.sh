@@ -7,6 +7,7 @@
 #  -q, if specified, means only set the exit code, do not output anything
 
 PREFIX="$(dirname $(readlink -f $0))"
+QUIET=0 # false (meaning not quiet)
 warncnt=0
 AMBARI_SERVER_PID='/var/run/ambari-server/ambari-server.pid'
 METAINFO_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.0.6.GlusterFS/metainfo.xml'
@@ -16,7 +17,7 @@ ACTIVE_FALSE='<active>false<'; ACTIVE_TRUE='<active>true<'
 while getopts ':q' opt; do
     case "$opt" in
       q)
-        QUIET=true # else, undefined
+        QUIET=1 # true
         ;;
       \?) # invalid option
         ;;
@@ -29,12 +30,12 @@ if [[ -f $AMBARI_SERVER_PID ]] ; then
   out="$(ambari-server stop 2>&1)"
   err=$?
   (( err != 0 )) && { \
-    [[ -z "$QUIET" ]] && echo "WARN $err: couldn't stop ambari server: $out";
+    (( ! QUIET )) && echo "WARN $err: couldn't stop ambari server: $out";
     ((warncnt++)); }
   out="$(ambari-server reset -s 2>&1)"
   err=$?
   (( err != 0 )) && { \
-    [[ -z "$QUIET" ]] && echo "WARN $err: couldn't reset ambari server: $out";
+    (( ! QUIET )) && echo "WARN $err: couldn't reset ambari server: $out";
     ((warncnt++)); }
 fi
 
@@ -42,7 +43,7 @@ fi
 out="$(yum -y install ambari-server 2>&1)"
 err=$?
 if (( err != 0 && err != 1 )) ; then # 1--> nothing-to-do
-  [[ -z "$QUIET" ]] && echo "ERROR $err: ambari server install: $out"
+  (( ! QUIET )) && echo "ERROR $err: ambari server install: $out"
   exit 1
 fi
 
@@ -54,7 +55,7 @@ sed -i -e "s/$ACTIVE_FALSE/$ACTIVE_TRUE/" $METAINFO_PATH
 out="$(ambari-server setup -s 2>&1)"
 err=$?
 if (( err != 0 )) ; then
-  [[ -z "$QUIET" ]] && echo "ERROR $err: ambari server setup: $out"
+  (( ! QUIET )) && echo "ERROR $err: ambari server setup: $out"
   exit 1
 fi
 
@@ -62,7 +63,7 @@ fi
 out="$(ambari-server start 2>&1)"
 err=$?
 if (( err != 0 )) ; then
-  [[ -z "$QUIET" ]] && echo "ERROR $err: ambari-server start: $out"
+  (( ! QUIET )) && echo "ERROR $err: ambari-server start: $out"
   exit 1
 fi
 
@@ -70,9 +71,9 @@ fi
 out="$(chkconfig ambari-server on 2>&1)"
 err=$?
 (( err != 0 )) && { \
-  [[ -z "$QUIET" ]] && echo "WARN $err: chkconfig ambari-server on: $out";
+  (( ! QUIET )) && echo "WARN $err: chkconfig ambari-server on: $out";
   ((warncnt++)); }
 
-[[ -z "$QUIET" ]] && \
+(( ! QUIET )) && \
   echo "ambari-server installed and running with $warncnt warnings"
 exit 0

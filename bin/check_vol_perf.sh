@@ -9,6 +9,7 @@
 # Assumption: the node running this script has access to the gluster cli.
 
 errcnt=0
+QUIET=0 # false (meaning not quiet)
 VOLINFO_TMPFILE="$(mktemp --suffix '.volinfo')"
 LAST_N=3 # tail records containing vol settings (vol info cmd)
 TAG='Options Reconfigured:'
@@ -22,7 +23,7 @@ declare -A EXPCT_SETTINGS=$($PREFIX/gen_vol_perf_settings.sh)
 while getopts ':q' opt; do
     case "$opt" in
       q)
-	QUIET=true  # else, undefined
+	QUIET=1 # true
 	;;
       \?) # invalid option
 	;;
@@ -38,7 +39,7 @@ VOLNAME="$1"
 gluster volume info $VOLNAME >$VOLINFO_TMPFILE 2>&1
 err=$?
 if (( err != 0 )) ; then
-  [[ -z "$QUIET" ]] && \
+  (( ! QUIET )) && \
     echo "vol info error $err: cannot obtain performance settings for $VOLNAME"
   exit 2
 fi
@@ -49,12 +50,12 @@ for setting in $out ; do # "perf-key:value" list
     k=${setting%:*} # strip off the value part
     v=${setting#*:} # strip off the key part
     if [[ "$v" != "${EXPCT_SETTINGS[$k]}" ]] ; then
-      [[ -z "$QUIET" ]] && \
+      (( ! QUIET )) && \
 	echo "WARN: $k set to \"$v\", expect \"${EXPCT_SETTINGS[$k]}\""
       ((errcnt++))
     fi
 done
 
 (( errcnt != 0 )) && exit 1
-[[ -z "$QUIET" ]] && echo "All $VOLNAME performance settings are set correctly"
+(( ! QUIET )) && echo "All $VOLNAME performance settings are set correctly"
 exit 0

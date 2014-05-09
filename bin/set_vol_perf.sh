@@ -11,6 +11,7 @@
 
 errcnt=0
 PREFIX="$(dirname $(readlink -f $0))"
+QUIET=0 # false (meaning not quiet)
 
 # set assoc array to desired values for the perf config keys
 declare -A VOL_SETTINGS=$($PREFIX/gen_vol_perf_settings.sh)
@@ -19,7 +20,7 @@ declare -A VOL_SETTINGS=$($PREFIX/gen_vol_perf_settings.sh)
 while getopts ':q' opt; do
     case "$opt" in
       q)
-        QUIET=true # else, undefined
+        QUIET=1 # true
         ;;
       \?) # invalid option
         ;;
@@ -36,10 +37,10 @@ for setting in ${!VOL_SETTINGS[@]}; do
     val="${VOL_SETTINGS[$setting]}"
     out="$(gluster volume set $VOLNAME $setting $val)"
     err=$?
-    [[ -z "$QUIET" ]] && echo "$setting $val: $out"
+    (( ! QUIET )) && echo "$setting $val: $out"
     ((errcnt+=err))
 done
 
 (( errcnt > 0 )) && exit 1
-[[ -z "$QUIET" ]] && echo "${#VOL_SETTINGS[@]} volume settings successfully set"
+(( ! QUIET )) && echo "${#VOL_SETTINGS[@]} volume settings successfully set"
 exit 0

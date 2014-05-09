@@ -34,7 +34,7 @@ function parse_cmd() {
   while true; do
       case "$1" in
         -q)
-          QUIET=true; shift; continue
+          QUIET=1 # true
         ;;
         --blkdev) # optional
 	  shift
@@ -78,9 +78,9 @@ function get_ambari_repo(){
 
   out="$(wget $REPO_URL 2>&1)"
   err=$?
-  [[ -z "$QUIET" ]] && echo "wget ambari repo: $out"
+  (( ! QUIET )) && echo "wget ambari repo: $out"
   if (( err != 0 )) ; then
-    [[ -z "$QUIET" ]] && echo "ERROR $err: ambari repo wget"
+    (( ! QUIET )) && echo "ERROR $err: ambari repo wget"
     ((errcnt++))
   fi
 
@@ -109,7 +109,7 @@ function mount_blkdev() {
     out="$(mount $BRICKMNT 2>&1)" # via fstab entry
     err=$?
     if (( err != 0 )) ; then
-      [[ -z "$QUIET" ]] && echo "ERROR $err: mount $BLKDEV as $BRICKMNT: $out"
+      (( ! QUIET )) && echo "ERROR $err: mount $BLKDEV as $BRICKMNT: $out"
       ((errcnt++))
     fi
   fi
@@ -133,18 +133,18 @@ function setup_ambari_agent() {
   if [[ -f $AMBARI_AGENT_PID ]] ; then
     out="$(ambari-agent stop 2>&1)"
     err=$?
-    [[ -z "$QUIET" ]] && echo echo "ambari-agent stop: $out"
+    (( ! QUIET )) && echo echo "ambari-agent stop: $out"
     if (( err != 0 )) ; then
-      [[ -z "$QUIET" ]] && echo echo "WARN $err: couldn't stop ambari agent"
+      (( ! QUIET )) && echo echo "WARN $err: couldn't stop ambari agent"
     fi
   fi
 
   # install agent
   out="$(yum -y install ambari-agent 2>&1)"
   err=$?
-  [[ -z "$QUIET" ]] && echo "ambari-agent install: $out"
+  (( ! QUIET )) && echo "ambari-agent install: $out"
   if (( err != 0 && err != 1 )) ; then # 1--> nothing-to-do
-    [[ -z "$QUIET" ]] && echo echo "ERROR $err: ambari-agent install"
+    (( ! QUIET )) && echo echo "ERROR $err: ambari-agent install"
     return 1
   fi
 
@@ -154,15 +154,15 @@ function setup_ambari_agent() {
   # start the agent now
   out="$(ambari-agent start 2>&1)"
   err=$?
-  [[ -z "$QUIET" ]] && echo "ambari-agent start: $out"
+  (( ! QUIET )) && echo "ambari-agent start: $out"
   if (( err != 0 )) ; then
-    [[ -z "$QUIET" ]] && echo "ERROR $err: ambari-agent start"
+    (( ! QUIET )) && echo "ERROR $err: ambari-agent start"
     return 1
   fi
 
   # persist the agent after reboot
   out="$(chkconfig ambari-agent on 2>&1)"
-  [[ -z "$QUIET" ]] && echo "ambari-agent chkconfig on: $out"
+  (( ! QUIET )) && echo "ambari-agent chkconfig on: $out"
   return 0
 }
 
@@ -182,9 +182,9 @@ function setup_iptables() {
 	out="$(iptables -A INPUT -m state --state NEW -m $proto \
 		-p $proto --dport $port -j ACCEPT)"
 	err=$?
-	[[ -z "$QUIET" ]] && echo "$NODE: iptables: $out"
+	(( ! QUIET )) && echo "$NODE: iptables: $out"
 	if (( err != 0 )) ; then
-	  [[ -z "$QUIET" ]] && echo "ERROR $err on $NODE: iptables port $port"
+	  (( ! QUIET )) && echo "ERROR $err on $NODE: iptables port $port"
  	  ((errcnt++))
 	fi
       fi
@@ -193,16 +193,16 @@ function setup_iptables() {
   # save and restart iptables
   out="$(service iptables save)"
   err=$?
-  [[ -z "$QUIET" ]] && echo "iptables save: $out"
+  (( ! QUIET )) && echo "iptables save: $out"
   if (( err != 0 )) ; then
-    [[ -z "$QUIET" ]] && echo "ERROR $err: iptables save"
+    (( ! QUIET )) && echo "ERROR $err: iptables save"
     ((errcnt++))
   fi
   out="$(service iptables restart)"
   err=$?
-  [[ -z "$QUIET" ]] && echo "iptables restart: $out"
+  (( ! QUIET )) && echo "iptables restart: $out"
   if (( err != 0 )) ; then
-    [[ -z "$QUIET" ]] && echo "ERROR $err: iptables restart"
+    (( ! QUIET )) && echo "ERROR $err: iptables restart"
     ((errcnt++))
   fi
 
@@ -220,13 +220,13 @@ function setup_selinux() {
   local permissive='permissive'
 
   # set selinux to permissive (audit errors reported but not enforced)
-  [[ -z "$QUIET" ]] && echo "Setting selinux to permissive"
+  (( ! QUIET )) && echo "Setting selinux to permissive"
   out="$(setenforce $permissive 2>&1)"
-  [[ -z "$QUIET" ]] && echo "$out"
+  (( ! QUIET )) && echo "$out"
 
   # keep selinux permissive on reboots
   if [[ ! -f $conf ]] ; then
-    [[ -z "$QUIET" ]] && echo "WARN: SELinux config file $conf missing"
+    (( ! QUIET )) && echo "WARN: SELinux config file $conf missing"
     return # nothing more to do...
   fi
 
@@ -234,7 +234,7 @@ function setup_selinux() {
   out="$(sed -i -e "/^$selinux_key/c\\$selinux_key$permissive" $conf)"
   err=$?
   if (( err != 0 )) ; then
-    [[ -z "$QUIET" ]] && echo "ERROR $err: setting selinux permissive in $CONF"
+    (( ! QUIET )) && echo "ERROR $err: setting selinux permissive in $CONF"
     return 1
   fi
 }
@@ -251,7 +251,7 @@ function setup_xfs() {
     out="$(mkfs -t xfs -i size=$isize -f $BLKDEV 2>&1)"
     err=$?
     if (( err != 0 )) ; then
-      [[ -z "$QUIET" ]] && echo "ERROR $err: mkfs.xfs on $BLKDEV: $out"
+      (( ! QUIET )) && echo "ERROR $err: mkfs.xfs on $BLKDEV: $out"
       ((errcnt++))
     fi
   fi
@@ -263,11 +263,12 @@ function setup_xfs() {
 
 ## main ##
 
+QUIET=0 # false (meaning not quiet)
 errcnt=0; q=''
 PREFIX="$(dirname $(readlink -f $0))"
 
 parse_cmd $@ || exit -1
-[[ -n "$QUIET" ]] && q='-q'
+(( QUIET )) && q='-q'
 
 setup_xfs          || ((errcnt++))
 mount_blkdev       || ((errcnt++))
@@ -282,5 +283,5 @@ if [[ -n "$BRICKMNT" ]] ; then # need brick mount prefix
 fi
 
 (( errcnt > 0 )) && exit 1
-[[ -z "$QUIET" ]] && echo "${#VOL_SETTINGS[@]} volume perf settings set"
+(( ! QUIET )) && echo "${#VOL_SETTINGS[@]} volume perf settings set"
 exit 0

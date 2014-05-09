@@ -12,12 +12,13 @@
 HADOOP_G='hadoop'
 errcnt=0; cnt=0
 PREFIX="$(dirname $(readlink -f $0))"
+QUIET=0 # false (meaning not quiet)
 
 # parse cmd opts
 while getopts ':q' opt; do
     case "$opt" in
       q)
-        QUIET=true # else, undefined
+        QUIET=1 # true
         ;;
       \?) # invalid option
         ;;
@@ -30,10 +31,10 @@ for user in $($PREFIX/gen_users.sh); do
       useradd --system -g $HADOOP_G $user 2>&1
       err=$?
       if (( err == 0 )) ; then
-	[[ -z "$QUIET" ]] && echo "user $user added with UID=$(id -u $user)"
+	(( ! QUIET )) && echo "user $user added with UID=$(id -u $user)"
 	((cnt++))
       else
-	[[ -z "$QUIET" ]] && \
+	(( ! QUIET )) && \
 	  echo "$(hostname): useradd of $user failed with error $err"
 	((errcnt++))
       fi
@@ -41,5 +42,5 @@ for user in $($PREFIX/gen_users.sh); do
 done
 
 (( errcnt > 0 )) && exit 1
-[[ -z "$QUIET" ]] && echo "$cnt new Hadoop users added"
+(( ! QUIET )) && echo "$cnt new Hadoop users added"
 exit 0

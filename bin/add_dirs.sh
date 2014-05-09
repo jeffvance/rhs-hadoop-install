@@ -15,12 +15,13 @@
 errcnt=0; cnt=0
 HADOOP_G='hadoop'
 PREFIX="$(dirname $(readlink -f $0))"
+QUIET=0 # false (meaning not quiet)
 
 # parse cmd opts
 while getopts ':qdl' opt; do
     case "$opt" in
       q)
-        QUIET=true # else, undefined
+        QUIET=1 # true
         ;;
       d) # only distributed dirs
         DIST=true # else, undefined
@@ -63,15 +64,15 @@ for tuple in $($PREFIX/gen_dirs.sh $opt); do
     err=$?
 
     if (( err == 0 )) ; then
-      [[ -z "$QUIET" ]] && echo "$dir created/updated with perms $perm"
+      (( ! QUIET )) && echo "$dir created/updated with perms $perm"
       ((cnt++))
     else
-      [[ -z "$QUIET" ]] && \
+      (( ! QUIET )) && \
 	  echo "$(hostname): creation of dir $dir failed with error $err"
       ((errcnt++))
     fi
 done
 
 (( errcnt > 0 )) && exit 1
-[[ -z "$QUIET" ]] && echo "$cnt new Hadoop directories added/updated"
+(( ! QUIET )) && echo "$cnt new Hadoop directories added/updated"
 exit 0

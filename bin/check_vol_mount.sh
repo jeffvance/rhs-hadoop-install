@@ -21,19 +21,19 @@ function chk_mnt() {
   local opts="$1"; local errcnt=0; local warncnt=0
 
   if ! grep -wq acl <<<$opts; then
-    [[ -z "$QUIET" ]] && echo "WARN: missing acl mount option"
+    (( ! QUIET )) && echo "WARN: missing acl mount option"
     ((warncnt++))
   fi
   if ! grep -wq "use-readdirp=no" <<<$opts; then
-    [[ -z "$QUIET" ]] && echo "ERROR: use-readdirp must be set to 'no'"
+    (( ! QUIET )) && echo "ERROR: use-readdirp must be set to 'no'"
     ((errcnt++))
   fi
   if ! grep -wq "attribute-timeout=0" <<<$opts; then
-    [[ -z "$QUIET" ]] && echo "ERROR: attribute-timeout must be set to zero"
+    (( ! QUIET )) && echo "ERROR: attribute-timeout must be set to zero"
     ((errcnt++))
   fi
   if ! grep -wq "entry-timeout=0" <<<$opts; then
-    [[ -z "$QUIET" ]] && echo "ERROR: entry-timeout must be set to zero"
+    (( ! QUIET )) && echo "ERROR: entry-timeout must be set to zero"
     ((errcnt++))
   fi
 
@@ -59,10 +59,10 @@ function check_vol_mnt_attrs() {
   # fstab check
   cnt=$(grep -c $VOLNAME /etc/fstab)
   if (( cnt == 0 )) ; then
-    [[ -z "$QUIET" ]] && echo "ERROR: $VOLNAME mount missing in /etc/fstab"
+    (( ! QUIET )) && echo "ERROR: $VOLNAME mount missing in /etc/fstab"
     ((errcnt++))
   elif (( cnt > 1 )) ; then
-    [[ -z "$QUIET" ]] && \
+    (( ! QUIET )) && \
 	echo "ERROR: $VOLNAME appears more than once in /etc/fstab"
     ((errcnt++))
   else # cnt == 1
@@ -74,7 +74,7 @@ function check_vol_mnt_attrs() {
   fi
 
   (( errcnt > 0 )) && return 1
-  [[ -z "$QUIET" ]] && \
+  (( ! QUIET )) && \
     echo "$VOLNAME mount setup correctly on $NODE with $warncnt warnings"
   return 0
 }
@@ -84,12 +84,13 @@ function check_vol_mnt_attrs() {
 
 errcnt=0; cnt=0
 PREFIX="$(dirname $(readlink -f $0))"
+QUIET=0 # false (meaning not quiet)
 
 # parse cmd opts
 while getopts ':q' opt; do
     case "$opt" in
       q)
-	QUIET=true  # else, undefined
+	QUIET=1 # true
 	;;
       \?) # invalid option
 	;;
@@ -111,6 +112,6 @@ for NODE in $NODES; do
 done
 
 (( errcnt > 0 )) && exit 1
-[[ -z "$QUIET" ]] && echo \
+(( ! QUIET )) && echo \
    "The $cnt nodes spanned by $VOLNAME have the correct vol mount settings"
 exit 0
