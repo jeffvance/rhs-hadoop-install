@@ -7,9 +7,9 @@
 # new volume is started. The volume is mounted with the correct glusterfs-fuse
 # mount options. Lastly, distributed, hadoop-specific directories are created.
 #
-# Syntax (all positional):
+# Syntax:
 #  $1=volName: name of the new volume
-#  $2=vol-mnt-prefix: path of the glusterfs-fuse mount point, eg. /mnt/glusterfs.
+#  $2=vol-mnt-prefix: path of the glusterfs-fuse mount point, eg. /mnt/glusterfs
 #     Note: the volume name will be appended to this mount point.
 #  $3=node-list: a list of (minimally) 2 nodes and 1 brick mount path. For
 #     example: "create_vol.sh HadoopVol /mnt/glusterfs rhs21-1:/mnt/brick1 
@@ -171,7 +171,7 @@ function chk_nodes() {
 #   VOLMNT
 function mk_volmnt() {
 
-  local err; local out; local i; local node
+  local err; local out; local node
   local volmnt="$VOLMNT/$VOLNAME"
   local \
     mntopts='entry-timeout=0,attribute-timeout=0,use-readdirp=no,acl,_netdev'
@@ -187,12 +187,13 @@ function mk_volmnt() {
 	rc=\$?
 	if (( rc != 0 && rc != 32 )) ; then # 32=already mounted
 	  echo Error \$rc: mounting $volmnt with $mntopts options
-	  reurn 1
+	  exit 1 # from ssh
 	fi
+	exit 0 # from ssh
       ")"
       if (( $? != 0 )) ; then
 	echo "ERROR on $node: $out"
-	reurn 1
+	return 1
       fi
   done
 

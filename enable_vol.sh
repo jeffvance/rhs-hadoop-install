@@ -1,13 +1,11 @@
 #!/bin/bash
 #
-# enable_vol.sh accepts a volume name, checks the volume mount and each node
-# spanned by the volume to be sure they are setup for hadoop workloads, and
-# then updates the core-site files, on all nodes, to contain the volume. 
+# enable_vol.sh accepts a volume name, discovers and checks the volume mount on
+# each node spanned by the volume to be sure they are setup for hadoop workloads,
+# and then updates the core-site file to contain the volume. 
 #
 # Syntax:
 #  $1=volName: gluster volume name
-#  $2=vol-mnt-prefix: path of the glusterfs-fuse mount point, eg:
-#       /mnt/glusterfs. Note: volume name is appended to this mount point.
 #  -y: auto answer "yes" to any prompts
 #  --yarn-master: hostname or ip of the yarn-master server (required)
 #  --hadoop-mgmt-node: hostname or ip of the hadoop mgmt server (required)
@@ -32,7 +30,6 @@ source $PREFIX/yesno
 #   MGMT_PASS
 #   MGMT_PORT
 #   MGMT_USER
-#   VOLMNT
 #   VOLNAME
 #   YARN_NODE
 function parse_cmd() {
@@ -70,14 +67,10 @@ function parse_cmd() {
   done
 
   VOLNAME="$1"
-  VOLMNT="$2"
 
   # check for required args and options
   [[ -z "$VOLNAME" ]] && {
     echo "Syntax error: volume name is required";
-    ((errcnt++)); }
-  [[ -z "$VOLMNT" ]] && {
-    echo "Syntax error: volume mount path prefix is required";
     ((errcnt++)); }
   [[ -z "$YARN_NODE" || -z "$MGMT_NODE" ]] && {
     echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
