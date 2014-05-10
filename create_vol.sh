@@ -182,13 +182,13 @@ function mk_volmnt() {
 
   for node in ${NODES[@]}; do
       [[ "$node" == "$LOCALHOST" ]] && { ssh='('; ssh_close=')'; } \
-			            || { ssh="ssh $node"; ssh_close=''; }
+			            || { ssh="ssh $node '"; ssh_close="'"; }
       out="$(eval "
-	$ssh 
+	$ssh
 	  mkdir -p $volmnt
 	  # append mount to fstab, if not present
 	  if ! grep -qs $volmnt /etc/fstab ; then
-	    echo '$node:/$VOLNAME $volmnt glusterfs $mntopts 0 0' >>/etc/fstab
+	    echo $node:/$VOLNAME $volmnt glusterfs $mntopts 0 0 >>/etc/fstab
 	  fi
 	  mount $volmnt # mount via fstab
 	  rc=\$?
@@ -277,7 +277,7 @@ function start_vol() {
       return 1
     fi
   else
-    echo "\"$VOLNAME\" volume started"
+    echo "\"$VOLNAME\" started"
   fi
 
   return 0
