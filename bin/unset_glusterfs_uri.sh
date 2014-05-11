@@ -18,11 +18,11 @@ function debug()
 }
 
 usage () {
-  echo "Usage: unset_glusterfs_uri.sh [-u userId] [-p password] [-port port] [-h ambari_host] <VOLUME_ID>";
+  echo "Usage: unset_glusterfs_uri.sh [-u userId] [-p password] [--port port] [-h ambari_host] <VOLUME_ID>";
   echo "";
   echo "       [-u userId]: Optional user ID to use for authentication. Default is 'admin'.";
   echo "       [-p password]: Optional password to use for authentication. Default is 'admin'.";
-  echo "       [-port port]: Optional port number for Ambari server. Default is '8080'. Provide empty string to not use port.";
+  echo "       [--port port]: Optional port number for Ambari server. Default is '8080'. Provide empty string to not use port.";
   echo "       [-h ambari_host]: Optional external host name for Ambari server. Default is 'localhost'.";
   echo "       [VOLUME_ID]: Gluster Volume ID.";
   exit 1;
