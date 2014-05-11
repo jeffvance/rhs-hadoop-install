@@ -18,7 +18,6 @@
 
 PREFIX="$(dirname $(readlink -f $0))"
 
-
 ## functions ##
 
 source $PREFIX/yesno
@@ -167,9 +166,15 @@ function chk_and_fix_nodes() {
 
 ## main ##
 
+VERSION='0.01'
+ME="$(basename $0 .sh)"
 LOCALHOST=$(hostname)
 errcnt=0
 AUTO_YES=0 # false
+
+echo '***'
+echo "*** $ME: version $VERSION"
+echo '***'
 
 parse_cmd $@ || exit -1
 
@@ -178,8 +183,8 @@ BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh $VOLNAME))
 BLKDEVS=($($PREFIX/bin/find_blocks.sh $VOLNAME))
 
 echo
-echo "****NODES=${NODES[@]}"
-echo "****BRKMNTS=${BRKMNTS[@]}"
+echo "*** NODES=${NODES[@]}"
+echo "*** BRKMNTS=${BRKMNTS[@]}"
 echo
 
 # make sure the volume exists

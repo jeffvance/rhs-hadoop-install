@@ -27,7 +27,6 @@
 
 PREFIX="$(dirname $(readlink -f $0))"
 
-
 ## functions ##
 
 # parse_cmd: simple positional parsing. Returns 1 on errors.
@@ -288,9 +287,15 @@ function start_vol() {
 
 ## main ##
 
+VERSION='0.01'
+ME="$(basename $0 .sh)"
 LOCALHOST=$(hostname)
 BRKMNTS=(); NODES=()
 errcnt=0
+
+echo '***'
+echo "*** $ME: version $VERSION"
+echo '***'
 
 parse_cmd $@ || exit -1
 
@@ -299,8 +304,8 @@ parse_nodes
 parse_brkmnts || exit 1
 
 echo
-echo "****NODES=${NODES[@]}"
-echo "****BRKMNTS=${BRKMNTS[@]}"
+echo "*** NODES=${NODES[@]}"
+echo "*** BRKMNTS=${BRKMNTS[@]}"
 echo
 
 # make sure the volume doesn't already exist

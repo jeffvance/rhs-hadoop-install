@@ -17,7 +17,6 @@
 
 PREFIX="$(dirname $(readlink -f $0))"
 
-
 ## functions ##
 
 source $PREFIX/yesno
@@ -100,15 +99,21 @@ function vol_exists() {
 
 ## main ##
 
+VERSION='0.01'
+ME="$(basename $0 .sh)"
 errcnt=0
 AUTO_YES=0 # false
+
+echo '***'
+echo "*** $ME: version $VERSION"
+echo '***'
 
 parse_cmd $@ || exit -1
 
 NODES=($($PREFIX/bin/find_nodes.sh $VOLNAME)) # array
 
 echo
-echo "****NODES=${NODES[@]}"
+echo "*** NODES=${NODES[@]}"
 echo
 
 # make sure the volume exists

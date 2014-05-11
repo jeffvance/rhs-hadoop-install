@@ -42,7 +42,6 @@
 
 PREFIX="$(dirname $(readlink -f $0))"
 
-
 ## functions ##
 
 source $PREFIX/yesno
@@ -318,12 +317,18 @@ function ambari_server() {
 
 ## main ##
 
+VERSION='0.01'
+ME="$(basename $0 .sh)"
 LOCALHOST=$(hostname)
 BRKMNTS=(); BLKDEVS=(); NODES=()
 MGMT_INSIDE=0 # assume false
 YARN_INSIDE=0 # assume false
 AUTO_YES=0    # assume false
 errnodes=''; errcnt=0
+
+echo '***'
+echo "*** $ME: version $VERSION"
+echo '***'
 
 parse_cmd $@ || exit -1
 
@@ -332,9 +337,9 @@ parse_nodes || exit 1
 parse_brkmnts_and_blkdevs || exit 1
 
 echo
-echo "****NODES=${NODES[@]}"
-echo "****BRKMNTS=${BRKMNTS[@]}"
-echo "****BLKDEVS=${BLKDEVS[@]}"
+echo "*** NODES=${NODES[@]}"
+echo "*** BRKMNTS=${BRKMNTS[@]}"
+echo "*** BLKDEVS=${BLKDEVS[@]}"
 echo
 
 # setup each node for hadoop workloads
