@@ -5,12 +5,12 @@
 #
 # Assumption: the node running this script has access to the gluster cli.
 
-LOCALHOST=$(hostname)
 VOLNAME="$1"
 [[ -z "$VOLNAME" ]] && {
   echo "Syntax error: volume name is required";
   exit -1;}
 
+LOCALHOST=$(hostname)
 PREFIX="$(dirname $(readlink -f $0))"
 
 BRICKS=($($PREFIX/find_bricks.sh $VOLNAME)) # array
