@@ -218,12 +218,16 @@ function setup_nodes() {
     local node="$1"
     local blkdev="$2" # can be blank
     local brkmnt="$3" # can be blank
-    local out; local err
+    local out; local err; local ssh; local scp
 
-    scp -r -q $PREFIX/bin $node:/tmp
-    out="$(ssh $node "/tmp/bin/setup_datanode.sh --blkdev $blkdev \
-	--brkmnt $brkmnt --yarn-master $YARN_NODE \
-	--hadoop-mgmt-node $MGMT_NODE")"
+    [[ "$node" == "$LOCALHOST" ]] && { ssh=''; scp='#'; } || \
+                                     { ssh="ssh $node"; scp='scp'; }
+    eval "$scp -r -q $PREFIX/bin $node:/tmp"
+    out="$(eval "
+	$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
+		--brkmnt $brkmnt --yarn-master $YARN_NODE \
+		--hadoop-mgmt-node $MGMT_NODE
+ 	")"
     err=$?
     if (( $? != 0 )) ; then
       echo "ERROR: $err: in setup_datanode: $out"
@@ -291,16 +295,20 @@ function create_pool() {
 #   MGMT_NODE
 function ambari_server() {
 
+  local out; local ssh; local scp
+
   echo "Installing the ambari-server on $MGMT_NODE..."
 
   # if the mgmt-node is inside the storage pool then all bin scripts have been
   # copied, else need to copy the setup_ambari_server script
-  if (( ! MGMT_INSIDE )) ; then
-    ssh $MGMT_NODE "mkdir -p /tmp/bin"
-    scp -q $PREFIX/bin/setup_ambari_server.sh $MGMT_NODE:/tmp/bin
+  [[ "$MGMT_NODE" == "$LOCALHOST" ]] && { ssh=''; scp='#'; } || \
+					{ ssh="ssh $MGMT_NODE"; scp='scp'; }
+  if (( ! MGMT_INSIDE )) ; then # scripts have already been copied
+    eval "$ssh mkdir -p /tmp/bin"
+    eval "$scp -q $PREFIX/bin/setup_ambari_server.sh $MGMT_NODE:/tmp/bin"
   fi
 
-  ssh $MGMT_NODE "/tmp/bin/setup_ambari_server.sh" || return 1
+  eval "$ssh /tmp/bin/setup_ambari_server.sh" || return 1
 
   return 0 
 }
@@ -308,6 +316,7 @@ function ambari_server() {
 
 ## main ##
 
+LOCALHOST=$(hostname)
 BRKMNTS=(); BLKDEVS=(); NODES=()
 MGMT_INSIDE=0 # assume false
 YARN_INSIDE=0 # assume false
