@@ -1,14 +1,21 @@
 #!/bin/bash
 
+
+errcnt=0;
+
 _DEBUG="off"
-CLUSTER=$3
-SITE=$4
-SITETAG=''
-CONFIGKEY=$5
-CONFIGVALUE=$6
-VOLUME_ID=$5
+USERID="admin"
+PASSWD="admin"
+PORT=":8080"
+PARAMS=''
+AMBARI_HOST='localhost'
+VOLUME_ID=''
 CLUSTER_NAME=""
 
+function debug()
+{
+ [ "$_DEBUG" == "on" ] &&  $@
+}
 
 usage () {
   echo "Usage: set_glusterfs_uri.sh [-u userId] [-p password] [-port port] [-h ambari_host] <VOLUME_ID>";
@@ -21,56 +28,83 @@ usage () {
   exit 1;
 }
 
-USERID="admin"
-PASSWD="admin"
-PORT=":8080"
-PARAMS=''
-AMBARI_HOST='localhost'
-CLUSTER_NAME=""
+function parse_cmd(){
+
+  local OPTIONS='u:p:h:'
+  local LONG_OPTS='port:,help,debug'
+
+  # defaults (global variables)
+  DEBUG=false
+  SCRIPT=$0
 
 
-if [ "$1" == "-u" ] ; then
-  USERID=$2;
-  shift 2;
-  echo "USERID=$USERID";
-  PARAMS="-u $USERID "
-fi
+  local args=$(getopt -n "$SCRIPT" -o $OPTIONS --long $LONG_OPTS -- $@)
+  (( $? == 0 )) || { echo "$SCRIPT syntax error"; exit -1; }
 
-if [ "$1" == "-p" ] ; then
-  PASSWD=$2;
-  shift 2;
-  echo "PASSWORD=$PASSWD";
-  PARAMS=$PARAMS" -p $PASSWD "
-fi
-
-if [ "$1" == "-port" ] ; then
-  if [ -z $2 ]; then
-    PORT="";
-  else
-    PORT=":$2";
+  eval set -- "$args" # set up $1... positional args
+  while true ; do
+        #echo $1
+	case "$1" in
+	--help)
+		usage; exit 0
+	;;
+	--port)
+		if [ -z $2 ]; then
+		  PORT="";
+		else
+		  PORT=":$2";
+		fi
+		debug echo "PORT=$2";
+		PARAMS=$PARAMS" -port $2 "
+		shift 2; continue
+	;;
+	--debug)
+		DEBUG=true;_DEBUG="on"; shift; continue
+	;;
+	-u)
+		USERID=$2;
+                debug echo "USERID=$USERID";
+		PARAMS="-u $USERID "
+		shift 2; continue
+	;;
+	-p)
+		PASSWD=$2;
+		debug echo "PASSWORD=$PASSWD";
+		PARAMS=$PARAMS" -p $PASSWD "
+		shift 2; continue
+	;;
+	-h)
+		if [ -z $2 ]; then
+		  AMBARI_HOST=$AMBARI_HOST;
+		else
+		  AMBARI_HOST="$2";
+		fi
+		debug echo "AMBARI_HOST=$2";
+		shift 2; continue
+	;;
+	--) # no more args to parse
+		shift; break
+	;;
+	*) echo "Error: Unknown option: \"$1\""; exit -1
+	;;
+      esac
+  done
+  
+  #take care off all other arguments
+  if [[ $# -gt 1 ]]; then
+    echo "Error: Unknown values: \"$@\""; exit -1
   fi
-  echo "PORT=$2";
-  PARAMS=$PARAMS" -port $2 "
-  shift 2;
-fi
-
-if [ "$1" == "-h" ] ; then
-  if [ -z $2 ]; then
-    AMBARI_HOST=$AMBARI_HOST;
+  if [ -z $1 ]; then
+    echo "Syntax error: VOLUME_ID is missing: \"$@\"";usage; exit -1
   else
-    AMBARI_HOST="$2";
+    VOLUME_ID="$1";
   fi
-  echo "AMBARI_HOST=$2";
-  shift 2;
-fi
 
-AMBARIURL="http://$AMBARI_HOST$PORT"
+  eval set -- "$@" # move arg pointer so $1 points to next arg past last opt
 
-
-
-function DEBUG()
-{
- [ "$_DEBUG" == "on" ] &&  $@
+  if [[ $DEBUG == true ]] ; then
+	debug echo "DEBUGGING ON"
+  fi
 }
 
 ########################
@@ -80,11 +114,11 @@ currentClusterName () {
 
   line=`curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/" | grep -E "cluster_name" | sed "s/\"//g"`;
   if [ -z "$line" ]; then
-    echo "[ERROR] not Cluster was found in server response.";
+    echo "[ERROR] Cluster was not found in server response.";
     exit 1;
   fi
 
-  DEBUG echo "########## LINE = "$line
+  debug echo "########## LINE = "$line
 
   line1=$line
   propLen=${#line1}
@@ -100,22 +134,28 @@ currentClusterName () {
   key=${keyvalue[0]}
   value="${keyvalue[1]}"
 
-  value=`echo $value | sed "s/\"//g"`
-  DEBUG echo "########## VALUE = "$value
+  value=`echo $value | sed "s/[\"\,\ ]//g"`
+  debug echo "########## VALUE = "$value
   CLUSTER_NAME="$value" 
 }
 
-	
+
+
+## ** main ** ##
+
+parse_cmd $@
+
+AMBARIURL="http://$AMBARI_HOST$PORT"
+debug echo "########## AMBARIURL = "$AMBARIURL
+
 currentClusterName
-DEBUG echo "########## CLUSTER_NAME = "$CLUSTER_NAME
-PARAMS=$PARAMS" add_volume $AMBARI_HOST $CLUSTER_NAME core-site "
+debug echo "########## CLUSTER_NAME = "$CLUSTER_NAME
+PARAMS=$PARAMS" add_volume $AMBARI_HOST $CLUSTER_NAME core-site "$VOLUME_ID
 PARAMS=`echo $PARAMS | sed "s/\"//g"`
-DEBUG echo "########## PARAMS = "$PARAMS	
+debug echo "########## PARAMS = "$PARAMS
+	
+debug echo "sh ./ambari_config.sh $PARAMS"
+sh ./ambari_config.sh $PARAMS	|| ((errcnt++))
 
-if (($# == 1)); then
-  DEBUG echo "sh ./ambari_config.sh $PARAMS $1"
-  sh ./ambari_config.sh $PARAMS $1	
-else
-  usage
-fi
-
+(( errcnt > 0 )) && exit 1
+exit 0
