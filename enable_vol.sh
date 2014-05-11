@@ -193,7 +193,6 @@ chk_and_fix_nodes || exit 1
 
 echo "Enable $VOLNAME in all core-site.xml files..."
 $PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE -u $MGMT_USER \
-	-p $MGMT_PASS -port $MGMT_PORT $VOLNAME && \
-  exit 1
+	-p $MGMT_PASS -port $MGMT_PORT $VOLNAME || exit 1
 
 exit 0
