@@ -317,7 +317,6 @@ function ambari_server() {
 
 ## main ##
 
-VERSION='0.01'
 ME="$(basename $0 .sh)"
 LOCALHOST=$(hostname)
 BRKMNTS=(); BLKDEVS=(); NODES=()
@@ -327,7 +326,7 @@ AUTO_YES=0    # assume false
 errnodes=''; errcnt=0
 
 echo '***'
-echo "*** $ME: version $VERSION"
+echo "*** $ME: version $(cat $PREFIX/VERSION)"
 echo '***'
 
 parse_cmd $@ || exit -1

@@ -99,13 +99,12 @@ function vol_exists() {
 
 ## main ##
 
-VERSION='0.01'
 ME="$(basename $0 .sh)"
 errcnt=0
 AUTO_YES=0 # false
 
 echo '***'
-echo "*** $ME: version $VERSION"
+echo "*** $ME: version $(cat $PREFIX/VERSION)"
 echo '***'
 
 parse_cmd $@ || exit -1

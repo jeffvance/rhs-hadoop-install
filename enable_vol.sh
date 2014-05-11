@@ -166,14 +166,13 @@ function chk_and_fix_nodes() {
 
 ## main ##
 
-VERSION='0.01'
 ME="$(basename $0 .sh)"
 LOCALHOST=$(hostname)
 errcnt=0
 AUTO_YES=0 # false
 
 echo '***'
-echo "*** $ME: version $VERSION"
+echo "*** $ME: version $(cat $PREFIX/VERSION)"
 echo '***'
 
 parse_cmd $@ || exit -1
