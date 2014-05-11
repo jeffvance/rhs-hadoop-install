@@ -6,6 +6,7 @@
 #
 # Assumption: the node running this script has access to the gluster cli.
 
+LOCALHOST=$(hostname)
 VOLNAME="$1" # optional volume name
 PREFIX="$(dirname $(readlink -f $0))"
 
@@ -13,8 +14,11 @@ for brick in $($PREFIX/find_bricks.sh $VOLNAME); do
     node=${brick%:*}
     brickmnt=${brick#*:}    # remove node
     brickmnt=${brickmnt%/*} # remove volname
-    ssh $node "
-	mnt=\$(grep $brickmnt /proc/mounts)
-	echo $node:\${mnt%% *}  # "node:/vg-lv path"
-    "
+    [[ "$node" == "$LOCALHOST" ]] && { ssh=''; ssh_close=''; } || \
+    				     { ssh="ssh $node '"; ssh_close="'"; }
+    eval "$ssh 
+	   mnt=\$(grep $brickmnt /proc/mounts)
+	   echo $node:\${mnt%% *}  # "node:/vg-lv path"
+	  $ssh_close
+	"
 done

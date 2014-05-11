@@ -136,8 +136,9 @@ function chk_vol() {
 # prepped for hadoop workloads by invoking bin/check_node.sh. Returns 1 on 
 # errors.
 # Uses globals:
-#   NODES
 #   BRKMNTS
+#   LOCALHOST
+#   NODES
 #   PREFIX
 # Side effect: all scripts under bin/ are copied to each node.
 function chk_nodes() {
@@ -170,9 +171,10 @@ function chk_nodes() {
 # mount is persisted in /etc/fstab. Returns 1 on errors.
 # Assumptions: the bin scripts have been copied to each node in /tmp/bin.
 # Uses globals:
+#   LOCALHOST
 #   NODES
-#   VOLNAME
 #   VOLMNT
+#   VOLNAME
 function mk_volmnt() {
 
   local err; local out; local node; local ssh; local ssh_close

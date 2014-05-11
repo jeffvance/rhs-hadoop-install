@@ -202,6 +202,7 @@ function parse_brkmnts_and_blkdevs() {
 # Uses globals:
 #   BLKDEVS
 #   BRKMNTS
+#   LOCALHOST
 #   NODES
 #   PREFIX
 #   YARN_INSIDE
@@ -291,6 +292,7 @@ function create_pool() {
 # ambari_server: install and start the ambari server on the MGMT_NODE. Returns
 # 1 on errors.
 # Uses globals:
+#   LOCALHOST
 #   MGMT_INSIDE
 #   MGMT_NODE
 function ambari_server() {

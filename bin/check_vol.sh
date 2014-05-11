@@ -12,6 +12,7 @@
 # Assumption: the node running this script has access to the gluster cli, and
 #   needed scripts under bin/ are in place on this node.
 
+LOCALHOST=$(hostname)
 errcnt=0; q=''
 PREFIX="$(dirname $(readlink -f $0))"
 QUIET=0 # false (meaning not quiet)
@@ -35,12 +36,13 @@ VOLNAME="$1"
 
 (( QUIET )) && q='-q'
 
-BRKMNTS="$($PREFIX/find_brick_mnts.sh $VOLNAME)"
 
-for brick in $BRKMNTS; do
+for brick in $($PREFIX/find_brick_mnts.sh $VOLNAME); do
     node=${brick%:*}
     brkmnt=${brick#*:}
-    ssh $node "/tmp/bin/check_node.sh $q $brkmnt" || ((errcnt++))
+    [[ "$node" == "$LOCALHOST" ]] && ssh='' || ssh="ssh $node"
+echo "****bin/chkvol.sh: node=$node, localhost=$LOCALHOST,ssh=$ssh"
+    eval "$ssh /tmp/bin/check_node.sh $q $brkmnt" || ((errcnt++))
 done
 
 $PREFIX/check_vol_mount.sh $q $VOLNAME $NODES || ((errcnt++))

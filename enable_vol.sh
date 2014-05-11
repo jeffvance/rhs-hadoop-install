@@ -103,6 +103,7 @@ function vol_exists() {
 # Uses globals:
 #   BLKDEVS
 #   BRKMNTS
+#   LOCALHOST
 #   MGMT_NODE
 #   NODES
 #   PREFIX
@@ -110,14 +111,16 @@ function vol_exists() {
 function setup_nodes() {
 
   local i=0; local err; local errcnt=0; local errnodes=''
-  local node; local brkmnt; local blkdev
+  local node; local brkmnt; local blkdev; local ssh; local scp
 
   for node in ${NODES[@]}; do
       brkmnt=${BRKMNTS[$i]}
       blkdev=${BLKDEVS[$i]}
 
-      scp -r -q $PREFIX/bin $node:/tmp
-      ssh $node "/tmp/bin/setup_datanode.sh --blkdev $blkdev \
+      [[ "$node" == "$LOCALHOST" ]] && { ssh=''; scp='#'; } || \
+				       { ssh="ssh $node"; scp='scp'; }
+      eval "$scp -r -q $PREFIX/bin $node:/tmp"
+      eval "$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
 		--brkmnt $brkmnt \
 		--yarn-master $YARN_NODE \
 		--hadoop-mgmt-node $MGMT_NODE"
@@ -164,6 +167,7 @@ function chk_and_fix_nodes() {
 
 ## main ##
 
+LOCALHOST=$(hostname)
 errcnt=0
 AUTO_YES=0 # false
 
