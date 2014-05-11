@@ -122,7 +122,7 @@ echo "$VOLNAME will be removed from all hadoop config files and thus will not be
 if (( AUTO_YES )) || yesno "  Continue? [y|N] " ; then
   echo "Disabling $VOLNAME in all core-site.xml files..."
   $PREFIX/bin/unset_glusterfs_uri.sh -h $MGMT_NODE -u $MGMT_USER \
-	-p $MGMT_PASS -port $MGMT_PORT $VOLNAME || exit 1
+	-p $MGMT_PASS --port $MGMT_PORT $VOLNAME || exit 1
 fi
 
 exit 0
