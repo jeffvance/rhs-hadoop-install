@@ -19,7 +19,7 @@ PREFIX="$(dirname $(readlink -f $0))"
 
 ## functions ##
 
-source $PREFIX/yesno
+source $PREFIX/bin/yesno
 
 # parse_cmd: simple positional parsing. Returns 1 on errors.
 # Sets globals:

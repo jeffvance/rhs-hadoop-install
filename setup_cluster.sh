@@ -44,7 +44,7 @@ PREFIX="$(dirname $(readlink -f $0))"
 
 ## functions ##
 
-source $PREFIX/yesno
+source $PREFIX/bin/yesno
 
 # parse_cmd: use get_opt to parse the command line. Returns 1 on errors.
 # Sets globals:
