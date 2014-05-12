@@ -138,7 +138,6 @@ currentClusterName () {
   debug echo "########## VALUE = "$value
   if [[ ! -z $value ]]; then   
     CLUSTER_NAME="$value" ; 
-    exit 0  
   else
     echo "Error: Cluster not found"
     exit 1
