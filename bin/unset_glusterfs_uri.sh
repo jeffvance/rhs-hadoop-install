@@ -136,7 +136,13 @@ currentClusterName () {
 
   value=`echo $value | sed "s/[\"\,\ ]//g"`
   debug echo "########## VALUE = "$value
-  CLUSTER_NAME="$value" 
+  if [[ ! -z $value ]]; then   
+    CLUSTER_NAME="$value" ; 
+    exit 0  
+  else
+    echo "Error: Cluster not found"
+    exit 1
+  fi
 }
 
 
