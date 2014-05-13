@@ -29,7 +29,7 @@ function usage () {
   echo "       [-p password]: Optional password to use for authentication. Default is 'admin'."
   echo "       [--port port]: Optional port number for Ambari server. Default is '8080'. Provide empty string to not use port."
   echo "       [-h ambari_host]: Optional external host name for Ambari server. Default is 'localhost'."
-  echo "       [VOLNAME]: Gluster Volume ID."
+  echo "       VOLNAME: Gluster Volume name."
   exit 1
 }
 
