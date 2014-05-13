@@ -1,5 +1,13 @@
 #!/bin/bash
 #
+# TODO:
+# 1) distribute the repo to each node and yum install it to get rhs-hadoop and
+#    rhs-hadoop-install
+# 2) logging
+# 3) --help
+# 4) CDN register each node, including yarn and mgmt nodes
+# 5) option to skip setting up default ports
+#
 # setup_cluster.sh accepts a list of nodes:brick-mnts:block-devs, along with
 # the name of the yarn-master and hadoop-mgmt servers, and creates a new trusted
 # pool with each node in the node-list setup as a storage/data node. The yarn
