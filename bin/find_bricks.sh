@@ -8,7 +8,7 @@
 
 VOLNAME="$1" # optional volume name
 
-if gluster volume status $VOLNAME ; then
+if gluster volume status $VOLNAME >& /dev/null ; then
   gluster volume status $VOLNAME | grep -w "Brick" | awk '{print $2}'
 else
   exit 1
