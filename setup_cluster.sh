@@ -4,9 +4,8 @@
 # 1) distribute the repo to each node and yum install it to get rhs-hadoop and
 #    rhs-hadoop-install
 # 2) logging
-# 3) --help
-# 4) CDN register each node, including yarn and mgmt nodes
-# 5) option to skip setting up default ports
+# 3) CDN register each node, including yarn and mgmt nodes
+# 4) option to skip setting up default ports
 #
 # setup_cluster.sh accepts a list of nodes:brick-mnts:block-devs, along with
 # the name of the yarn-master and hadoop-mgmt servers, and creates a new trusted
@@ -23,36 +22,60 @@
 # Also, on all nodes (assumed to be storage- data-nodes) and on the yarn-master
 # server node, the ambari agent is installed (updated if present) and started.
 # If the hadoop management node is outside of the storage pool then it will not
-# have the agent installed.
-#
-# Last, the ambari-server is installed and started on the mgmt-node.
+# have the agent installed. Last, the ambari-server is installed and started on
+# the mgmt-node.
 #
 # Tasks related to volumes or ambari setup are not done here.
 #
-# Syntax:
-#  -y: auto answer "yes" to any prompts
-#  --yarn-master: hostname or ip of the yarn-master server (expected to be out-
-#       side of the storage pool)
-#  --hadoop-mgmt-node: hostname or ip of the hadoop mgmt server (expected to
-#       be outside of the storage pool)
-#  node-list: a list of (minimally) 2 nodes, 1 brick mount path and 1 block
-#     device path. More generally the node-list looks like:
-#     <node1>:<brkmnt1><blkdev1> <node2>[:<brkmnt2>][:<blkmnt2>] ...
-#       [<nodeN>][:<brkmntN>][:<blkdevN>]
-#     The first <brkmnt> and <blkdev> are required. If all the nodes use the
-#     same path to their brick mounts and block devices then there is no need
-#     to repeat the brick mount and block dev values. If a node uses a 
-#     different brick mount then it is defined following a ":". If a node uses
-#     a different block dev the it is defined following two ":" (this assumes
-#     that the brick mount is not different). If a node uses both a different
-#     brick mount and block dev then each one is proceded by a ":", following
-#     the node name.
+# See usage() for syntax.
+#
+# Assumption: script must be executed from a node that has access to the
+#  gluster cli.
+
 
 PREFIX="$(dirname $(readlink -f $0))"
 
 ## functions ##
 
 source $PREFIX/bin/yesno
+
+# usage: output the description and syntax.
+function usage() {
+
+  cat <<EOF
+
+$ME sets up a storage cluster for hadoop workloads.
+
+SYNTAX:
+
+$ME --version | --help
+
+$ME [-y] --hadoop-management-node <node> --yarn-master <node> \\
+              <nodes-spec-list>
+where:
+
+  <node-spec-list> : a list of two or more <node-spec>s.
+  <node-spec> : a storage node followed by a ':', followed by a brick mount path,
+      followed by another ':', followed by a block device path. Eg:
+         <node1><:brickmnt1>:<blkdev1>  <node2>[:<brickmnt2>][:<blkdev2>] ...
+      Each node is expected to be separate from the management and yarn-master
+      nodes. Only the brick mount path and the block device path associated with
+      the first node are required. If omitted from the other <node-spec-list>
+      members then each node assumes the values of the first node for brick
+      mount path and block device path. If a brick mount path is omitted but a
+      block device path is specified then the block device path is proceded by
+      two ':'s, eg. "<nodeN>::<blkdevN>"
+  -y : auto answer "yes" to all prompts. Default is to be promoted before the
+      script continues.
+  --yarn-master : hostname or ip of the yarn-master server which is expected to
+      be outside of the storage pool.
+  --hadoop-mgmt-node : hostname or ip of the hadoop mgmt server which is expected
+      to be outside of the storage pool.
+  --version : output only the version string.
+  --help : this text.
+
+EOF
+}
 
 # parse_cmd: use get_opt to parse the command line. Returns 1 on errors.
 # Sets globals:
@@ -63,13 +86,19 @@ source $PREFIX/bin/yesno
 function parse_cmd() {
 
   local opts='y'
-  local long_opts='yarn-master:,hadoop-mgmt-node:'
+  local long_opts='help,version,yarn-master:,hadoop-mgmt-node:'
   local errcnt=0
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
 
   while true; do
       case "$1" in
+	--help)
+	  usage; exit 0
+	;;
+	--version) # version is already output, so nothing to do here
+	  exit 0
+	;;
 	-y)
 	  AUTO_YES=1; shift; continue
 	;;

@@ -2,7 +2,6 @@
 #
 # TODO:
 # 1) logging
-# 2) --help
 #
 # create_vol.sh accepts a volume name, volume mount path prefix, and a list of
 # two or more "node:brick_mnt" pairs, and creates a new volume with the
@@ -11,20 +10,7 @@
 # new volume is started. The volume is mounted with the correct glusterfs-fuse
 # mount options. Lastly, distributed, hadoop-specific directories are created.
 #
-# Syntax:
-#  $1=volName: name of the new volume
-#  $2=vol-mnt-prefix: path of the glusterfs-fuse mount point, eg. /mnt/glusterfs
-#     Note: the volume name will be appended to this mount point.
-#  $3=node-list: a list of (minimally) 2 nodes and 1 brick mount path. For
-#     example: "create_vol.sh HadoopVol /mnt/glusterfs rhs21-1:/mnt/brick1 
-#                rhs21-2"
-#     the glusterfs-fuse mount on node rhs21-1 will be "/mnt/glusterfs/HadoopVol"
-#     The general syntax is: <node1>:<brkmnt1> <node1>[:<brkmnt2>] ... 
-#       <nodeN>[:<brkmntN>]
-#     The first <brkmnt> is required. If all the nodes use the same path to
-#     their brick mounts then there is no need to repeat the brick mount point.
-#     If a node uses a different brick mount then it is defined following a
-#     ":" after the node name.
+# See useage() for syntax.
 #
 # Assumption: script must be executed from a node that has access to the 
 #  gluster cli.
@@ -32,6 +18,39 @@
 PREFIX="$(dirname $(readlink -f $0))"
 
 ## functions ##
+
+# usage: output the description and syntax.
+function usage() {
+
+  cat <<EOF
+
+$ME creates and prepare a new volume designated for hadoop workloads.
+
+SYNTAX:
+
+$ME --version | --help
+
+$ME <volname> <volume-mnt-prefix> <node-list-spec>
+
+where:
+
+  <node-spec-list> : a list of two or more <node-spec>s.
+  <node-spec> : a storage node followed by a ':', followed by a brick mount
+      path.  Eg:
+         <node1><:brickmnt1>  <node2>[:<brickmnt2>] ...
+      Each node is expected to be separate from the management and yarn-master
+      nodes. Only the brick mount path associated with the first node is
+      required. If omitted from the other <node-spec-list> members then each node
+      assumes the value of the first node for the brick mount path.
+
+  <volname> : name of the new volume.
+  <vol-mnt-prefix> : path of the glusterfs-fuse mount point, eg. /mnt/glusterfs.
+      Note: the volume name will be appended to this mount point.
+  --version : output only the version string.
+  --help : this text.
+
+EOF
+}
 
 # parse_cmd: simple positional parsing. Returns 1 on errors.
 # Sets globals:
@@ -41,6 +60,23 @@ PREFIX="$(dirname $(readlink -f $0))"
 function parse_cmd() {
 
   local errcnt=0
+  local long_opts='help,version'
+
+  eval set -- "$(getopt -o '' --long $long_opts -- $@)"
+
+  while true; do
+      case "$1" in
+        --help)
+          usage; exit 0
+        ;;
+        --version) # version is already output, so nothing to do here
+          exit 0
+        ;;
+        --)
+          shift; break
+        ;;
+      esac
+  done
 
   VOLNAME="$1"; shift
   VOLMNT="$1"; shift
