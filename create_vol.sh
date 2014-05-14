@@ -24,7 +24,8 @@ function usage() {
 
   cat <<EOF
 
-$ME creates and prepare a new volume designated for hadoop workloads.
+$ME creates and prepares a new volume designated for hadoop workloads. The 
+replica factor is hard-coded to 2, per RHS requirements.
 
 SYNTAX:
 

@@ -65,12 +65,12 @@ where:
       mount path and block device path. If a brick mount path is omitted but a
       block device path is specified then the block device path is proceded by
       two ':'s, eg. "<nodeN>::<blkdevN>"
-  -y : auto answer "yes" to all prompts. Default is to be promoted before the
-      script continues.
   --yarn-master : hostname or ip of the yarn-master server which is expected to
       be outside of the storage pool.
   --hadoop-mgmt-node : hostname or ip of the hadoop mgmt server which is expected
       to be outside of the storage pool.
+  -y : auto answer "yes" to all prompts. Default is to be promoted before the
+      script continues.
   --version : output only the version string.
   --help : this text.
 
