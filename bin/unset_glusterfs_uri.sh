@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# set_glusterfs_uri.sh updates the hadoop core-site.xml file for the ...
+# unset_glusterfs_uri.sh updates the hadoop core-site.xml file
 #
 # Syntax: see usage() function.
 
