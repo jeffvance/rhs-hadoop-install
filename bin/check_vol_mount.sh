@@ -25,15 +25,15 @@ function chk_mnt() {
     ((warncnt++))
   fi
   if ! grep -wq "use-readdirp=no" <<<$opts; then
-    (( ! QUIET )) && echo "ERROR: use-readdirp must be set to 'no'"
+    echo "ERROR: use-readdirp must be set to 'no'"
     ((errcnt++))
   fi
   if ! grep -wq "attribute-timeout=0" <<<$opts; then
-    (( ! QUIET )) && echo "ERROR: attribute-timeout must be set to zero"
+    echo "ERROR: attribute-timeout must be set to zero"
     ((errcnt++))
   fi
   if ! grep -wq "entry-timeout=0" <<<$opts; then
-    (( ! QUIET )) && echo "ERROR: entry-timeout must be set to zero"
+    echo "ERROR: entry-timeout must be set to zero"
     ((errcnt++))
   fi
 

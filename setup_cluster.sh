@@ -37,7 +37,8 @@ PREFIX="$(dirname $(readlink -f $0))"
 
 ## functions ##
 
-source $PREFIX/bin/yesno
+source $PREFIX/bin/functions
+# extract NODES array from NODE_SPEC
 
 # usage: output the description and syntax.
 function usage() {
@@ -128,9 +129,9 @@ function parse_cmd() {
   return 0
 }
 
-# parse_nodes: set the global NODES array from NODE_SPEC and report warnings
-# if the yarn-master or mgmt nodes are inside the storage pool, and prompts
-# the user to continue unless AUTO_YES is set. Returns 1 if user answers no.
+# parse_nodes: set the global NODES array from NODE_SPEC, report warnings if
+# the yarn-master or mgmt nodes are inside the storage pool, and prompt the
+# user to continue unless AUTO_YES is set. Returns 1 if user answers no.
 # Uses globals:
 #   NODE_SPEC
 #   YARN_NODE
@@ -368,7 +369,11 @@ echo '***'
 
 parse_cmd $@ || exit -1
 
+# extract NODES array from NODE_SPEC
 parse_nodes || exit 1
+
+# check for passwordless ssh connectivity to nodes
+check_ssh $LOCALHOST $NODES || exit 1
 
 parse_brkmnts_and_blkdevs || exit 1
 

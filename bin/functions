@@ -25,3 +25,26 @@ function yesno() {
    done
 }
 
+# check_ssh: verify that the user can passwordless ssh to the passed-in list of
+# nodes. Returns 1 on errors.
+# Args: $1  = localhost
+#       $2+ = list of nodes.
+function check_ssh() {
+
+  local localhost="$1"; shift
+  local nodes="$@"
+  local node; local err; local errcnt=0
+
+  for node in $nodes; do
+      [[ "$node" == "$localhost" ]] && continue # skip
+      ssh -q $node exit
+      err=$?
+      if (( err != 0 )) ; then
+        echo "ERROR: cannot connect to node $node"
+        ((errcnt++))
+      fi
+  done
+
+  (( errcnt > 0 )) && return 1
+  return 0
+}

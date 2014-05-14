@@ -41,7 +41,6 @@ for brick in $($PREFIX/find_brick_mnts.sh $VOLNAME); do
     node=${brick%:*}
     brkmnt=${brick#*:}
     [[ "$node" == "$LOCALHOST" ]] && ssh='' || ssh="ssh $node"
-echo "****bin/chkvol.sh: node=$node, localhost=$LOCALHOST,ssh=$ssh"
     eval "$ssh /tmp/bin/check_node.sh $q $brkmnt" || ((errcnt++))
 done
 

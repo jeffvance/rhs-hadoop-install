@@ -277,6 +277,7 @@ PREFIX="$(dirname $(readlink -f $0))"
 parse_cmd $@ || exit -1
 (( QUIET )) && q='-q'
 
+echo "setup_datanodes: BLKDEV=$BLKDEV"
 setup_xfs          || ((errcnt++))
 mount_blkdev       || ((errcnt++))
 setup_selinux      || ((errcnt++))

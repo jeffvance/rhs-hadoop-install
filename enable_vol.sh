@@ -13,7 +13,7 @@ PREFIX="$(dirname $(readlink -f $0))"
 
 ## functions ##
 
-source $PREFIX/bin/yesno
+source $PREFIX/bin/functions
 
 # usage: output the general description and syntax.
 function usage() {
@@ -186,8 +186,11 @@ function chk_and_fix_nodes() {
     echo
     echo "One or more nodes spanned by $VOLNAME has issues"
     if (( AUTO_YES )) || yesno "  Correct above issues? [y|N] " ; then
+      echo
       setup_nodes || return 1
       $PREFIX/bin/set_vol_perf.sh $VOLNAME || return 1
+    else
+      return 1
     fi
   fi
 
@@ -209,21 +212,24 @@ echo '***'
 parse_cmd $@ || exit -1
 
 NODES=($($PREFIX/bin/find_nodes.sh $VOLNAME)) # arrays
-BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh $VOLNAME))
-BLKDEVS=($($PREFIX/bin/find_blocks.sh $VOLNAME))
+BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh -n $VOLNAME))
+BLKDEVS=($($PREFIX/bin/find_blocks.sh -n $VOLNAME))
 
 echo
 echo "*** NODES=${NODES[@]}"
 echo "*** BRKMNTS=${BRKMNTS[@]}"
+echo "*** BLKDEVS=${BLKDEVS[@]}"
 echo
 
 # make sure the volume exists
 vol_exists || exit 1
 
-chk_and_fix_nodes || exit 1
-
-echo "Enable $VOLNAME in all core-site.xml files..."
-$PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE -u $MGMT_USER \
+if chk_and_fix_nodes ; then
+  echo "Enable $VOLNAME in all core-site.xml files..."
+  $PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE -u $MGMT_USER \
 	-p $MGMT_PASS --port $MGMT_PORT $VOLNAME || exit 1
+else
+  exit 1
+fi
 
 exit 0

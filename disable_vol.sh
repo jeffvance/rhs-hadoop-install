@@ -12,7 +12,7 @@ PREFIX="$(dirname $(readlink -f $0))"
 
 ## functions ##
 
-source $PREFIX/bin/yesno
+source $PREFIX/bin/functions
 
 # usage: output the general description and syntax.
 function usage() {
