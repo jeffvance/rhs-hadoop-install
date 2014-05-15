@@ -43,7 +43,7 @@ fi
 out="$(yum -y install ambari-server 2>&1)"
 err=$?
 if (( err != 0 && err != 1 )) ; then # 1--> nothing-to-do
-  (( ! QUIET )) && echo "ERROR $err: ambari server install: $out"
+  echo "ERROR $err: ambari server install: $out"
   exit 1
 fi
 
@@ -55,7 +55,7 @@ sed -i -e "s/$ACTIVE_FALSE/$ACTIVE_TRUE/" $METAINFO_PATH
 out="$(ambari-server setup -s 2>&1)"
 err=$?
 if (( err != 0 )) ; then
-  (( ! QUIET )) && echo "ERROR $err: ambari server setup: $out"
+  echo "ERROR $err: ambari server setup: $out"
   exit 1
 fi
 
@@ -63,7 +63,7 @@ fi
 out="$(ambari-server start 2>&1)"
 err=$?
 if (( err != 0 )) ; then
-  (( ! QUIET )) && echo "ERROR $err: ambari-server start: $out"
+  echo "ERROR $err: ambari-server start: $out"
   exit 1
 fi
 

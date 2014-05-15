@@ -19,7 +19,7 @@
 # checked to be open, selinux is set to permissive, hadoop required users are
 # created, and the required hadoop local directories are created (note: the
 # required distributed dirs are not created here).
-
+#
 # Also, on all nodes (assumed to be storage- data-nodes) and on the yarn-master
 # server node, the ambari agent is installed (updated if present) and started.
 # If the hadoop management node is outside of the storage pool then it will not
@@ -29,10 +29,6 @@
 # Tasks related to volumes or ambari setup are not done here.
 #
 # See usage() for syntax.
-#
-# Assumption: script must be executed from a node that has access to the
-#  gluster cli.
-
 
 PREFIX="$(dirname $(readlink -f $0))"
 
@@ -303,14 +299,17 @@ function setup_nodes() {
 # Returns 1 on errors.
 # Note: gluster peer probe returns 0 if the node is already in the pool. It
 #   returns 1 if the node is unknown.
-# Note: not needed to probe "yourself" but not an error either, and this way we
-#   don't need to know which storage node this script is being executed from
+# Uses globals:
+#   FIRST_NODE
+#   NODES
 function create_pool() {
 
-  local node; local err; local errcnt=0; local errnodes=''
+  local i; local node
+  local err; local errcnt=0; local errnodes=''; local out
 
-  for node in ${NODES[@]}; do
-      gluster peer probe $node >& /dev/null
+  for (( i=1; i<${#NODES[@]}; i++ )); do # skip first node
+      node=${NODES[$i]}
+      out="$(ssh $FIRST_NODE "gluster peer probe $node")"
       err=$?
       if (( err != 0 )) ; then
 	echo "ERROR $err: peer probe failed on $node"
@@ -343,7 +342,7 @@ function ambari_server() {
   # copied, else need to copy the setup_ambari_server script
   [[ "$MGMT_NODE" == "$LOCALHOST" ]] && { ssh=''; scp='#'; } || \
 					{ ssh="ssh $MGMT_NODE"; scp='scp'; }
-  if (( ! MGMT_INSIDE )) ; then # scripts have already been copied
+  if (( ! MGMT_INSIDE )) ; then # outside of pool, scripts not copied
     eval "$ssh mkdir -p /tmp/bin"
     eval "$scp -q $PREFIX/bin/setup_ambari_server.sh $MGMT_NODE:/tmp/bin"
   fi
@@ -372,6 +371,7 @@ parse_cmd $@ || exit -1
 
 # extract NODES array from NODE_SPEC
 parse_nodes || exit 1
+FIRST_NODE=${NODES[0]} # use this storage node for all gluster cli cmds
 
 # check for passwordless ssh connectivity to nodes
 check_ssh $LOCALHOST $NODES || exit 1
