@@ -2,6 +2,7 @@
 #
 # TODO:
 # 1) logging
+# 2) verification
 #
 # create_vol.sh accepts a volume name, volume mount path prefix, and a list of
 # two or more "node:brick_mnt" pairs, and creates a new volume with the
@@ -11,9 +12,6 @@
 # mount options. Lastly, distributed, hadoop-specific directories are created.
 #
 # See useage() for syntax.
-#
-# Assumption: script must be executed from a node that has access to the 
-#  gluster cli.
 
 PREFIX="$(dirname $(readlink -f $0))"
 
@@ -260,6 +258,7 @@ function add_distributed_dirs() {
 # create_vol: gluster vol create VOLNAME with a hard-codes replica 2 and set
 # its performance settings. Returns 1 on errors.
 # Uses globals:
+#   FIRST_NODE
 #   NODES
 #   BRKMNTS
 #   VOLNAME
@@ -272,7 +271,8 @@ function create_vol() {
       bricks+="${NODES[$i]}:${BRKMNTS[$i]}/$VOLNAME "
   done
 
-  out="$(gluster volume create $VOLNAME replica 2 $bricks 2>&1)"
+  out="$(ssh $FIRST_NODE "gluster volume create $VOLNAME replica 2 $bricks 2>&1"
+       )"
   err=$?
   if (( err != 0 )) ; then
     echo "ERROR $err: gluster vol create $VOLNAME $bricks: $out"
@@ -281,23 +281,26 @@ function create_vol() {
   echo "\"$VOLNAME\" created"
 
   # set vol performance settings
-  $PREFIX/bin/set_vol_perf.sh $VOLNAME
-
+  if ! $PREFIX/bin/set_vol_perf.sh $VOLNAME ; then
+    return 1
+  fi
   return 0
 }
 
 # start_vol: gluster vol start VOLNAME. Returns 1 on errors.
 # Uses globals:
+#   FIRST_NODE
 #   VOLNAME
 function start_vol() {
 
   local err; local out
 
-  out="$(gluster --mode=script volume start $VOLNAME 2>&1)"
+  out="$(ssh $FIRST_NODE "gluster --mode=script volume start $VOLNAME 2>&1"
+       )"
   err=$?
   if (( err != 0 )) ; then # serious error or vol already started
     if grep -qs ' already started' <<<$out ; then
-      echo "\"$VOLNAME\" volume already started..."
+      echo "WARN: \"$VOLNAME\" volume already started..."
     else
       echo "ERROR $err: gluster vol start $VOLNAME: $out"
       return 1
@@ -324,6 +327,7 @@ echo '***'
 parse_cmd $@ || exit -1
 
 parse_nodes
+FIRST_NODE=${NODES[0]} # use this storage node for all gluster cli cmds
 
 # check for passwordless ssh connectivity to nodes
 check_ssh $LOCALHOST $NODES || exit 1
