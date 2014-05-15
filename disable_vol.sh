@@ -124,13 +124,14 @@ echo '***'
 parse_cmd $@ || exit -1
 
 NODES=($($PREFIX/bin/find_nodes.sh $VOLNAME)) # array
+FIRST_NODE=${NODES[0]} # use this storage node for all gluster cli cmds
 
 echo
 echo "*** NODES=${NODES[@]}"
 echo
 
 # make sure the volume exists
-vol_exists $VOLNAME || exit 1
+vol_exists $VOLNAME $FIRST_NODE || exit 1
 
 echo "$VOLNAME will be removed from all hadoop config files and thus will not be available for any hadoop workloads"
 if (( AUTO_YES )) || yesno "  Continue? [y|N] " ; then

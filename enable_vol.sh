@@ -194,6 +194,8 @@ echo '***'
 parse_cmd $@ || exit -1
 
 NODES=($($PREFIX/bin/find_nodes.sh $VOLNAME)) # arrays
+FIRST_NODE=${NODES[0]} # use this storage node for all gluster cli cmds
+
 BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh -n $VOLNAME))
 BLKDEVS=($($PREFIX/bin/find_blocks.sh -n $VOLNAME))
 
@@ -204,7 +206,7 @@ echo "*** BLKDEVS=${BLKDEVS[@]}"
 echo
 
 # make sure the volume exists
-vol_exists $VOLNAME || exit 1
+vol_exists $VOLNAME $FIRST_NODE || exit 1
 
 if chk_and_fix_nodes ; then
   echo "Enable $VOLNAME in all core-site.xml files..."

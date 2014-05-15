@@ -50,18 +50,16 @@ function check_ssh() {
 }
 
 # vol_exists: invokes gluster vol info to see if VOLNAME exists. Returns 1 on
-# errors. $1=volume name
+# errors. 
+# Args:
+#   $1=volume name,
+#   $2=any storage node where gluster cli can be run.
 function vol_exists() {
 
-  local vol="$1"
-  local err
+  local vol="$1"; local rhs_node="$2"
 
-  gluster volume info $VOLNAME >& /dev/null
-  err=$?
-  if (( err != 0 )) ; then
-    echo "ERROR $err: vol info error on \"$VOLNAME\", volume may not exist"
-    return 1
-  fi
+  ssh $rhs_node "gluster volume info $VOLNAME >& /dev/null"
+  (( $? != 0 )) && return 1
   return 0
 }
 

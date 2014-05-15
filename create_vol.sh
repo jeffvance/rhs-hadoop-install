@@ -340,7 +340,9 @@ echo "*** BRKMNTS=${BRKMNTS[@]}"
 echo
 
 # make sure the volume doesn't already exist
-vol_exists $VOLNAME && exit 1
+vol_exists $VOLNAME $FIRST_NODE && {
+  echo "ERROR: volume \"$VOLNAME\" already exists";
+  exit 1; }
 
 # verify that each node is prepped for hadoop workloads
 chk_nodes  || exit 1
