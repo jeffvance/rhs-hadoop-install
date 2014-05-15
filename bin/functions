@@ -27,12 +27,11 @@ function yesno() {
 
 # check_ssh: verify that the user can passwordless ssh to the passed-in list of
 # nodes. Returns 1 on errors.
-# Args: $1  = localhost
-#       $2+ = list of nodes.
+# Args: $@ = list of nodes.
 function check_ssh() {
 
-  local localhost="$1"; shift
   local nodes="$@"
+  local localhost="$(hostname)"
   local node; local err; local errcnt=0
 
   for node in $nodes; do

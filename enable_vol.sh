@@ -5,9 +5,6 @@
 # and then updates the core-site file to contain the volume. 
 #
 # See usage() for syntax.
-#
-# Assumption: script must be executed from a node that has access to the 
-#  gluster cli.
 
 PREFIX="$(dirname $(readlink -f $0))"
 

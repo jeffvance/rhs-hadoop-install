@@ -8,9 +8,6 @@
 # Syntax:
 #  $1=volume name
 #  -q, if specified, means only set the exit code, do not output anything
-#
-# Assumption: the node running this script has access to the gluster cli, and
-#   needed scripts under bin/ are in place on this node.
 
 LOCALHOST=$(hostname)
 errcnt=0; q=''

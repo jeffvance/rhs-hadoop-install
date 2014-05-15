@@ -374,7 +374,7 @@ parse_nodes || exit 1
 FIRST_NODE=${NODES[0]} # use this storage node for all gluster cli cmds
 
 # check for passwordless ssh connectivity to nodes
-check_ssh $LOCALHOST $NODES || exit 1
+check_ssh $NODES || exit 1
 
 parse_brkmnts_and_blkdevs || exit 1
 

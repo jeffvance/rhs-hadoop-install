@@ -1,17 +1,16 @@
 #!/bin/bash
 #
-# check_node.sh verifies that the node running the script (localhost) is setup
-# correctly for hadoop workloads. This includes everything other than volume-
-# specific checks. So, we check: ntp config, required gluster and ambari ports
-# being open, ambari agent running, selinux not enabled, hadoop users and local
-# hadoop directories exist.
+# check_node.sh verifies that the node running this script is setup correctly
+# for hadoop workloads. This includes everything other than volume-specific
+# checks. So, we check: ntp config, required gluster and ambari ports being
+# open, ambari agent running, selinux not enabled, hadoop users and local hadoop
+# directories exist.
 #
 # Syntax:
 #  $1= xfs brick mount directory path including the volume name
 #  -q, if specified, means only set the exit code, do not output anything
 
-# Assumption: the node running this script can passwordless ssh to the node arg.
-
+## functions ##
 
 # check_ambari_agent: see if the ambari agent is running on this node.
 function check_ambari_agent() {
