@@ -35,7 +35,6 @@ PREFIX="$(dirname $(readlink -f $0))"
 ## functions ##
 
 source $PREFIX/bin/functions
-# extract NODES array from NODE_SPEC
 
 # usage: output the description and syntax.
 function usage() {
@@ -48,7 +47,7 @@ SYNTAX:
 
 $ME --version | --help
 
-$ME [-y] --hadoop-management-node <node> --yarn-master <node> \\
+$ME [-y] [--hadoop-management-node <node>] --yarn-master <node> \\
               <nodes-spec-list>
 where:
 
@@ -65,8 +64,8 @@ where:
       two ':'s, eg. "<nodeN>::<blkdevN>"
   --yarn-master : hostname or ip of the yarn-master server which is expected to
       be outside of the storage pool.
-  --hadoop-mgmt-node : hostname or ip of the hadoop mgmt server which is expected
-      to be outside of the storage pool.
+  --hadoop-mgmt-node : (optional) hostname or ip of the hadoop mgmt server which
+      is expected to be outside of the storage pool. Default is localhost.
   -y : auto answer "yes" to all prompts. Default is to be promoted before the
       script continues.
   --version : output only the version string.
@@ -117,12 +116,12 @@ function parse_cmd() {
   [[ -z "$NODE_SPEC" || ${#NODE_SPEC[@]} < 2 ]] && {
     echo "Syntax error: expect list of 2 or more nodes plus brick mount(s) and block dev(s)";
     ((errcnt++)); }
-  [[ -z "$YARN_NODE" || -z "$MGMT_NODE" ]] && {
-    echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
+
+  [[ -z "$YARN_NODE" ]] && {
+    echo "Syntax error: the yarn-master node is required";
     ((errcnt++)); }
 
   (( errcnt > 0 )) && return 1
-
   return 0
 }
 
@@ -158,17 +157,13 @@ function parse_nodes() {
     else
       echo "WARN: the yarn-master node is inside the storage pool which is sub-optimal."
     fi
-    if (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " ; then
-      return 1
-    fi
+    (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && return 1
   fi
 
   # warning if yarn-master == mgmt node
   if [[ "$YARN_NODE" == "$MGMT_NODE" ]] ; then
     echo "WARN: the yarn-master and hadoop-mgmt-nodes are the same which is sub-optimal."
-    if (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " ; then
-      return 1
-    fi
+    (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && return 1
   fi
 
   return 0
@@ -368,6 +363,12 @@ echo "*** $ME: version $(cat $PREFIX/VERSION)"
 echo '***'
 
 parse_cmd $@ || exit -1
+if [[ -z "$MGMT_NODE" ]] ; then # omitted
+  
+  echo "No management node specified therefore the localhost ($LOCALHOST) is assumed"
+  (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && exit -1
+  MGMT_NODE="$LOCALHOST"
+fi
 
 # extract NODES array from NODE_SPEC
 parse_nodes || exit 1

@@ -13,6 +13,7 @@
 #       be outside of the storage pool) (required)
 #  -q, if specified, means only set the exit code, do not output anything
 
+PREFIX="$(dirname $(readlink -f $0))"
 
 ## functions ##
 
@@ -272,12 +273,10 @@ function setup_xfs() {
 
 QUIET=0 # false (meaning not quiet)
 errcnt=0; q=''
-PREFIX="$(dirname $(readlink -f $0))"
 
 parse_cmd $@ || exit -1
 (( QUIET )) && q='-q'
 
-echo "setup_datanodes: BLKDEV=$BLKDEV"
 setup_xfs          || ((errcnt++))
 mount_blkdev       || ((errcnt++))
 setup_selinux      || ((errcnt++))
