@@ -110,24 +110,6 @@ function parse_cmd() {
   return 0
 }
 
-# vol_exists: invokes gluster vol info to see if VOLNAME exists. Returns 1 on
-# errors.
-# Uses globals:
-#   VOLNAME
-function vol_exists() {
-
-  local err
-
-  gluster volume info $VOLNAME >& /dev/null
-  err=$?
-  if (( err != 0 )) ; then
-    echo "ERROR $err: vol info error on \"$VOLNAME\", volume may not exist"
-    return 1
-  fi
-
-  return 0
-}
-
 
 ## main ##
 
@@ -148,7 +130,7 @@ echo "*** NODES=${NODES[@]}"
 echo
 
 # make sure the volume exists
-vol_exists || exit 1
+vol_exists $VOLNAME || exit 1
 
 echo "$VOLNAME will be removed from all hadoop config files and thus will not be available for any hadoop workloads"
 if (( AUTO_YES )) || yesno "  Continue? [y|N] " ; then

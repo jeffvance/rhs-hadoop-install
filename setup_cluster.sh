@@ -6,6 +6,7 @@
 # 2) logging
 # 3) CDN register each node, including yarn and mgmt nodes
 # 4) option to skip setting up default ports
+# 5) wait for nodes to join trusted pool
 #
 # setup_cluster.sh accepts a list of nodes:brick-mnts:block-devs, along with
 # the name of the yarn-master and hadoop-mgmt servers, and creates a new trusted

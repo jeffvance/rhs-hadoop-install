@@ -19,6 +19,8 @@ PREFIX="$(dirname $(readlink -f $0))"
 
 ## functions ##
 
+source $PREFIX/bin/functions
+
 # usage: output the description and syntax.
 function usage() {
 
@@ -150,24 +152,6 @@ function parse_brkmnts() {
 	  ;;
       esac
   done
-
-  return 0
-}
-
-# chk_vol: invokes gluster vol info to see if VOLNAME already exists. Returns 1
-# on errors.
-# Uses globals:
-#   VOLNAME
-function chk_vol() {
-
-  local err
-
-  gluster volume info $VOLNAME >& /dev/null
-  err=$?
-  if (( err == 0 )) ; then
-    echo "ERROR: volume \"$VOLNAME\" already exists"
-    return 1
-  fi
 
   return 0
 }
@@ -341,6 +325,9 @@ parse_cmd $@ || exit -1
 
 parse_nodes
 
+# check for passwordless ssh connectivity to nodes
+check_ssh $LOCALHOST $NODES || exit 1
+
 parse_brkmnts || exit 1
 
 echo
@@ -349,7 +336,7 @@ echo "*** BRKMNTS=${BRKMNTS[@]}"
 echo
 
 # make sure the volume doesn't already exist
-chk_vol    || exit 1
+vol_exists $VOLNAME && exit 1
 
 # verify that each node is prepped for hadoop workloads
 chk_nodes  || exit 1
