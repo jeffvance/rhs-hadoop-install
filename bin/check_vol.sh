@@ -36,7 +36,6 @@ VOLNAME="$1"
 
 (( QUIET )) && q='-q'
 
-
 for brick in $($PREFIX/find_brick_mnts.sh $VOLNAME); do
     node=${brick%:*}
     brkmnt=${brick#*:}
