@@ -57,51 +57,51 @@ function parse_cmd(){
   eval set -- "$args" # set up $1... positional args
 
   while true ; do
-		case "$1" in
-			--help)
-				usage; exit 0
-			;;
-			--port)
-				if [[ -z "$2" ]]; then
-		  		PORT=""
-				else
-		  		PORT=":$2"
-				fi
-				debug echo "PORT=$2"
-				PARAMS=$PARAMS" -port $2 "
-				shift 2; continue
-			;;
-			--debug)
-				DEBUG=true;_DEBUG="on"; shift; continue
-			;;
-	    --action)
-		    [[ -n "$2" ]] && ACTION="$2"
-		    debug echo "ACTION=$ACTION"
-		    shift 2; continue
-	     ;;
-			-u)
-				USERID="$2"
+    case "$1" in
+      --help)
+        usage; exit 0
+      ;;
+      --port)
+        if [[ -z "$2" ]]; then
+          PORT=""
+        else
+          PORT=":$2"
+        fi
+        debug echo "PORT=$2"
+        PARAMS=$PARAMS" -port $2 "
+        shift 2; continue
+      ;;
+      --debug)
+        DEBUG=true;_DEBUG="on"; shift; continue
+      ;;
+      --action)
+        [[ -n "$2" ]] && ACTION="$2"
+        debug echo "ACTION=$ACTION"
+        shift 2; continue
+       ;;
+      -u)
+        USERID="$2"
         debug echo "USERID=$USERID"
-				PARAMS="-u $USERID "
-				shift 2; continue
-			;;
-			-p)
-				PASSWD="$2"
-				debug echo "PASSWORD=$PASSWD"
-				PARAMS=$PARAMS" -p $PASSWD "
-				shift 2; continue
-			;;
-			-h)
-				[[ -n "$2" ]] && AMBARI_HOST="$2"
-				debug echo "AMBARI_HOST=$2"
-				shift 2; continue
-			;;
-			--) # no more args to parse
+        PARAMS="-u $USERID "
+        shift 2; continue
+      ;;
+      -p)
+        PASSWD="$2"
+        debug echo "PASSWORD=$PASSWD"
+        PARAMS=$PARAMS" -p $PASSWD "
+        shift 2; continue
+      ;;
+      -h)
+        [[ -n "$2" ]] && AMBARI_HOST="$2"
+        debug echo "AMBARI_HOST=$2"
+        shift 2; continue
+      ;;
+      --) # no more args to parse
         debug echo "parsing done"
-				shift; break;
-			;;
-			*) echo "Error: Unknown option: \"$1\""; return 1
-	    ;;
+        shift; break;
+      ;;
+      *) echo "Error: Unknown option: \"$1\""; return 1
+      ;;
     esac
   done
 
@@ -130,7 +130,7 @@ function parse_cmd(){
   if [ "$ACTION" == "start" ] || [ "$ACTION" == "stop" ]; then
    ACTION=$ACTION
   else
-		echo "Syntax error: ACTION should be start|stop"; usage ; return 1
+    echo "Syntax error: ACTION should be start|stop"; usage ; return 1
   fi
 
   eval set -- "$@" # move arg pointer so $1 points to next arg past last opt
@@ -203,29 +203,29 @@ startService () {
       return 1
     fi
 
-		rid=$value
+    rid=$value
     #Check if request is successful
-		debug echo "curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g""
-		while true
-		do
-			output=$(curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g")
+    debug echo "curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g""
+    while true
+    do
+      output=$(curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g")
       debug echo "########## output = "$output 
-			if [ "$output" == "PENDING" ] || [ "$output" == "IN_PROGRESS" ]
-			then
-				echo "Request is still $output ..."
-				sleep 4
-				continue
-			else
+      if [ "$output" == "PENDING" ] || [ "$output" == "IN_PROGRESS" ]
+      then
+        echo "Request is still $output ..."
+        sleep 4
+        continue
+      else
         if [ "$output" != "COMPLETED" ] ; then
           echo "[ERROR] : Request is $output."
           return 1
         else
-					echo "Request is $output."
+          echo "Request is $output."
         fi
-				break
-			fi
-		done
-	fi
+        break
+      fi
+    done
+  fi
 }
 
 
@@ -252,29 +252,29 @@ stopService () {
       return 1
     fi
 
-		rid=$value
-		debug echo "curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g""
+    rid=$value
     #Check if request is successful
-		while true
-		do
-			output=$(curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g")
+    while true
+    do
+      output=$(curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g")
+      debug echo "curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g""
       debug echo "########## output = "$output 
-			if [ "$output" == "PENDING" ] || [ "$output" == "IN_PROGRESS" ]
-			then
-				echo "Request is still $output ..."
-				sleep 4
-				continue
-			else
+      if [ "$output" == "PENDING" ] || [ "$output" == "IN_PROGRESS" ]
+      then
+        echo "Request is still $output ..."
+        sleep 4
+        continue
+      else
         if [ "$output" != "COMPLETED" ] ; then
           echo "[ERROR] : Request is $output."
           return 1
         else
-					echo "Request is $output."
+          echo "Request is $output."
         fi
-				break
-			fi
-		done
-	fi
+        break
+      fi
+    done
+  fi
 }
 
 
@@ -295,11 +295,11 @@ debug echo "########## CLUSTER_NAME = "$CLUSTER_NAME
 debug echo "########## SERVICENAME  = "$SERVICENAME
 debug echo "########## ACTION = "$ACTION
 
-if [ "$ACTION" == "start" ] ;	then 
+if [ "$ACTION" == "start" ] ; then 
   startService $SERVICENAME || exit 1
 else [ "$ACTION" == "stop" ]
   stopService $SERVICENAME || exit 1
 fi
-	
+  
 
 exit 0
