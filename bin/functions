@@ -1,30 +1,4 @@
 
-# yesno: prompts $1 to stdin and returns 0 if user answers yes, else returns 1.
-# The default (just hitting <enter>) is specified by $2.
-# $1=prompt (required),
-# $2=default (optional): 'y' or 'n' with 'n' being the default default.
-function yesno() {
-
-  local prompt="$1"; local default="${2:-n}" # default is no
-  local yn
-
-   while true ; do
-       read -p "$prompt" yn
-       case $yn in
-         [Yy])         return 0;;
-         [Yy][Ee][Ss]) return 0;;
-         [Nn])         return 1;;
-         [Nn][Oo])     return 1;;
-         '') # default
-           [[ "$default" != 'y' ]] && return 1 || return 0
-         ;;
-         *) # unexpected...
-           echo "Expecting a yes/no response, not \"$yn\""
-         ;;
-       esac
-   done
-}
-
 # check_ssh: verify that the user can passwordless ssh to the passed-in list of
 # nodes. Returns 1 on errors.
 # Args: $@ = list of nodes.
@@ -56,9 +30,36 @@ function check_ssh() {
 function vol_exists() {
 
   local vol="$1"; local rhs_node="$2"
+  local ssh
 
-  ssh $rhs_node "gluster volume info $VOLNAME >& /dev/null"
+  [[ "$rhs_node" == "$(hostname)" ]] && ssh='' || ssh="ssh $rhs_node"
+  eval "$ssh gluster volume info $VOLNAME >& /dev/null"
   (( $? != 0 )) && return 1
   return 0
 }
 
+# yesno: prompts $1 to stdin and returns 0 if user answers yes, else returns 1.
+# The default (just hitting <enter>) is specified by $2.
+# $1=prompt (required),
+# $2=default (optional): 'y' or 'n' with 'n' being the default default.
+function yesno() {
+
+  local prompt="$1"; local default="${2:-n}" # default is no
+  local yn
+
+   while true ; do
+       read -p "$prompt" yn
+       case $yn in
+	 [Yy])         return 0;;
+	 [Yy][Ee][Ss]) return 0;;
+	 [Nn])         return 1;;
+	 [Nn][Oo])     return 1;;
+	 '') # default
+	   [[ "$default" != 'y' ]] && return 1 || return 0
+	 ;;
+	 *) # unexpected...
+	   echo "Expecting a yes/no response, not \"$yn\""
+	 ;;
+       esac
+   done
+}

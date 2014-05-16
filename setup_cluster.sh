@@ -151,7 +151,7 @@ function parse_nodes() {
   # warning if mgmt or yarn-master nodes are inside the storage pool
   if (( MGMT_INSIDE || YARN_INSIDE )) ; then
     if (( MGMT_INSIDE && YARN_INSIDE )) ; then
-      echo "WARN: the yarn-master and hadoop management nodes are inside the storage pool which is sub-optimal."
+      echo -e "WARN: the yarn-master and hadoop management nodes are inside the storage pool\nwhich is sub-optimal."
     elif (( MGMT_INSIDE )) ; then
       echo "WARN: the hadoop management node is inside the storage pool which is sub-optimal."
     else
@@ -290,21 +290,79 @@ function setup_nodes() {
   return 0
 }
 
-# create_pool: create the trusted pool, even if the pool already exists.
-# Returns 1 on errors.
+# pool_exists: return 0 if the trusted storage pool exists, else 1.
+# Uses globals:
+#   FIRST_NODE
+#   LOCALHOST
+function pool_exists() {
+
+  local ssh
+
+  [[ "$FIRST_NODE" == "LOCALHOST" ]] && ssh='' || ssh="ssh $FIRST_NODE" 
+  eval "$ssh gluster peer status >& /dev/null"
+  (( $? != 0 )) && return 1
+  return 0
+}
+
+# create_pool: create the trusted pool or add new nodes to the existing pool.
+# User is prompted to confirm addition to an existing pool. Returns 1 on errors.
 # Note: gluster peer probe returns 0 if the node is already in the pool. It
 #   returns 1 if the node is unknown.
 # Uses globals:
+#   AUTO_YES
 #   FIRST_NODE
+#   NODES
+#   PREFIX
+# Sets globals
 #   NODES
 function create_pool() {
 
-  local i; local node
-  local err; local errcnt=0; local errnodes=''; local out
+  local node; local err; local errcnt=0; local errnodes=''; local out
+  local firstnode=$FIRST_NODE; local pool=(${NODES[@]})
 
-  for (( i=1; i<${#NODES[@]}; i++ )); do # skip first node
-      node=${NODES[$i]}
-      out="$(ssh $FIRST_NODE "gluster peer probe $node")"
+  # nested function: return 1 if not ok to add node(s) to pool. In all other
+  # cases return 0. Freely uses or sets the globals and locals listed above.
+  function ok_to_add_nodes() {
+
+    local node; local pool=(); local uniq=()
+
+    # find all nodes in trusted pool, leading/trailing blanks matter
+    pool=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE)) # array
+    firstnode=${pool[0]} # peer probe from this node
+    pool="${pool[@]}"  # string framed with spaces
+
+    # find nodes in pool that are not in NODES (unique)
+    for node in ${NODES[@]}; do
+	[[ $pool =~ $node ]] && continue
+	uniq+=($node)
+    done
+
+    # are we adding nodes, or just checking existing nodes?
+    NODES=(${uniq[@]}) # nodes to potentially add to existing pool, can be 0
+    if (( ${#uniq[@]} > 0 )) ; then # supplied nodes not in pool
+      echo
+      echo -e "The following nodes are not in the existing storage pool:\n  ${uniq[@]}"
+      (( ! AUTO_YES )) && ! yesno  "  Add nodes? [y|N] " && return 1 # will exit
+    else # no unique nodes
+      echo "No new nodes being added so only verifying existing nodes..."
+    fi
+
+    return 0
+  }
+
+  # main #
+
+  if pool_exists ; then
+    echo "Storage pool exists..."
+    ok_to_add_nodes || return 1
+  else
+    echo "Creating storage pool consisting of ${#NODES[@]} new nodes..."
+  fi
+  echo
+
+  # create or add-to storage pool
+  for node in ${NODES[@]}; do
+      out="$(ssh $firstnode "gluster peer probe $node")"
       err=$?
       if (( err != 0 )) ; then
 	echo "ERROR $err: peer probe failed on $node"
@@ -317,7 +375,6 @@ function create_pool() {
     echo "$errcnt peer probe errors on nodes: $errnodes"
     return 1
   fi
-
   return 0
 }
 
