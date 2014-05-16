@@ -28,12 +28,13 @@ shift $((OPTIND-1))
 VOLNAME="$1" # optional, default=entire pool
 [[ -z "$rhs_node" ]] && rhs_node="$LOCALHOST"
 
-[[ -n "$VOLNAME" ]] && ! vol_exists $VOLNAME $rhs_node && {
-  echo "ERROR: volume $VOLNAME does not exist";
-  exit 1; }
-
 [[ "$rhs_node" == "$LOCALHOST" ]] && ssh='' || ssh="ssh $rhs_node"
 
-eval "$ssh gluster volume status $VOLNAME | grep -w 'Brick' | awk '{print \$2}'"
-(( $? != 0 )) && exit 1
+eval "$ssh gluster volume status $VOLNAME" >/tmp/volstatus.out
+if (( $? != 0 )) ; then
+  cat /tmp/volstatus.out
+  exit 1
+fi
+
+grep -w 'Brick' /tmp/volstatus.out | awk '{print $2}'
 exit 0

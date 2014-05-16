@@ -25,6 +25,7 @@ while getopts ':un:' opt; do
     esac
 done
 shift $((OPTIND-1))
+
 VOLNAME="$1" # optional, default=entire pool
 [[ -n "$rhs_node" ]] && rhs_node="-n $rhs_node" || rhs_node=''
 
@@ -42,5 +43,5 @@ done
   exit 0; }
 
 # unique nodes
-echo "$(printf '%s\n' "${NODES[@]}" | sort -u))"
+echo "$(printf '%s\n' "${NODES[@]}" | sort -u)"
 exit 0

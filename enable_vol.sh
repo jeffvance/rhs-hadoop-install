@@ -23,16 +23,19 @@ SYNTAX:
 
 $ME --version | --help
 
-$ME [--user <ambari-admin-user>] [--pass <ambari-admin-password>] \\
-           [--port <port-num>] [-y] \\
-           --hadoop-management-node <node> --yarn-master <node> <volname>
+$ME [-y] [--user <ambari-admin-user>] [--pass <ambari-admin-password>] \\
+           [--port <port-num>] [--hadoop-management-node <node>] \\
+           [--rhs-node <node>] --yarn-master <node> <volname>
 where:
 
   <volname> : the RHS volume to be enabled for hadoop workloads.
   --yarn-master : hostname or ip of the yarn-master server which is expected to
       be outside of the storage pool.
-  --hadoop-mgmt-node : hostname or ip of the hadoop mgmt server which is expected
-      to be outside of the storage pool.
+  --rhs_node : (optional) hostname of any of the storage nodes. This is needed in
+      order to access the gluster command. Default is localhost which, must have
+      gluster cli access.
+  --hadoop-mgmt-node : (optional) hostname or ip of the hadoop mgmt server which
+      is expected to be outside of the storage pool. Default is localhost.
   -y : auto answer "yes" to all prompts. Default is to be promoted before the
       script continues.
   --user : the ambari admin user name. Default: "admin".
@@ -51,12 +54,13 @@ EOF
 #   MGMT_PASS
 #   MGMT_PORT
 #   MGMT_USER
+#   RHS_NODE
 #   VOLNAME
 #   YARN_NODE
 function parse_cmd() {
 
   local opts='y'
-  local long_opts='version,help,yarn-master:,hadoop-mgmt-node:,user:,pass:,port:'
+  local long_opts='version,help,yarn-master:,rhs-node:,hadoop-mgmt-node:,user:,pass:,port:'
   local errcnt=0
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
@@ -74,6 +78,9 @@ function parse_cmd() {
         ;;
         --yarn-master)
           YARN_NODE="$2"; shift 2; continue
+        ;;
+        --rhs-node)
+          RHS_NODE="$2"; shift 2; continue
         ;;
         --hadoop-mgmt-node)
           MGMT_NODE="$2"; shift 2; continue
@@ -99,8 +106,8 @@ function parse_cmd() {
   [[ -z "$VOLNAME" ]] && {
     echo "Syntax error: volume name is required";
     ((errcnt++)); }
-  [[ -z "$YARN_NODE" || -z "$MGMT_NODE" ]] && {
-    echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
+  [[ -z "$YARN_NODE" ]] && {
+    echo "Syntax error: the yarn-master node is required";
     ((errcnt++)); }
 
   (( errcnt > 0 )) && return 1
@@ -189,6 +196,17 @@ echo "*** $ME: version $(cat $PREFIX/VERSION)"
 echo '***'
 
 parse_cmd $@ || exit -1
+
+if [[ -z "$MGMT_NODE" ]] ; then # omitted
+  echo "No management node specified therefore the localhost ($LOCALHOST) is assumed"
+  (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && exit -1
+  MGMT_NODE="$LOCALHOST"
+fi
+if [[ -z "$RHS_NODE" ]] ; then # omitted
+  echo "No RHS storage node specified therefore the localhost ($LOCALHOST) is assumed"
+  (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && exit -1
+  RHS_NODE="$LOCALHOST"
+fi
 
 NODES=($($PREFIX/bin/find_nodes.sh $VOLNAME)) # arrays
 FIRST_NODE=${NODES[0]} # use this storage node for all gluster cli cmds

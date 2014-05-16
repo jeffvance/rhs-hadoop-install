@@ -421,7 +421,6 @@ echo '***'
 
 parse_cmd $@ || exit -1
 if [[ -z "$MGMT_NODE" ]] ; then # omitted
-  
   echo "No management node specified therefore the localhost ($LOCALHOST) is assumed"
   (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && exit -1
   MGMT_NODE="$LOCALHOST"
