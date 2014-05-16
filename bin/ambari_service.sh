@@ -253,11 +253,11 @@ stopService () {
     fi
 
 		rid=$value
+		debug echo "curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g""
     #Check if request is successful
 		while true
 		do
 			output=$(curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g")
-			debug echo "curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g""
       debug echo "########## output = "$output 
 			if [ "$output" == "PENDING" ] || [ "$output" == "IN_PROGRESS" ]
 			then
