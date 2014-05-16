@@ -5,7 +5,7 @@
 # bricks, "<node>:/<brick-mnt-dir>", are output, one brick per line.
 # Args:
 #   $1=volume name in question. Optional, default is every node in pool.
-#   -x=any storage node. Optional, but if not supplied then localhost must be a
+#   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
 
 PREFIX="$(dirname $(readlink -f $0))"
@@ -14,7 +14,7 @@ LOCALHOST="$(hostname)"
 source $PREFIX/functions # need vol_exists()
 
 # parse cmd opts
-while getopts ':x:' opt; do
+while getopts ':n:' opt; do
     case "$opt" in
       n)
         rhs_node="$OPTARG"

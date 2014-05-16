@@ -281,7 +281,7 @@ function create_vol() {
   echo "\"$VOLNAME\" created"
 
   # set vol performance settings
-  if ! $PREFIX/bin/set_vol_perf.sh $VOLNAME ; then
+  if ! $PREFIX/bin/set_vol_perf.sh -n $FIRST_NODE $VOLNAME ; then
     return 1
   fi
   return 0

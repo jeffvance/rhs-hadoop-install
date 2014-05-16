@@ -304,42 +304,34 @@ function pool_exists() {
   return 0
 }
 
-# create_pool: create the trusted pool or add new nodes to the existing pool.
-# User is prompted to confirm addition to an existing pool. Returns 1 on errors.
-# Note: gluster peer probe returns 0 if the node is already in the pool. It
-#   returns 1 if the node is unknown.
+# define_pool: If the trusted pool already exists then figure out which nodes in
+# NODES are new (can be none) and assign them to the global POOL array, which is
+# used for the gluster peer probe. Returns 1 if it's not ok to add node(s) to 
+# the pool. In all other cases 0 is returned. 
 # Uses globals:
-#   AUTO_YES
+#   NODES
+# Sets globals:
 #   FIRST_NODE
-#   NODES
-#   PREFIX
-# Sets globals
-#   NODES
-function create_pool() {
+#   POOL
+function define_pool() {
 
-  local node; local err; local errcnt=0; local errnodes=''; local out
-  local firstnode=$FIRST_NODE; local pool=(${NODES[@]})
+  local node; local uniq=()
 
-  # nested function: return 1 if not ok to add node(s) to pool. In all other
-  # cases return 0. Freely uses or sets the globals and locals listed above.
-  function ok_to_add_nodes() {
-
-    local node; local pool=(); local uniq=()
-
-    # find all nodes in trusted pool, leading/trailing blanks matter
-    pool=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE)) # array
-    firstnode=${pool[0]} # peer probe from this node
-    pool="${pool[@]}"  # string framed with spaces
+  if pool_exists ; then
+    echo "Storage pool exists..."
+    # find all nodes in trusted pool
+    POOL=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE)) # nodes in existing pool
+    FIRST_NODE=${POOL[0]} # peer probe from this node
 
     # find nodes in pool that are not in NODES (unique)
     for node in ${NODES[@]}; do
-	[[ $pool =~ $node ]] && continue
+	[[ "${POOL[@]}" =~ $node ]] && continue
 	uniq+=($node)
     done
 
     # are we adding nodes, or just checking existing nodes?
-    NODES=(${uniq[@]}) # nodes to potentially add to existing pool, can be 0
-    if (( ${#uniq[@]} > 0 )) ; then # supplied nodes not in pool
+    POOL=(${uniq[@]}) # nodes to potentially add to existing pool, can be 0
+    if (( ${#uniq[@]} > 0 )) ; then # we have nodes not in pool
       echo
       echo -e "The following nodes are not in the existing storage pool:\n  ${uniq[@]}"
       (( ! AUTO_YES )) && ! yesno  "  Add nodes? [y|N] " && return 1 # will exit
@@ -347,22 +339,30 @@ function create_pool() {
       echo "No new nodes being added so only verifying existing nodes..."
     fi
 
-    return 0
-  }
-
-  # main #
-
-  if pool_exists ; then
-    echo "Storage pool exists..."
-    ok_to_add_nodes || return 1
-  else
-    echo "Creating storage pool consisting of ${#NODES[@]} new nodes..."
+  else # no pool
+    echo "Will create a storage pool consisting of ${#NODES[@]} new nodes..."
+    POOL=(${NODES[@]})
   fi
-  echo
+
+  return 0
+}
+
+# create_pool: create the trusted pool or add new nodes to the existing pool.
+# Note: gluster peer probe returns 0 if the node is already in the pool. It
+#   returns 1 if the node is unknown.
+# Uses globals:
+#   AUTO_YES
+#   FIRST_NODE
+#   POOL
+#   PREFIX
+function create_pool() {
+
+  local node; local err; local errcnt=0; local errnodes=''; local out
 
   # create or add-to storage pool
-  for node in ${NODES[@]}; do
-      out="$(ssh $firstnode "gluster peer probe $node")"
+  for node in ${POOL[@]}; do
+      [[ "$node" == "$FIRST_NODE" ]] && continue # skip
+      out="$(ssh $FIRST_NODE "gluster peer probe $node")"
       err=$?
       if (( err != 0 )) ; then
 	echo "ERROR $err: peer probe failed on $node"
@@ -442,14 +442,19 @@ echo "*** BRKMNTS=${BRKMNTS[@]}"
 echo "*** BLKDEVS=${BLKDEVS[@]}"
 echo
 
+# figure out which nodes, if any, will be added to the storage pool
+define_pool || exit 1
+
 # setup each node for hadoop workloads
 setup_nodes || exit 1
 
-# create the trusted storage pool
-create_pool || exit 1
+# if we have nodes to add then create/add-to the trusted storage pool
+if (( ${#POOL[@]} > 0 )) ; then
+  create_pool || exit 1
+fi
 
 # install and start the ambari server on the MGMT_NODE
 ambari_server || exit 1
 
-echo "${#NODES[@]} nodes setup for hadoop workloads with no errors"
+echo "All nodes verified/setup for hadoop workloads with no errors"
 exit 0
