@@ -188,7 +188,7 @@ function chk_and_fix_nodes() {
 ## main ##
 
 ME="$(basename $0 .sh)"
-LOCALHOST=$(hostname)
+LOCALHOST="$(hostname)"
 errcnt=0
 AUTO_YES=0 # false
 
