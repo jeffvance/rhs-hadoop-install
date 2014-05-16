@@ -56,51 +56,51 @@ function parse_cmd(){
   eval set -- "$args" # set up $1... positional args
 
   while true ; do
-		case "$1" in
-			--help)
-				usage; exit 0
-			;;
-			--port)
-				if [[ -z "$2" ]]; then
-		  		PORT=""
-				else
-		  		PORT=":$2"
-				fi
-				debug echo "PORT=$2"
-				PARAMS=$PARAMS" -port $2 "
-				shift 2; continue
-			;;
-			--debug)
-				DEBUG=true;_DEBUG="on"; shift; continue
-			;;
-	    --config)
-		    [[ -n "$2" ]] && SITE="$2"
-		    debug echo "SITE=$SITE"
-		    shift 2; continue
-	     ;;
-			-u)
-				USERID="$2"
+    case "$1" in
+      --help)
+        usage; exit 0
+      ;;
+      --port)
+        if [[ -z "$2" ]]; then
+          PORT=""
+        else
+          PORT=":$2"
+        fi
+        debug echo "PORT=$2"
+        PARAMS=$PARAMS" -port $2 "
+        shift 2; continue
+      ;;
+      --debug)
+        DEBUG=true;_DEBUG="on"; shift; continue
+      ;;
+      --config)
+        [[ -n "$2" ]] && SITE="$2"
+        debug echo "SITE=$SITE"
+        shift 2; continue
+       ;;
+      -u)
+        USERID="$2"
         debug echo "USERID=$USERID"
-				PARAMS="-u $USERID "
-				shift 2; continue
-			;;
-			-p)
-				PASSWD="$2"
-				debug echo "PASSWORD=$PASSWD"
-				PARAMS=$PARAMS" -p $PASSWD "
-				shift 2; continue
-			;;
-			-h)
-				[[ -n "$2" ]] && AMBARI_HOST="$2"
-				debug echo "AMBARI_HOST=$2"
-				shift 2; continue
-			;;
-			--) # no more args to parse
+        PARAMS="-u $USERID "
+        shift 2; continue
+      ;;
+      -p)
+        PASSWD="$2"
+        debug echo "PASSWORD=$PASSWD"
+        PARAMS=$PARAMS" -p $PASSWD "
+        shift 2; continue
+      ;;
+      -h)
+        [[ -n "$2" ]] && AMBARI_HOST="$2"
+        debug echo "AMBARI_HOST=$2"
+        shift 2; continue
+      ;;
+      --) # no more args to parse
         debug echo "parsing done"
-				shift; break;
-			;;
-			*) echo "Error: Unknown option: \"$1\""; return 1
-	    ;;
+        shift; break;
+      ;;
+      *) echo "Error: Unknown option: \"$1\""; return 1
+      ;;
     esac
   done
 
@@ -108,11 +108,11 @@ function parse_cmd(){
   #take care of all other arguments
   #make sure property is there
   if (( $# == 0 )); then
-    echo "Error: [PROPERTY] is missing"; usage ; return 1
+    echo "Syntax error: [PROPERTY] is missing"; usage ; return 1
   fi
   #make sure there is only one property
   if (( $# > 1 )); then
-    echo "Error: Unknown values: \"$@\""; return 1
+    echo "Syntax error: Unknown values: \"$@\""; return 1
   fi
 
   if [[ -z "$1" ]]; then
@@ -239,7 +239,7 @@ doGrep () {
         if [ "$lastChar" == "," ]; then
           line1=${line1:0:$propLen-1}
         fi
-	      echo $line1
+        echo $line1
       else
         newProperties=$newProperties$line
       fi
