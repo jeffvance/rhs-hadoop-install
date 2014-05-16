@@ -309,7 +309,9 @@ function pool_exists() {
 # used for the gluster peer probe. Returns 1 if it's not ok to add node(s) to 
 # the pool. In all other cases 0 is returned. 
 # Uses globals:
+#   AUTO_YES
 #   NODES
+#   PREFIX
 # Sets globals:
 #   FIRST_NODE
 #   POOL
@@ -351,10 +353,8 @@ function define_pool() {
 # Note: gluster peer probe returns 0 if the node is already in the pool. It
 #   returns 1 if the node is unknown.
 # Uses globals:
-#   AUTO_YES
 #   FIRST_NODE
 #   POOL
-#   PREFIX
 function create_pool() {
 
   local node; local err; local errcnt=0; local errnodes=''; local out
