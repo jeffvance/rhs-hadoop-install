@@ -2,31 +2,37 @@
 #
 # find_blocks.sh discovers the blocks devices for the trusted storage pool, or
 # for the given volume if the <volName> arg is supplied. In either case, the
-# list of "<node>:/<block-devs> are output, one pair per line.
+# list of "[<node>:]/<block-devs> are output, one pair per line.
 # Syntax:
-#  $1=volume name
-#  -x, (no-node) if specified, means only output the block-devs portion,
+#   $1=volume name in question. Optional, default is every node in pool.
+#   -n=any storage node. Optional, but if not supplied then localhost must be a
+#      storage node.
+#   -x=(no-node) if specified, means only output the block-devs portion,
 #      omit each node.
-#
-# Assumption: the node running this script has access to the gluster cli.
 
 LOCALHOST=$(hostname)
 INCL_NODE=1 # true, default
 PREFIX="$(dirname $(readlink -f $0))"
 
 # parse cmd opts
-while getopts ':x' opt; do
+while getopts ':xn:' opt; do
     case "$opt" in
       n)
-        INCL_NODE=0; shift # false
+        rhs_node="$OPTARG"
+        ;;
+      x)
+        INCL_NODE=0 # false
         ;;
       \?) # invalid option
         ;;
     esac
 done
-VOLNAME="$1" # optional volume name
+shift $((OPTIND-1))
 
-for brick in $($PREFIX/find_bricks.sh $VOLNAME); do
+VOLNAME="$1" # optional volume name
+[[ -n "$rhs_node" ]] && rhs_node="-n $rhs_node" || rhs_node=''
+
+for brick in $($PREFIX/find_bricks.sh $rhs_node $VOLNAME); do
     node=${brick%:*}
     brickmnt=${brick#*:}    # remove node
     brickmnt=${brickmnt%/*} # remove volname

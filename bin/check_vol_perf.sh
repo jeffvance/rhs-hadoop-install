@@ -3,15 +3,17 @@
 # check_vol_perf.sh verifies that the supplied volume is set for the correct
 # performance values.
 # Syntax:
-#  $1=Volume name
-#  -q, if specified, means only set the exit code, do not output anything
+#   $1=Volume name
+#   -n=any storage node. Optional, but if not supplied then localhost must be a
+#      storage node.
+#   -q=only set the exit code, do not output anything
 
 warncnt=0
 QUIET=0 # false (meaning not quiet)
 VOLINFO_TMPFILE="$(mktemp --suffix '.volinfo')"
 LAST_N=3 # tail records containing vol settings (vol info cmd)
 TAG='Options Reconfigured:'
-
+LOCALHOST="$(hostname)"
 PREFIX="$(dirname $(readlink -f $0))"
 
 source $PREFIX/functions # need vol_exists()
@@ -20,8 +22,11 @@ source $PREFIX/functions # need vol_exists()
 declare -A EXPCT_SETTINGS=$($PREFIX/gen_vol_perf_settings.sh)
 
 # parse cmd opts
-while getopts ':q' opt; do
+while getopts ':qn:' opt; do
     case "$opt" in
+      n)
+        rhs_node="$OPTARG"
+        ;;
       q)
 	QUIET=1 # true
 	;;
@@ -36,15 +41,16 @@ VOLNAME="$1"
   echo "Syntax error: volume name is required";
   exit -1; }
 
-NODES="$($PREFIX/find_nodes.sh $VOLNAME)"
-FIRST_NODE=${NODES[0]}
+[[ -n "$rhs_node" ]] && rhs_node_opt="-n $rhs_node" || rhs_node_opt=''
+[[ -z "$rhs_node" ]] && rhs_node="$LOCALHOST" 
+NODES="$($PREFIX/find_nodes.sh $rhs_node_opt $VOLNAME)"
 
-if ! vol_exists $VOLNAME $FIRST_NODE ; then
+if ! vol_exists $VOLNAME $rhs_node ; then
   echo "ERROR: volume $VOLNAME does not exist"
   exit 1
 fi
 
-[[ "$FIRST_NODE" == "$(hostname)" ]] && ssh='' || ssh="ssh $FIRST_NODE"
+[[ "$rhs_node" == "$LOCALHOST" ]] && ssh='' || ssh="ssh $rhs_node"
 eval "$ssh gluster volume info $VOLNAME >$VOLINFO_TMPFILE 2>&1"
 err=$?
 if (( err != 0 )) ; then

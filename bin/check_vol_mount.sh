@@ -5,12 +5,11 @@
 # settings, determined by ps, and the "persistent" settings, defined in
 # /etc/fstab.
 # Syntax:
-#  $1=volume name
-#  $2=optional list of nodes to check
-#  -q, if specified, means only set the exit code, do not output anything
-#
-# Assumption: the node running this script has access to the gluster cli unless
-#   the nodes spanned by the volume are passed to this script.
+#   $1=volume name
+#   $2=optional list of nodes to check
+#   -n=any storage node. Optional, but if not supplied then localhost must be a
+#      storage node.
+#   -q=only set the exit code, do not output anything
 
 
 # given the passed-in vol mount opts, verify the correct settings. Returns 1 
@@ -87,8 +86,11 @@ PREFIX="$(dirname $(readlink -f $0))"
 QUIET=0 # false (meaning not quiet)
 
 # parse cmd opts
-while getopts ':q' opt; do
+while getopts ':qn:' opt; do
     case "$opt" in
+      n)
+        rhs_node="$OPTARG"
+        ;;
       q)
 	QUIET=1 # true
 	;;
@@ -103,8 +105,10 @@ VOLNAME="$1"; shift
   echo "Syntax error: volume name is required";
   exit -1; }
 
+[[ -n "$rhs_node" ]] && rhs_node="-n $rhs_node" || rhs_node=''
+
 NODES="$@" # optional list of nodes
-[[ -z "$NODES" ]] && NODES="$($PREFIX/find_nodes.sh $VOLNAME)" 
+[[ -z "$NODES" ]] && NODES="$($PREFIX/find_nodes.sh $rhs_node $VOLNAME)" 
 
 for NODE in $NODES; do
     ((cnt++)) # num of nodes

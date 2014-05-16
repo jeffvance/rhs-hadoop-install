@@ -164,17 +164,18 @@ function setup_nodes() {
 # Uses globals:
 #   AUTO_YES
 #   PREFIX
+#   RHS_NODE
 #   VOLNAME
 function chk_and_fix_nodes() {
 
   # verify that the volume is setup for hadoop workload and potentially fix
-  if ! $PREFIX/bin/check_vol.sh $VOLNAME ; then # 1 or more problems
+  if ! $PREFIX/bin/check_vol.sh -n $RHS_NODE $VOLNAME ; then # problems
     echo
     echo "One or more nodes spanned by $VOLNAME has issues"
     if (( AUTO_YES )) || yesno "  Correct above issues? [y|N] " ; then
       echo
       setup_nodes || return 1
-      $PREFIX/bin/set_vol_perf.sh $VOLNAME || return 1
+      $PREFIX/bin/set_vol_perf.sh -n $RHS_NODE $VOLNAME || return 1
     else
       return 1
     fi
@@ -208,20 +209,27 @@ if [[ -z "$RHS_NODE" ]] ; then # omitted
   RHS_NODE="$LOCALHOST"
 fi
 
-NODES=($($PREFIX/bin/find_nodes.sh $VOLNAME)) # arrays
-FIRST_NODE=${NODES[0]} # use this storage node for all gluster cli cmds
+vol_exists $VOLNAME $RHS_NODE || {
+  echo "ERROR volume $VOLNAME does not exist";
+  exit 1; }
 
-BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh -x $VOLNAME))
-BLKDEVS=($($PREFIX/bin/find_blocks.sh -x $VOLNAME))
+NODES=($($PREFIX/bin/find_nodes.sh -n $RHS_NODE $VOLNAME)) # spanned by vol
+if (( $? != 0 )) ; then
+  echo "${NODE[@]}" # from find_nodes
+  exit 1
+fi
+
+# check for passwordless ssh connectivity to nodes
+check_ssh ${NODES[@]} || exit 1
+
+BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh -xn $RHS_NODE $VOLNAME))
+BLKDEVS=($($PREFIX/bin/find_blocks.sh -xn $RHS_NODE $VOLNAME))
 
 echo
 echo "*** NODES=${NODES[@]}"
 echo "*** BRKMNTS=${BRKMNTS[@]}"
 echo "*** BLKDEVS=${BLKDEVS[@]}"
 echo
-
-# make sure the volume exists
-vol_exists $VOLNAME $FIRST_NODE || exit 1
 
 if chk_and_fix_nodes ; then
   echo "Enable $VOLNAME in all core-site.xml files..."
