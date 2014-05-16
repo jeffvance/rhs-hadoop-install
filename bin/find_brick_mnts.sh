@@ -6,7 +6,7 @@
 # "<node>:/<brick-mnt-dir>"
 # Syntax:
 #  $1=volume name
-#  -n, (no-node) if specified, means only output the brick-mnt portion,
+#  -x, (no-node) if specified, means only output the brick-mnt portion,
 #      omit each node.
 #
 # Assumption: the node running this script has access to the gluster cli.
@@ -15,9 +15,9 @@ INCL_NODE=1 # true, default
 PREFIX="$(dirname $(readlink -f $0))"
 
 # parse cmd opts
-while getopts ':n' opt; do
+while getopts ':x' opt; do
     case "$opt" in
-      n)
+      x)
         INCL_NODE=0; shift # false
         ;;
       \?) # invalid option

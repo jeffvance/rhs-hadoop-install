@@ -5,7 +5,7 @@
 # list of "<node>:/<block-devs> are output, one pair per line.
 # Syntax:
 #  $1=volume name
-#  -n, (no-node) if specified, means only output the block-devs portion,
+#  -x, (no-node) if specified, means only output the block-devs portion,
 #      omit each node.
 #
 # Assumption: the node running this script has access to the gluster cli.
@@ -15,7 +15,7 @@ INCL_NODE=1 # true, default
 PREFIX="$(dirname $(readlink -f $0))"
 
 # parse cmd opts
-while getopts ':n' opt; do
+while getopts ':x' opt; do
     case "$opt" in
       n)
         INCL_NODE=0; shift # false

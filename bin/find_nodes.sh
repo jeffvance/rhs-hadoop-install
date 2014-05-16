@@ -3,7 +3,6 @@
 # find_nodes.sh discovers the nodes for the trusted storage pool, or for the
 # given volume if the <volname> arg is supplied. In either case, the list of
 # nodes is output, one node per line.
-# Syntax:
 # Args:
 #   $1=volume name in question. Optional, default is every node in pool.
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
@@ -13,7 +12,7 @@
 PREFIX="$(dirname $(readlink -f $0))"
 
 # parse cmd opts
-while getopts ':u,n:' opt; do
+while getopts ':un:' opt; do
     case "$opt" in
       n)
         rhs_node="$OPTARG"

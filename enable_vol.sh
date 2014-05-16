@@ -193,8 +193,8 @@ parse_cmd $@ || exit -1
 NODES=($($PREFIX/bin/find_nodes.sh $VOLNAME)) # arrays
 FIRST_NODE=${NODES[0]} # use this storage node for all gluster cli cmds
 
-BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh -n $VOLNAME))
-BLKDEVS=($($PREFIX/bin/find_blocks.sh -n $VOLNAME))
+BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh -x $VOLNAME))
+BLKDEVS=($($PREFIX/bin/find_blocks.sh -x $VOLNAME))
 
 echo
 echo "*** NODES=${NODES[@]}"
