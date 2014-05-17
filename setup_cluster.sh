@@ -296,11 +296,14 @@ function setup_nodes() {
 #   LOCALHOST
 function pool_exists() {
 
-  local ssh
+  local ssh; local out
 
   [[ "$FIRST_NODE" == "LOCALHOST" ]] && ssh='' || ssh="ssh $FIRST_NODE" 
-  eval "$ssh gluster peer status >& /dev/null"
+  out="$(eval "$ssh gluster peer status >& /dev/null")"
   (( $? != 0 )) && return 1
+
+  # peer status returns 0 even when no pool exists, so parse output
+  grep -qs -v 'Peers: 0' <<<$out && return 1
   return 0
 }
 

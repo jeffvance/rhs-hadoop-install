@@ -42,30 +42,31 @@ function chk_mnt() {
 }
 
 # check_vol_mnt_attrs: verify that the correct mount settings for VOLNAME have
-# been set on this node. This include verifying both the "live" settings,
+# been set on the passed-in node. This include verifying both the "live" settings,
 # determined by ps, and the "persistent" settings, defined in /etc/fstab.
 function check_vol_mnt_attrs() {
 
+  local node="$1"
   local rc; local errcnt=0; local warncnt=0; local cnt; local mntopts
 
   # live check
-  mntopts="$(ps -ef | grep -w "$VOLNAME" | grep -vwE 'grep|-s')"
+  mntopts="$(ssh $node "
+	ps -ef | grep 'glusterfs --.*$VOLNAME' | grep -v grep")"
   mntopts=${mntopts#*glusterfs} # just the opts
   chk_mnt "$mntopts"
   rc=$?
   (( rc == 1 )) && ((errcnt++)) || (( rc == 2 )) && ((warncnt++))
 
   # fstab check
-  cnt=$(grep -c $VOLNAME /etc/fstab)
+  cnt=$(ssh $node grep -c $VOLNAME /etc/fstab)
   if (( cnt == 0 )) ; then
-    (( ! QUIET )) && echo "ERROR: $VOLNAME mount missing in /etc/fstab"
+    echo "ERROR: $VOLNAME mount missing in /etc/fstab"
     ((errcnt++))
   elif (( cnt > 1 )) ; then
-    (( ! QUIET )) && \
-	echo "ERROR: $VOLNAME appears more than once in /etc/fstab"
+    echo "ERROR: $VOLNAME appears more than once in /etc/fstab"
     ((errcnt++))
   else # cnt == 1
-    mntopts="$(grep -w $VOLNAME /etc/fstab)"
+    mntopts="$(ssh $node grep -w $VOLNAME /etc/fstab)"
     mntopts=${mntopts#* glusterfs }
     chk_mnt "$mntopts"
     rc=$?
@@ -74,7 +75,7 @@ function check_vol_mnt_attrs() {
 
   (( errcnt > 0 )) && return 1
   (( ! QUIET )) && \
-    echo "$VOLNAME mount setup correctly on $NODE with $warncnt warnings"
+    echo "$VOLNAME mount setup correctly on $node with $warncnt warnings"
   return 0
 }
 
@@ -110,9 +111,9 @@ VOLNAME="$1"; shift
 NODES="$@" # optional list of nodes
 [[ -z "$NODES" ]] && NODES="$($PREFIX/find_nodes.sh $rhs_node $VOLNAME)" 
 
-for NODE in $NODES; do
+for node in $NODES; do
     ((cnt++)) # num of nodes
-    check_vol_mnt_attrs || ((errcnt++))
+    check_vol_mnt_attrs $node || ((errcnt++))
 done
 
 (( errcnt > 0 )) && exit 1

@@ -236,16 +236,21 @@ function mk_volmnt() {
 # Returns 1 on errors.
 # Note: the gluster-fuse mount, by convention is the VOLMNT prefix with the
 #   volume name appended.
+# DEPENDENCY:
+#   1) all bin/* scripts have been copied to /tmp/bin on the FIRST_NODE.
+#      Currently this has been done by chk_nodes().
 # Uses globals:
+#   FIRST_NODE
+#   LOCALHOST
 #   VOLNAME
 #   VOLMNT
-#   PREFIX
 function add_distributed_dirs() {
 
-  local err
+  local err; local ssh
 
   # add the required distributed hadoop dirs
-  $PREFIX/bin/add_dirs.sh -d "$VOLMNT/$VOLNAME"
+  [[ "$FIRST_NODE" == "$LOCALHOST" ]] && ssh='' || ssh="ssh $FIRST_NODE"
+  eval "$ssh /tmp/bin/add_dirs.sh -d $VOLMNT/$VOLNAME"
   err=$?
   if (( err != 0 )) ; then
     echo "ERROR $err: add_dirs -d $VOLMNT/$VOLNAME"
@@ -332,17 +337,17 @@ FIRST_NODE=${NODES[0]} # use this storage node for all gluster cli cmds
 # check for passwordless ssh connectivity to nodes
 check_ssh ${NODES[@]} || exit 1
 
+# make sure the volume doesn't already exist
+vol_exists $VOLNAME $FIRST_NODE && {
+  echo "ERROR: volume \"$VOLNAME\" already exists";
+  exit 1; }
+
 parse_brkmnts || exit 1
 
 echo
 echo "*** NODES=${NODES[@]}"
 echo "*** BRKMNTS=${BRKMNTS[@]}"
 echo
-
-# make sure the volume doesn't already exist
-vol_exists $VOLNAME $FIRST_NODE && {
-  echo "ERROR: volume \"$VOLNAME\" already exists";
-  exit 1; }
 
 # verify that each node is prepped for hadoop workloads
 chk_nodes  || exit 1
