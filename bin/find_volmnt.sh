@@ -1,9 +1,10 @@
 #!/bin/bash
 #
 # find_volmnt.sh discovers the gluster volume mount directory for the passed in
-# volume (required). A single line containing just the vol-mnt" is output.
+# volume (required). A single line containing just the "vol-mnt" is output. Eg.
+# "/mnt/glusterds/HadoopVol".
 # Args:
-#   $1=volume name.
+#   $1=volume name (required).
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
 
@@ -31,7 +32,6 @@ else  # use supplied node
   ssh="ssh $rhs_node '"; ssh_close="'"
 fi
 
-echo "**** ssh=$ssh, ssh_close=$ssh_close"
 eval "$ssh 
 	mnt=(\$(grep -w $VOLNAME /proc/mounts)) # array
 	echo \${mnt[1]} # node:/volmnt
