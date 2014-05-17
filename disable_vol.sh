@@ -115,6 +115,27 @@ function parse_cmd() {
   return 0
 }
 
+# edit_core_site: invoke bin/unset_glusterfs_uri to edit the core-site file and
+# restart all ambari services across the cluster. Returns 1 on errors.
+# Uses globals:
+#   MGMT_*
+#   PREFIX
+#   VOLNAME
+function edit_core_site() {
+
+  local mgmt_node; local mgmt_u; local mgmt_p; local mgmt_port
+
+  echo "Disable $VOLNAME in all core-site.xml files..."
+
+  [[ -n "$MGMT_NODE" ]] && mgmt_node="-h $MGMT_NODE"
+  [[ -n "$MGMT_USER" ]] && mgmt_u="-u $MGMT_USER"
+  [[ -n "$MGMT_PASS" ]] && mgmt_p="-p $MGMT_PASS"
+  [[ -n "$MGMT_PORT" ]] && mgmt_port="--port $MGMT_PORT"
+
+  $PREFIX/bin/unset_glusterfs_uri.sh $mgmt_node $mgmt_u $mgmt_p $mgmt_port \
+	$VOLNAME || return 1
+}
+
 
 ## main ##
 
@@ -152,9 +173,7 @@ echo
 
 echo "$VOLNAME will be removed from all hadoop config files and thus will not be available for any hadoop workloads"
 if (( AUTO_YES )) || yesno "  Continue? [y|N] " ; then
-  echo "Disabling $VOLNAME in all core-site.xml files..."
-  $PREFIX/bin/unset_glusterfs_uri.sh -h $MGMT_NODE -u $MGMT_USER \
-	-p $MGMT_PASS --port $MGMT_PORT $VOLNAME || exit 1
+  edit_core_site || exit 1
 fi
 
 exit 0

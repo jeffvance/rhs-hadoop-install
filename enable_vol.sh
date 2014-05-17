@@ -184,6 +184,27 @@ function chk_and_fix_nodes() {
   return 0
 }
 
+# edit_core_site: invoke bin/set_glusterfs_uri to edit the core-site file and
+# restart all ambari services across the cluster. Returns 1 on errors.
+# Uses globals:
+#   MGMT_*
+#   PREFIX
+#   VOLNAME
+function edit_core_site() {
+
+  local mgmt_node; local mgmt_u; local mgmt_p; local mgmt_port
+
+  echo "Enable $VOLNAME in all core-site.xml files..."
+
+  [[ -n "$MGMT_NODE" ]] && mgmt_node="-h $MGMT_NODE"
+  [[ -n "$MGMT_USER" ]] && mgmt_u="-u $MGMT_USER"
+  [[ -n "$MGMT_PASS" ]] && mgmt_p="-p $MGMT_PASS"
+  [[ -n "$MGMT_PORT" ]] && mgmt_port="--port $MGMT_PORT"
+
+  $PREFIX/bin/set_glusterfs_uri.sh $mgmt_node $mgmt_u $mgmt_p $mgmt_port \
+	 $VOLNAME || exit 1
+}
+
 
 ## main ##
 
@@ -231,12 +252,11 @@ echo "*** BRKMNTS=${BRKMNTS[@]}"
 echo "*** BLKDEVS=${BLKDEVS[@]}"
 echo
 
-if chk_and_fix_nodes ; then
-  echo "Enable $VOLNAME in all core-site.xml files..."
-  $PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE -u $MGMT_USER \
-	-p $MGMT_PASS --port $MGMT_PORT $VOLNAME || exit 1
-else
-  exit 1
-fi
+# verify nodes spanned by the volume are ready for hadoop workloads, and if
+# not prompt user to fix problems.
+chk_and_fix_nodes || exit 1
+
+# edit the core-site file to recognize the enabled volume
+edit_core_site || exit 1
 
 exit 0
