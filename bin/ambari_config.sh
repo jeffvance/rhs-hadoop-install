@@ -17,25 +17,22 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-
-_DEBUG="off"
-
+#
+#		NOTE : This File is taken from Apache Ambari Server code
+#
 usage () {
-  echo "Usage: configs.sh [-u userId] [-p password] [-port port] [-s] <ACTION> <AMBARI_HOST> <CLUSTER_NAME> <CONFIG_TYPE> [CONFIG_FILENAME | CONFIG_KEY [CONFIG_VALUE] | VOLUME_ID]";
+  echo "Usage: configs.sh [-u userId] [-p password] [-port port] <ACTION> <AMBARI_HOST> <CLUSTER_NAME> <CONFIG_TYPE> [CONFIG_FILENAME | CONFIG_KEY [CONFIG_VALUE]]";
   echo "";
   echo "       [-u userId]: Optional user ID to use for authentication. Default is 'admin'.";
   echo "       [-p password]: Optional password to use for authentication. Default is 'admin'.";
   echo "       [-port port]: Optional port number for Ambari server. Default is '8080'. Provide empty string to not use port.";
-  echo "       [-s]: Optional support of SSL. Default is 'false'. Provide empty string to not use SSL.";
   echo "       <ACTION>: One of 'get', 'set', 'delete'. 'Set' adds/updates as necessary.";
-  echo "       		 add_volume/remove_volume adds/removes volumes as necessary.	";
   echo "       <AMBARI_HOST>: Server external host name";
   echo "       <CLUSTER_NAME>: Name given to cluster. Ex: 'c1'"
   echo "       <CONFIG_TYPE>: One of the various configuration types in Ambari. Ex:global, core-site, hdfs-site, mapred-queue-acls, etc.";
   echo "       [CONFIG_FILENAME]: File where entire configurations are saved to, or read from. Only applicable to 'get' and 'set' actions";
   echo "       [CONFIG_KEY]: Key that has to be set or deleted. Not necessary for 'get' action.";
   echo "       [CONFIG_VALUE]: Optional value to be set. Not necessary for 'get' or 'delete' actions.";
-  echo "       [VOLUME_ID]: Gluster Volume ID.";
   exit 1;
 }
 
@@ -71,99 +68,6 @@ SITE=$4
 SITETAG=''
 CONFIGKEY=$5
 CONFIGVALUE=$6
-VOLUME_ID=$5
-
-function DEBUG()
-{
- [ "$_DEBUG" == "on" ] &&  $@
-}
-
-###################
-## startService()
-###################
-startService () {
-  DEBUG echo "########## service = "$1
-  if curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/services/$1" | grep state | cut -d : -f 2 | grep -q "STARTED" ; then
-    echo "$1 already started."
-  else
-    echo "Starting $1 service"
-    line=`curl -s -u $USERID:$PASSWD -X PUT  -H "X-Requested-By: rhs" "$AMBARIURL/api/v1/clusters/$CLUSTER/services?ServiceInfo/state=INSTALLED&ServiceInfo/service_name=$1" --data "{\"RequestInfo\": {\"context\" :\"Start $1 Service\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"STARTED\"}}}"`;
-    
-    DEBUG echo "########## line = "$line
-    value=`echo $line |cut -d',' -f2 |cut -d":" -f3`
-    value=`echo $value | sed "s/\"//g"`
-    DEBUG echo "########## value = ["$value"]"
-
-		rid=$value
-		while true
-		do
-			output=`curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g"`
-			echo "curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g""
-      DEBUG echo "########## output = "$output 
-			if [ "$output" == "PENDING" ] || [ "$output" == "IN_PROGRESS" ]
-			then
-				DEBUG echo "Request is still $output"
-				sleep 4
-				continue
-			else
-				DEBUG echo "response is $output"
-				break
-			fi
-		done
-
-	fi
-}
-
-
-###################
-## stoptService()
-###################
-stopService () {
-  DEBUG echo "########## service = "$1
-  if curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/services/$1" | grep state | cut -d : -f 2 | grep -q "INSTALLED" ; then
-    echo "$1 already stopped."
-  else
-    echo "Stopping $1 service"
-    line=`curl -s -u $USERID:$PASSWD -X PUT  -H "X-Requested-By: rhs" "$AMBARIURL/api/v1/clusters/$CLUSTER/services?ServiceInfo/state=STARTED&ServiceInfo/service_name=$1" --data "{\"RequestInfo\": {\"context\" :\"Start $1 Service\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"INSTALLED\"}}}"`;
-
-    DEBUG echo "########## line = "$line
-    value=`echo $line |cut -d',' -f2 |cut -d":" -f3`
-    value=`echo $value | sed "s/\"//g"`
-    DEBUG echo "########## value = ["$value"]"
-  
-		rid=$value
-		while true
-		do
-			output=`curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/requests/$rid" |grep "request_status" |cut -d : -f 2 |  sed "s/[\"\,\ ]//g"`
-      DEBUG echo "########## output = "$output 
-			if [ "$output" == "PENDING" ] || [ "$output" == "IN_PROGRESS" ]
-			then
-				DEBUG echo "Request is still $output"
-				sleep 4
-				continue
-			else
-				DEBUG echo "response is $output"
-				break
-			fi
-		done
-  fi
-}
-
-###################
-## restartService()
-###################
-restartService () {
-	declare -a services=("MAPREDUCE2" "YARN" "HDFS")
-	for x in ${services[@]}
-	do
-		stopService "$x"
-	done
-        declare -a services1=("HDFS" "MAPREDUCE2" "YARN" )
-	for x in ${services1[@]}
-	do
-		startService "$x"
-	done
-}
 
 ###################
 ## currentSiteTag()
@@ -197,6 +101,58 @@ currentSiteTag () {
   SITETAG=$currentSiteTag;
 }
 
+
+_DEBUG="off"
+function DEBUG()
+{
+ [ "$_DEBUG" == "on" ] &&  $@
+}
+
+#############################################
+## doConfigUpdate1() 
+##  @param MODE of update. Either 'set' or 'delete'
+#############################################
+doConfigUpdate1 () {
+  MODE=$1
+  currentSiteTag
+  DEBUG echo "########## Performing '$MODE' $CONFIGKEY:$CONFIGVALUE on (Site:$SITE, Tag:$SITETAG)";
+  propertiesStarted=0;
+  curl -k -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/configurations?type=$SITE&tag=$SITETAG" | while read -r line; do
+    ## echo ">>> $line";
+    if [ "$propertiesStarted" -eq 0 -a "`echo $line | grep "\"properties\""`" ]; then
+      propertiesStarted=1
+    fi;
+    if [ "$propertiesStarted" -eq 1 ]; then
+      if [ "$line" == "}" ]; then
+        ## Properties ended
+        ## Add property
+        newProperties=$newProperties$line
+        propertiesStarted=0;
+        
+
+        DEBUG echo "########## NEW Site:$SITE, Tag:$SITETAG";
+      elif [ "`echo $line | grep "\"$CONFIGKEY\""`" ]; then
+        DEBUG echo "########## Config found. Skipping origin value"
+        line1=$line
+        propLen=${#line1}
+        lastChar=${line1:$propLen-1:1}
+        if [ "$lastChar" == "," ]; then
+          line1=${line1:0:$propLen-1}
+        fi
+	echo $line1
+	OIFS="$IFS"
+	IFS=':'
+	read -a keyvalue <<< "${line1}"
+	IFS="$OIFS"
+	echo ${keyvalue[1]}
+      else
+        newProperties=$newProperties$line
+      fi
+    fi
+  done;
+}
+
+
 #############################################
 ## doConfigUpdate() 
 ##  @param MODE of update. Either 'set' or 'delete'
@@ -204,7 +160,7 @@ currentSiteTag () {
 doConfigUpdate () {
   MODE=$1
   currentSiteTag
-  DEBUG echo "########## Performing '$MODE' $CONFIGKEY:$CONFIGVALUE on (Site:$SITE, Tag:$SITETAG)";
+  echo "########## Performing '$MODE' $CONFIGKEY:$CONFIGVALUE on (Site:$SITE, Tag:$SITETAG)";
   propertiesStarted=0;
   curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/configurations?type=$SITE&tag=$SITETAG" | while read -r line; do
     ## echo ">>> $line";
@@ -232,13 +188,13 @@ doConfigUpdate () {
         newTag="version${newTag}000"
         finalJson="{ \"Clusters\": { \"desired_config\": {\"type\": \"$SITE\", \"tag\":\"$newTag\", $newProperties}}}"
         newFile="doSet_$newTag.json"
-        DEBUG echo "########## PUTting json into: $newFile"
+        echo "########## PUTting json into: $newFile"
         echo $finalJson > $newFile
         curl -u $USERID:$PASSWD -X PUT -H "X-Requested-By: ambari" "$AMBARIURL/api/v1/clusters/$CLUSTER" --data @$newFile
         currentSiteTag
-        DEBUG echo "########## NEW Site:$SITE, Tag:$SITETAG";
+        echo "########## NEW Site:$SITE, Tag:$SITETAG";
       elif [ "`echo $line | grep "\"$CONFIGKEY\""`" ]; then
-        DEBUG echo "########## Config found. Skipping origin value"
+        echo "########## Config found. Skipping origin value"
       else
         newProperties=$newProperties$line
       fi
@@ -260,16 +216,16 @@ doConfigFileUpdate () {
       finalJson="{ \"Clusters\": { \"desired_config\": {\"type\": \"$SITE\", \"tag\":\"$newTag\", $newProperties}}}"
       newFile="$FILENAME"
       echo $finalJson>$newFile
-      DEBUG echo "########## PUTting file:\"$FILENAME\" into config(type:\"$SITE\", tag:$newTag) via $newFile"
+      echo "########## PUTting file:\"$FILENAME\" into config(type:\"$SITE\", tag:$newTag) via $newFile"
       curl -u $USERID:$PASSWD -X PUT -H "X-Requested-By: ambari" "$AMBARIURL/api/v1/clusters/$CLUSTER" --data @$newFile
       currentSiteTag
-      DEBUG echo "########## NEW Site:$SITE, Tag:$SITETAG";
+      echo "########## NEW Site:$SITE, Tag:$SITETAG";
     else
-      DEBUG echo "[ERROR] File \"$FILENAME\" should be in the following JSON format:";
-      DEBUG echo "[ERROR]   \"properties\": {";
-      DEBUG echo "[ERROR]     \"key1\": \"value1\",";
-      DEBUG echo "[ERROR]     \"key2\": \"value2\",";
-      DEBUG echo "[ERROR]   }";
+      echo "[ERROR] File \"$FILENAME\" should be in the following JSON format:";
+      echo "[ERROR]   \"properties\": {";
+      echo "[ERROR]     \"key1\": \"value1\",";
+      echo "[ERROR]     \"key2\": \"value2\",";
+      echo "[ERROR]   }";
       exit 1;
     fi
   else
@@ -289,7 +245,7 @@ doGet () {
     rm -f $FILENAME;
   fi
   currentSiteTag
-  DEBUG echo "########## Performing 'GET' on (Site:$SITE, Tag:$SITETAG)";
+  echo "########## Performing 'GET' on (Site:$SITE, Tag:$SITETAG)";
   propertiesStarted=0;
   curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/configurations?type=$SITE&tag=$SITETAG" | while read -r line; do
     ## echo ">>> $line";
@@ -310,146 +266,6 @@ doGet () {
   done;
 }
 
-
-
-#############################################
-## doGrep() 
-#############################################
-doGrep () {
-  currentSiteTag
-  DEBUG echo "########## Performing Grep $CONFIGKEY on (Site:$SITE, Tag:$SITETAG)";
-  propertiesStarted=0;
-  curl -k -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/configurations?type=$SITE&tag=$SITETAG" | while read -r line; do
-    ## echo ">>> $line";
-    if [ "$propertiesStarted" -eq 0 -a "`echo $line | grep "\"properties\""`" ]; then
-      propertiesStarted=1
-    fi;
-    if [ "$propertiesStarted" -eq 1 ]; then
-      if [ "$line" == "}" ]; then
-        ## Properties ended
-        newProperties=$newProperties$line
-        propertiesStarted=0;     
-      elif [ "`echo $line | grep "\"$CONFIGKEY\""`" ]; then
-        DEBUG echo "########## Config found. Skipping origin value"
-        line1=$line
-        propLen=${#line1}
-        lastChar=${line1:$propLen-1:1}
-        if [ "$lastChar" == "," ]; then
-          line1=${line1:0:$propLen-1}
-        fi
-	echo $line1
-      else
-        newProperties=$newProperties$line
-      fi
-    fi
-  done;
-}
-
-#############################################
-## doUpdate() 
-##  @param MODE of update. ONLY update
-#############################################
-doUpdate () {
-  MODE=$1
-  CONFIGKEY=$2
-  CONFIGVALUE=$3
-  currentSiteTag
-  DEBUG echo "########## Performing '$MODE' $CONFIGKEY:$CONFIGVALUE on (Site:$SITE, Tag:$SITETAG)";
-  propertiesStarted=0;
-  curl -k -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/configurations?type=$SITE&tag=$SITETAG" | while read -r line; do
-    ## echo ">>> $line";
-    if [ "$propertiesStarted" -eq 0 -a "`echo $line | grep "\"properties\""`" ]; then
-      propertiesStarted=1
-    fi;
-    if [ "$propertiesStarted" -eq 1 ]; then
-      if [ "$line" == "}" ]; then
-        ## Properties ended
-        ## Add property
-        if [ "$MODE" == "update" ]; then
-          newProperties="$newProperties, \"$CONFIGKEY\" : \"$CONFIGVALUE\" ";
-        fi
-        if [ "$MODE" == "remove" ]; then
-          newProperties="$newProperties, \"$CONFIGKEY\" : \"$CONFIGVALUE\" ";
-        fi
-        newProperties=$newProperties$line
-        propertiesStarted=0;
-        
-        newTag=`date "+%s"`
-        newTag="version${newTag}001"
-        finalJson="{ \"Clusters\": { \"desired_config\": {\"type\": \"$SITE\", \"tag\":\"$newTag\", $newProperties}}}"
-        newFile="doUpdate_$newTag.json"
-        DEBUG echo "########## PUTting json into: $newFile"
-        echo $finalJson > $newFile
-        curl -k -u $USERID:$PASSWD -X PUT -H "X-Requested-By: ambari" "$AMBARIURL/api/v1/clusters/$CLUSTER" --data @$newFile
-        currentSiteTag
-        DEBUG echo "########## NEW Site:$SITE, Tag:$SITETAG";
-      elif [ "`echo $line | grep "\"$CONFIGKEY\""`" ]; then
-        DEBUG echo "########## Config found. Skipping origin value"
-        line1=$line
-        propLen=${#line1}
-        lastChar=${line1:$propLen-1:1}
-        if [ "$lastChar" == "," ]; then
-          line1=${line1:0:$propLen-1}
-        fi
-	DEBUG echo "########## LINE = "$line1
-	OIFS="$IFS"
-	IFS=':'
-	read -a keyvalue <<< "${line1}"
-	IFS="$OIFS"
-	key=${keyvalue[0]}
-	value=${keyvalue[1]}
-	value=`echo $value | sed "s/\"//g"`
-	DEBUG echo "########## VALUE = "$value
-	STR_ARRAY=(`echo $value | tr "," "\n"`)
-	for x in ${STR_ARRAY[@]}
-	do
-		#echo "&gt; [$x]"
-		if ([ $x != $CONFIGVALUE ])
-		then
-		    #DEBUG echo "$x"
-		    NEW_STR_ARRAY=( "${NEW_STR_ARRAY[@]}" "$x" )
-		fi
-	done
-	A=${STR_ARRAY[@]};
-	B=${NEW_STR_ARRAY[@]};
-	DEBUG echo "########## A = ["${#STR_ARRAY[@]}"] B = ["${#NEW_STR_ARRAY[@]}"]"
-        if [ "$MODE" == "update" ]; then
-		#check if key is already present
-		if [ "$A" != "$B" ]
-		then
-		  DEBUG echo "ERROR!! Volume $CONFIGVALUE aready present in $key."
-		   CONFIGVALUE=$value
-		else
-		  if [ ${#STR_ARRAY[@]} -eq 0 ]; then
-		      CONFIGVALUE=$CONFIGVALUE
-		  else
-		      CONFIGVALUE=$value","$CONFIGVALUE
-		  fi
-	        fi
-		DEBUG echo "########## CONFIGVALUE = "$CONFIGVALUE	
-	else
-		NEW_STR_ARRAY_COMMA=""
-		for x in ${NEW_STR_ARRAY[@]}
-		do
-		  NEW_STR_ARRAY_COMMA+=$x","
-		done
-		line1=$NEW_STR_ARRAY_COMMA
-		propLen=${#line1}
-		lastChar=${line1:$propLen-1:1}
-		if [ "$lastChar" == "," ]; then
-		  line1=${line1:0:$propLen-1}
-		fi
-		CONFIGVALUE=$line1
-		DEBUG echo "########## CONFIGVALUE = "$CONFIGVALUE	
-	fi
-      else
-        newProperties=$newProperties$line
-      fi
-    fi
-  done;
-}
-
-
 case "$1" in
   set)
     if (($# == 6)); then
@@ -460,33 +276,9 @@ case "$1" in
       usage
     fi
     ;;
-  add_volume)
-    if (($# == 5)); then
-      doUpdate "update" "fs.glusterfs.volumes" $5 # Individual key
-      sleep 4	
-      CONFIGKEY="fs.glusterfs.volume.fuse."$5
-      CONFIGVALUE="/mnt/"$5	
-      doConfigUpdate "set"
-      restartService
-    else
-      usage
-    fi
-    ;;
-  remove_volume)
-    if (($# == 5)); then
-      doUpdate "remove" "fs.glusterfs.volumes" $5 # Individual key
-      sleep 4
-      CONFIGKEY="fs.glusterfs.volume.fuse."$5
-      CONFIGVALUE="/mnt/"$5
-      doConfigUpdate "delete"
-      restartService
-    else
-      usage
-    fi
-    ;;
-  grep)
-    if (($# == 5)); then
-      doGrep $5
+  update)
+    if (($# == 6)); then
+      doConfigUpdate1 "update" # Individual key
     else
       usage
     fi
