@@ -32,7 +32,7 @@ function usage () {
   echo "       [--port port]: Optional port number for Ambari server. Default is '8080'. Provide empty string to not use port."
   echo "       [-h ambari_host]: Optional external host name for Ambari server. Default is 'localhost'."
   echo "       --action start|stop : start/stop SERVICENAME"
-  echo "       [SERVICENAME]: config property or property value."
+  echo "       [SERVICENAME]: service name HDFS|YARN|MAPREDUCE2."
   exit 1
 }
 
