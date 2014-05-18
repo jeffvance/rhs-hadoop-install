@@ -170,7 +170,16 @@ PARAMS=$PARAMS" add_volume $AMBARI_HOST $CLUSTER_NAME core-site "$VOLNAME
 PARAMS=`echo $PARAMS | sed "s/\"//g"`
 debug echo "########## PARAMS = "$PARAMS
 	
-debug echo "sh ./ambari_config.sh $PARAMS"
-sh ./ambari_config.sh $PARAMS || exit 
+PORT=$(echo "$PORT" | sed "s/[\"\,\:\ ]//g")
+CONFIG_UPDATE_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST --config core-site --action add --configkey fs.glusterfs.volumes --configvalue $VOLNAME"
+[[ $DEBUG == true ]] && CONFIG_UPDATE_PARAM=$CONFIG_UPDATE_PARAM" --debug"
+
+
+debug echo "./ambari_config_update.sh $CONFIG_UPDATE_PARAM" 
+sh ./ambari_config_update.sh "$CONFIG_UPDATE_PARAM" 
+
+CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT set $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME /mnt/$VOLNAME"
+debug echo "./config.sh $CONFIG_SET_PARAM"
+./configs.sh $CONFIG_SET_PARAM
 
 exit 0
