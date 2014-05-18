@@ -152,6 +152,21 @@ function currentClusterName () {
 }
 
 
+restartService () {
+	declare -a services=("MAPREDUCE2" "YARN" "HDFS")
+	for x in ${services[@]}
+	do
+		sh ./ambari_service.sh "-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST --action stop $x"
+	done
+  
+  declare -a services1=("HDFS" "MAPREDUCE2" "YARN" )
+	for x in ${services1[@]}
+	do
+		sh ./ambari_service.sh "-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST --action start $x"
+	done
+}
+
+
 ## ** main ** ##
 
 # defaults (global variables)
@@ -181,5 +196,6 @@ sh ./ambari_config_update.sh "$CONFIG_UPDATE_PARAM"
 CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT set $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME /mnt/$VOLNAME"
 debug echo "./config.sh $CONFIG_SET_PARAM"
 ./configs.sh $CONFIG_SET_PARAM
+restartService
 
 exit 0
