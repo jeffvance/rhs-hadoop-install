@@ -143,6 +143,7 @@ function parse_cmd() {
 #   MGMT_NODE
 # Sets globals:
 #   MGMT_INSIDE
+#   NODES
 #   NODE_BLKDEVS
 #   NODE_BRKMNTS
 #   YARN_INSIDE
@@ -161,6 +162,7 @@ function parse_nodes_brkmnts_blkdevs() {
   # parse out list of nodes, format: "node[:brick-mnt][:blk-dev]"
   for node_spec in ${NODE_SPEC[@]}; do
       node=${node_spec%%:*}
+      NODES+=($node)
       # fill in missing brk-mnts and/or blk-devs
       case "$(grep -o ':' <<<"$node_spec" | wc -l)" in # num of ":"s
           0) # brkmnt and blkdev omitted
@@ -192,7 +194,7 @@ function parse_nodes_brkmnts_blkdevs() {
   done
 
   # remove last trailing comma from each node's brk/blk value
-  for node in ${!NODE_BRKMNTS[@]}; do
+  for node in ${NODES[@]}; do
       NODE_BRKMNTS[$node]=${NODE_BRKMNTS[$node]%*,}
       NODE_BLKDEVS[$node]=${NODE_BLKDEVS[$node]%*,}
   done
@@ -224,6 +226,7 @@ function parse_nodes_brkmnts_blkdevs() {
 # storage pool then it will not have the agent installed. Returns 1 on errors.
 # Uses globals:
 #   LOCALHOST
+#   NODES
 #   NODE_BLKDEVS
 #   NODE_BRKMNTS
 #   PREFIX
@@ -261,7 +264,7 @@ function setup_nodes() {
   }
 
   # main #
-  for node in ${!NODE_BRKMNTS[@]}; do
+  for node in ${NODES[@]}; do
       brkmnt=${NODE_BRKMNTS[$node]} # 1 or more brk-mnt path(s)
       blkdev=${NODE_BLKDEVS[$node]} # 1 or more blk-dev path(s)
       do_node "$node" "$blkdev" "$brkmnt" || {
@@ -290,11 +293,11 @@ function pool_exists() {
   local ssh; local out
 
   [[ "$FIRST_NODE" == "LOCALHOST" ]] && ssh='' || ssh="ssh $FIRST_NODE" 
-  out="$(eval "$ssh gluster peer status >& /dev/null")"
+  out="$(eval "$ssh gluster peer status")"
   (( $? != 0 )) && return 1
 
   # peer status returns 0 even when no pool exists, so parse output
-  grep -qs -v 'Peers: 0' <<<$out && return 1
+  grep -qs 'Peers: 0' <<<$out && return 1
   return 0
 }
 
@@ -405,6 +408,7 @@ function ambari_server() {
 
 ME="$(basename $0 .sh)"
 LOCALHOST=$(hostname)
+NODES=()
 declare -A NODE_BRKMNTS; declare -A NODE_BLKDEVS
 MGMT_INSIDE=0 # assume false
 YARN_INSIDE=0 # assume false
@@ -425,26 +429,25 @@ fi
 # extract nodes, brick mnts and blk devs arrays from NODE_SPEC
 parse_nodes_brkmnts_blkdevs || exit -1
 # use the first storage node for all gluster cli cmds
-FIRST_NODE=(${!NODE_BRKMNTS[@]}) # need array before indexing 1st node
-FIRST_NODE=${FIRST_NODE[0]}
+FIRST_NODE=${NODES[0]}
 
 # check for passwordless ssh connectivity to nodes
-check_ssh ${!NODE_BRKMNTS[@]} || exit 1
+check_ssh ${NODES[@]} || exit 1
 
 echo
-echo "*** NODES= ${!NODE_BRKMNTS[@]}"
+echo "*** NODES= ${NODES[@]}"
 echo "*** BRKMNTS="
-for node in ${!NODE_BRKMNTS[@]}; do
+for node in ${NODES[@]}; do
     echo "      $node: ${NODE_BRKMNTS[$node]}"
 done
 echo "*** BLKDEVS="
-for node in ${!NODE_BLKDEVS[@]}; do
+for node in ${NODES[@]}; do
     echo "      $node: ${NODE_BLKDEVS[$node]}"
 done
 echo
 
 # figure out which nodes, if any, will be added to the storage pool
-define_pool ${!NODE_BRKMNTS[@]} || exit 1
+define_pool ${NODES[@]} || exit 1
 
 # setup each node for hadoop workloads
 setup_nodes || exit 1
