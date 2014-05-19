@@ -4,13 +4,15 @@
 # and owners. This only needs to be done once for the pool when -d is specified.
 # It needs to be done per-node if -l is specified.
 # Note: the hadoop users and group need to have the same UID and GID across
-#   all nodes in the storage pool and on the mgmt and yarn-master servers.
+#   all nodes in the storage pool and on the mgmt and yarn-master servers; 
+#   however this script does not check nor enforce this requirement.
 #
 # Syntax:
-#  $1=distributed (gluster) or brick mount (per-node) path -- required
-#  -q, if specified, means only set the exit code, do not output anything
-#  -d, output only the distributed dirs, skip local dirs
-#  -l, output only the local dirs, skip distributed dirs
+#  $1=distributed gluster mount (single) or brick mount(s) (per-node) path 
+#     (required).
+#  -q=only set the exit code, do not output anything.
+#  -d=output only the distributed dirs, skip local dirs.
+#  -l=output only the local dirs, skip distributed dirs.
 
 errcnt=0; cnt=0
 HADOOP_G='hadoop'
@@ -35,12 +37,9 @@ while getopts ':qdl' opt; do
 done
 shift $((OPTIND-1))
 
-MNT="$1"
+MNT="$@" # typically a single mount but can be a list
 [[ -z "$MNT" ]] && {
-  echo "ERROR: mount path is required";
-  exit -1; }
-[[ ! -d "$MNT" ]] && {
-  echo "ERROR: $MNT is not a directory";
+  echo "ERROR: mount path(s) required";
   exit -1; }
 
 if [[ -n "$DIST" ]] ; then
@@ -52,25 +51,34 @@ else
   exit -1
 fi
 
-for tuple in $($PREFIX/gen_dirs.sh $opt); do
-    dir="$MNT/${tuple%%:*}"; let fill=(42-${#dir})
-    dir+="$(printf ' %.0s' $(seq $fill))" # left-justified for nicer output
-    perm=${tuple%:*}; perm=${perm#*:}
-    owner=${tuple##*:}
+# test for directory
+for dir in $MNT; do
+   [[ ! -d $dir ]] && {
+	echo "ERROR: $dir is not a directory";
+	exit -1; }
+done
 
-    mkdir -p $dir 2>&1 \
-    && chmod $perm $dir 2>&1 \
-    && chown $owner:$HADOOP_G $dir 2>&1
-    err=$?
+for dir in $MNT; do # to handle a list of local mounts
+    for tuple in $($PREFIX/gen_dirs.sh $opt); do
+	path="$MNT/${tuple%%:*}"; let fill=(42-${#path})
+	path+="$(printf ' %.0s' $(seq $fill))" # left-justified for nicer output
+	perm=${tuple%:*}; perm=${perm#*:}
+	owner=${tuple##*:}
 
-    if (( err == 0 )) ; then
-      (( ! QUIET )) && echo "$dir created/updated with perms $perm"
-      ((cnt++))
-    else
-      (( ! QUIET )) && \
-	  echo "$(hostname): creation of dir $dir failed with error $err"
-      ((errcnt++))
-    fi
+	mkdir -p $path 2>&1 \
+	  && chmod $perm $path 2>&1 \
+	  && chown $owner:$HADOOP_G $path 2>&1
+	err=$?
+
+	if (( err == 0 )) ; then
+	  (( ! QUIET )) && echo "$path created/updated with perms $perm"
+	  ((cnt++))
+	else
+	  (( ! QUIET )) && \
+	    echo "$(hostname): creation of path $path failed with error $err"
+	  ((errcnt++))
+	fi
+    done
 done
 
 (( errcnt > 0 )) && exit 1
