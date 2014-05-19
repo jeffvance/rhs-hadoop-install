@@ -255,8 +255,9 @@ function setup_nodes() {
 		--hadoop-mgmt-node $MGMT_NODE
  	")"
     err=$?
+    echo "setup_datanode for $node: $out"
     if (( $? != 0 )) ; then
-      echo "ERROR: $err: in setup_datanode: $out"
+      echo "ERROR: $err: in setup_datanode"
       return 1
     fi
 
@@ -379,6 +380,8 @@ function create_pool() {
 
 # ambari_server: install and start the ambari server on the MGMT_NODE. Returns
 # 1 on errors.
+# ASSUMPTION: 1) bin/* has been copied to all storage nodes but has not been
+#   copied to nodes outside of the pool.
 # Uses globals:
 #   LOCALHOST
 #   MGMT_INSIDE
@@ -393,11 +396,10 @@ function ambari_server() {
   # copied, else need to copy the setup_ambari_server script
   [[ "$MGMT_NODE" == "$LOCALHOST" ]] && { ssh=''; scp='#'; } || \
 					{ ssh="ssh $MGMT_NODE"; scp='scp'; }
-  if (( ! MGMT_INSIDE )) ; then # outside of pool, scripts not copied
-    eval "$ssh mkdir -p /tmp/bin"
-    eval "$scp -q $PREFIX/bin/setup_ambari_server.sh $MGMT_NODE:/tmp/bin"
-  fi
+  # if mgmt-node is outside of pool then scripts may need to be copied
+  (( ! MGMT_INSIDE )) && eval "$scp -q -r $PREFIX/bin $MGMT_NODE:/tmp"
 
+  # setup the ambari server on the mgmt-node
   eval "$ssh /tmp/bin/setup_ambari_server.sh" || return 1
 
   return 0 

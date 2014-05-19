@@ -304,5 +304,5 @@ if [[ -n "$BRICKMNT" ]] ; then # need brick mount prefix
 fi
 
 (( errcnt > 0 )) && exit 1
-(( ! QUIET )) && echo "${#VOL_SETTINGS[@]} volume perf settings set"
+(( ! QUIET )) && echo "Node $(hostname) successfully setup"
 exit 0
