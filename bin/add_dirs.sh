@@ -60,7 +60,7 @@ done
 
 for dir in $MNT; do # to handle a list of local mounts
     for tuple in $($PREFIX/gen_dirs.sh $opt); do
-	path="$MNT/${tuple%%:*}"; let fill=(42-${#path})
+	path="$dir/${tuple%%:*}"; let fill=(42-${#path})
 	path+="$(printf ' %.0s' $(seq $fill))" # left-justified for nicer output
 	perm=${tuple%:*}; perm=${perm#*:}
 	owner=${tuple##*:}

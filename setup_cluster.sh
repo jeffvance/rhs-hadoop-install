@@ -135,9 +135,9 @@ function parse_cmd() {
 # list. 
 # A check is made to see if the management node and/or yarn-master node is inside
 # the storage pool and/or are the same node, and if so a warning is reported and
-# the user is prompted to continue.
-# Returns 1 if user answers no.
+# the user is prompted to continue. Returns 1 if user answers no.
 # Uses globals:
+#   AUTO_YES
 #   NODE_SPEC
 #   YARN_NODE
 #   MGMT_NODE
@@ -153,7 +153,7 @@ function parse_nodes_brkmnts_blkdevs() {
   local def_blkdev=${node_spec[2]} # default
   local brkmnts=(); local blkdev
 
-  if [[ -z "$brkmnt" || -z "$blkdev" ]] ; then
+  if [[ -z "$def_brkmnt" || -z "$def_blkdev" ]] ; then
     echo "Syntax error: expect a brick mount and block device to immediately follow the first node (each separated by a \":\")"
     return 1
   fi
@@ -312,7 +312,7 @@ function pool_exists() {
 #   POOL
 function define_pool() {
 
-  local nodes="$@"
+  local nodes=($@)
   local node; local uniq=()
 
   if pool_exists ; then
@@ -423,16 +423,24 @@ if [[ -z "$MGMT_NODE" ]] ; then # omitted
 fi
 
 # extract nodes, brick mnts and blk devs arrays from NODE_SPEC
-parse_nodes_brkmnts_blkdevs
-FIRST_NODE=${!NODE_BRKMNTS[0]} # use this storage node for all gluster cli cmds
+parse_nodes_brkmnts_blkdevs || exit -1
+# use the first storage node for all gluster cli cmds
+FIRST_NODE=(${!NODE_BRKMNTS[@]}) # need array before indexing 1st node
+FIRST_NODE=${FIRST_NODE[0]}
 
 # check for passwordless ssh connectivity to nodes
 check_ssh ${!NODE_BRKMNTS[@]} || exit 1
 
 echo
-echo "*** NODES=${!NODE_BRKMNTS[@]}"
-echo "*** BRKMNTS=${NODE_BRKMNTS[@]}"
-echo "*** BLKDEVS=${NODE_BLKDEVS[@]}"
+echo "*** NODES= ${!NODE_BRKMNTS[@]}"
+echo "*** BRKMNTS="
+for node in ${!NODE_BRKMNTS[@]}; do
+    echo "      $node: ${NODE_BRKMNTS[$node]}"
+done
+echo "*** BLKDEVS="
+for node in ${!NODE_BLKDEVS[@]}; do
+    echo "      $node: ${NODE_BLKDEVS[$node]}"
+done
 echo
 
 # figure out which nodes, if any, will be added to the storage pool
