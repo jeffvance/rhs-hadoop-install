@@ -5,13 +5,16 @@
 # It is assumed that localhost has already been validated (eg. check_node.sh
 # has been run) prior to setting up the node.
 # Syntax:
-#  --blkdev: block device path (optional), skip xfs and blk-mnts if missing
-#  --brkmnt: brick mount path (optional), skip xfs and blk-mnts if missing
+#  --blkdev: block dev path(s) (optional), skip xfs and blk-mnts if missing
+#  --brkmnt: brick mnt path(s) (optional), skip xfs and blk-mnts if missing
 #  --yarn-master: hostname or ip of the yarn-master server (expected to be out-
 #       side of the storage pool) (required)
 #  --hadoop-mgmt-node: hostname or ip of the hadoop mgmt server (expected to
 #       be outside of the storage pool) (required)
 #  -q, if specified, means only set the exit code, do not output anything
+#
+# Note: the blkdev and brkmnt values can be a list of 1 or more paths separated
+#   by a comma (no spaces).
 
 PREFIX="$(dirname $(readlink -f $0))"
 
@@ -19,8 +22,8 @@ PREFIX="$(dirname $(readlink -f $0))"
 
 # parse_cmd: use get_opt to parse the command line. Returns 1 on errors.
 # Sets globals:
-#   BLKDEV
-#   BRICKMNT
+#   BLKDEV()
+#   BRICKMNT()
 #   MGMT_NODE
 #   YARN_NODE
 #   QUIET
@@ -64,6 +67,10 @@ function parse_cmd() {
     echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
     ((errcnt++)); }
 
+  # convert list of 1 or more blkdevs and brkmnts to arrays
+  BLKDEV=(${BLKDEV//,/ })
+  BRICKMNT=(${BRICKMNT//,/ })
+
   (( errcnt > 0 )) && return 1
   return 0
 }
@@ -92,29 +99,34 @@ function get_ambari_repo(){
   return 0
 }
 
-# mount_blkdev: create the brick-mnt dir if needed, append the xfs brick mount
-# to /etc/fstab, and then mount it. Returns 1 on errors.
+# mount_blkdev: create the brick-mnt dir(s) if needed, append the xfs brick
+# mount to /etc/fstab, and then mount it. Returns 1 on errors.
 function mount_blkdev() {
 
   local err; local errcnt=0; local out
+  local blkdev; local brkmnt; local i=0
   local mntopts="noatime,inode64"
 
-  [[ -z "$BLKDEV" || -z "$BRICKMNT" ]] && return 0 # need both for brick mount
+  [[ -z "$BLKDEV" || -z "$BRICKMNT" ]] && return 0 # need both to mount brickt
 
-  [[ ! -e $BRICKMNT ]] && mkdir -p $BRICKMNT
+  for brkmnt in ${BRICKMNT[@]}; do
+      blkdev=${BLKDEV[$i]}
+      [[ ! -e $brkmnt ]] && mkdir -p $brkmnt
 
-  if ! grep -qsw $BRICKMNT /etc/fstab ; then
-    echo "$BLKDEV $BRICKMNT xfs $mntopts 0 0" >>/etc/fstab
-  fi
+      if ! grep -qsw $brkmnt /etc/fstab ; then
+ 	echo "$blkdev $brkmnt xfs $mntopts 0 0" >>/etc/fstab
+      fi
 
-  if ! grep -qsw $BRICKMNT /proc/mounts ; then
-    out="$(mount $BRICKMNT 2>&1)" # via fstab entry
-    err=$?
-    if (( err != 0 )) ; then
-      echo "ERROR $err: mount $BLKDEV as $BRICKMNT: $out"
-      ((errcnt++))
-    fi
-  fi
+      if ! grep -qsw $brkmnt /proc/mounts ; then
+ 	out="$(mount $brkmnt 2>&1)" # via fstab entry
+ 	err=$?
+ 	if (( err != 0 )) ; then
+	  echo "ERROR $err: mount $blkdev as $brkmnt: $out"
+	  ((errcnt++))
+	fi
+      fi
+      ((i++))
+  done
 
   (( errcnt > 0 )) && return 1
   return 0
@@ -249,20 +261,22 @@ function setup_selinux() {
 # setup_xfs: mkfs.xfs on the block device. Returns 1 on error.
 function setup_xfs() {
 
-  local blk; local err; local errcnt=0; local out
+  local blkdev; local err; local errcnt=0; local out
   local isize=512
 
   [[ -z "$BLKDEV" ]] && return 0 # nothing to do...
 
-  if ! xfs_info $BLKDEV >& /dev/null ; then
-    out="$(mkfs -t xfs -i size=$isize -f $BLKDEV 2>&1)"
-    err=$?
-    (( ! QUIET )) && echo "mkfs.xfs on $BLKDEV: $out"
-    if (( err != 0 )) ; then
-      echo "ERROR $err: mkfs.xfs on $BLKDEV: $out"
-      ((errcnt++))
-    fi
-  fi
+  for blkdev in ${BLKDEV[@]}; do
+      if ! xfs_info $blkdev >& /dev/null ; then
+	out="$(mkfs -t xfs -i size=$isize -f $blkdev 2>&1)"
+	err=$?
+	(( ! QUIET )) && echo "mkfs.xfs on $blkdev: $out"
+	if (( err != 0 )) ; then
+	  echo "ERROR $err: mkfs.xfs on $blkdev: $out"
+	  ((errcnt++))
+	fi
+      fi
+  done
 
   (( errcnt > 0 )) && return 1
   return 0
