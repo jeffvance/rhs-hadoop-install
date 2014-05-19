@@ -9,7 +9,7 @@
 #  -q, if specified, means only set the exit code, do not output anything
 
 HADOOP_G='hadoop'
-GROUPS="$HADOOP_G" # only one hadoop group for now...
+H_GROUPS="$HADOOP_G" # only one hadoop group for now...
 errcnt=0; cnt=0
 QUIET=0 # false (meaning not quiet)
 
@@ -25,7 +25,7 @@ while getopts ':q' opt; do
 done
 shift $((OPTIND-1))
 
-for grp in $GROUPS; do
+for grp in $H_GROUPS; do
     if ! getent group $grp >/dev/null ; then
       groupadd --system $grp 2>&1
       err=$?
