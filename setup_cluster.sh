@@ -390,17 +390,17 @@ function ambari_server() {
 
   local out; local ssh; local scp
 
-  echo "Installing the ambari-server on $MGMT_NODE..."
+  echo "Installing the ambari-server on $MGMT_NODE... this can take time"
 
-  # if the mgmt-node is inside the storage pool then all bin scripts have been
-  # copied, else need to copy the setup_ambari_server script
-  [[ "$MGMT_NODE" == "$LOCALHOST" ]] && { ssh=''; scp='#'; } || \
-					{ ssh="ssh $MGMT_NODE"; scp='scp'; }
-  # if mgmt-node is outside of pool then scripts may need to be copied
-  (( ! MGMT_INSIDE )) && eval "$scp -q -r $PREFIX/bin $MGMT_NODE:/tmp"
-
-  # setup the ambari server on the mgmt-node
-  eval "$ssh /tmp/bin/setup_ambari_server.sh" || return 1
+  if [[ "$MGMT_NODE" == "$LOCALHOST" ]] ; then # all scripts in place
+    $PREFIX/bin/setup_ambari_server.sh || return 1
+  else 
+    # if the mgmt-node is inside the storage pool then all bin scripts have been
+    # copied, else need to copy the setup_ambari_server script
+    (( MGMT_INSIDE )) || scp -q -r $PREFIX/bin $MGMT_NODE:/tmp
+    # setup the ambari server on the mgmt-node
+    ssh $MGMT_NODE "/tmp/bin/setup_ambari_server.sh" || return 1
+  fi
 
   return 0 
 }
@@ -437,15 +437,17 @@ FIRST_NODE=${NODES[0]}
 check_ssh ${NODES[@]} || exit 1
 
 echo
-echo "*** NODES= ${NODES[@]}"
-echo "*** BRKMNTS="
+echo "*** NODES    : ${NODES[@]}"
+echo "*** BRKMNTS  :"
 for node in ${NODES[@]}; do
     echo "      $node: ${NODE_BRKMNTS[$node]}"
 done
-echo "*** BLKDEVS="
+echo "*** BLKDEVS  :"
 for node in ${NODES[@]}; do
     echo "      $node: ${NODE_BLKDEVS[$node]}"
 done
+echo "*** Ambari mgmt node  : $MGMT_NODE"
+echo "*** Yarn-master server: $YARN_NODE"
 echo
 
 # figure out which nodes, if any, will be added to the storage pool

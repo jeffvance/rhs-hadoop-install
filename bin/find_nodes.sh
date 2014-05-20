@@ -27,16 +27,28 @@ done
 shift $((OPTIND-1))
 
 VOLNAME="$1" # optional, default=entire pool
-[[ -n "$rhs_node" ]] && rhs_node="-n $rhs_node" || rhs_node=''
+[[ -n "$rhs_node" ]] && rhs_node_opt="-n $rhs_node" || rhs_node_opt=''
 
-NODES=($($PREFIX/find_bricks.sh $rhs_node $VOLNAME)) # array
-(( $? != 0 )) && {
-  echo "${NODES[@]}"; # errmsg from find_bricks
+if [[ -z "$VOLNAME" ]] ; then # use peer status to get all nodes in pool
+  NODES=($(eval "
+	ssh $rhs_node gluster peer status | grep Hostname: | awk '{print \$2}'
+  "))
+  err=$?
+else # use find_bricks which needs at least one volume created
+  NODES=($($PREFIX/find_bricks.sh $rhs_node_opt $VOLNAME))
+  err=$?
+fi
+(( err != 0 )) && {
+  echo "${NODES[@]}"; # errmsg from above
   exit 1; }
-  
-for (( i=0; i<${#NODES[@]}; i++ )); do
-    NODES[$i]="${NODES[$i]%:*}" # just the node name
-done
+
+if [[ -z "$VOLNAME" ]] ; then 
+  NODES+=($rhs_node) # since not included in peer status
+else
+  for (( i=0; i<${#NODES[@]}; i++ )); do
+      NODES[$i]="${NODES[$i]%:*}" # just the node name
+  done
+fi
 
 [[ -z "$UNIQ" ]] && {
   echo "${NODES[@]}" | tr ' ' '\n';

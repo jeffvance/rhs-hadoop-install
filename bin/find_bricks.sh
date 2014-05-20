@@ -3,6 +3,8 @@
 # find_bricks.sh discovers the bricks for the trusted storage pool, or for the
 # given volume if the <volName> arg is supplied. In either case, the list of
 # bricks, "<node>:/<brick-mnt-dir>", are output, one brick per line.
+# REQUIREMENT: at least one volume has to have been created in the pool, even if
+#   <volname> is omitted.
 # Args:
 #   $1=volume name in question. Optional, default is every node in pool.
 #   -n=any storage node. Optional, but if not supplied then localhost must be a

@@ -19,6 +19,7 @@
 PREFIX="$(dirname $(readlink -f $0))"
 
 ## functions ##
+source $PREFIX/functions
 
 # parse_cmd: use get_opt to parse the command line. Returns 1 on errors.
 # Sets globals:
@@ -70,30 +71,6 @@ function parse_cmd() {
   # convert list of 1 or more blkdevs and brkmnts to arrays
   BLKDEV=(${BLKDEV//,/ })
   BRICKMNT=(${BRICKMNT//,/ })
-
-  (( errcnt > 0 )) && return 1
-  return 0
-}
-
-# get_ambari_repo: wget the ambari repo file in the correct location.
-function get_ambari_repo(){
- 
-  local REPO_DIR='/etc/yum.repos.d'
-  local REPO_URL='http://public-repo-1.hortonworks.com/ambari/centos6/1.x/updates/1.4.4.23/ambari.repo'
-  local out; local err; local errcnt=0
-
-  [[ -d $REPO_DIR ]] || mkdir -p $REPO_DIR
-  cd $REPO_DIR
-
-  out="$(wget $REPO_URL 2>&1)"
-  err=$?
-  (( ! QUIET )) && echo "wget ambari repo: $out"
-  if (( err != 0 )) ; then
-    echo "ERROR $err: ambari repo wget: $out"
-    ((errcnt++))
-  fi
-
-  cd - >/dev/null
 
   (( errcnt > 0 )) && return 1
   return 0

@@ -13,6 +13,9 @@ AMBARI_SERVER_PID='/var/run/ambari-server/ambari-server.pid'
 METAINFO_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.0.6.GlusterFS/metainfo.xml'
 ACTIVE_FALSE='<active>false<'; ACTIVE_TRUE='<active>true<'
 
+## functions ##
+source $PREFIX/functions
+
 # parse cmd opts
 while getopts ':q' opt; do
     case "$opt" in
@@ -24,6 +27,9 @@ while getopts ':q' opt; do
     esac
 done
 shift $((OPTIND-1))
+
+# wget the ambari repo
+get_ambari_repo
 
 # stop and reset server if running
 if [[ -f $AMBARI_SERVER_PID ]] ; then
@@ -39,8 +45,8 @@ if [[ -f $AMBARI_SERVER_PID ]] ; then
     ((warncnt++)); }
 fi
 
-# install the ambari server
-out="$(yum -y install ambari-server 2>&1)"
+# install the ambari server -- may want to capture this long output...
+yum -y install ambari-server
 err=$?
 if (( err != 0 && err != 1 )) ; then # 1--> nothing-to-do
   echo "ERROR $err: ambari server install: $out"
