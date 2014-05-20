@@ -274,8 +274,8 @@ setup_selinux      || ((errcnt++))
 setup_iptables     || ((errcnt++))
 setup_ambari_agent || ((errcnt++))
 
-$PREFIX/add_users.sh $q               || ((errcnt++))
 $PREFIX/add_groups.sh $q              || ((errcnt++))
+$PREFIX/add_users.sh $q               || ((errcnt++))
 if [[ -n "$BRICKMNT" ]] ; then # need brick mount prefix
   $PREFIX/add_dirs.sh -l $q $BRICKMNT || ((errcnt++)) # just local dirs
 fi
