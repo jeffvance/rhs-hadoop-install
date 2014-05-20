@@ -139,8 +139,13 @@ function setup_ambari_agent() {
     return 1
   fi
 
+  if [[ ! -f $AMBARI_INI ]] ; then
+    echo "ERROR: $AMBARI_INI file missing"
+    return 1
+  fi
+
   # modify the agent's .ini file to contain the mgmt node hostname
-  sed -i -e "s/'localhost'/${MGMT_NODE}/" $AMBARI_INI >& /dev/null
+  sed -i -e "s/hostname=localhost/hostname=${MGMT_NODE}/" $AMBARI_INI
 
   # start the agent now
   out="$(ambari-agent start 2>&1)"
