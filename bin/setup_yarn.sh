@@ -11,36 +11,32 @@
 PREFIX="$(dirname $(readlink -f $0))"
 errcnt=0
 
-# set_yarn: define the nfs mount for VOLNAME on the yarn-master node.
+# set_yarn: if the yarn node does not already have VOLNAME nfs-mounted then
+# append the nfs volume mount to fstab and mount it.
 function set_yarn() {
 
-  local out; local ssh; local ssh_close
+  local out; local ssh=''; local ssh_close=''; local err
   local volmnt="${VOLMNT}_nfs"
   local mntopts='defaults,_netdev'
 
-  [[ "$yarn_node" == "$HOSTNAME" ]] && { ssh='('; ssh_close=')'; } \
-				    || { ssh="ssh $yarn_node '"; ssh_close="'"; }
+  [[ "$yarn_node" != "$HOSTNAME" ]] && { ssh="ssh $yarn_node '"; ssh_close="'"; }
+
   out="$(eval "
   	$ssh
-	  mkdir -p $volmnt
 	  # append to fstab if not present
-	  if ! grep -qsw $volmnt /etc/fstab ; then
+	  if ! grep -qs \"$yarn_node:/$VOLNAME.* nfs \" /etc/fstab ; then
 	    echo $yarn_node:/$VOLNAME $volmnt nfs $mntopts 0 0 >>/etc/fstab
+	    mkdir -p $volmnt
+	    mount $volmnt 2>&1 # mount via fstab, exit with mount returncode
 	  fi
-	  mount $volmnt # mount via fstab
-	  rc=\$?
-	  if (( rc != 0 && rc != 32 )) ; then # 32=already mounted
-            echo Error \$rc: mounting $volmnt with $mntopts options
-            exit 1 # from ssh or sub-shell
-	  fi
-	  exit 0 # from ssh or sub-shell
 	$ssh_close
       ")"
-  (( $? != 0 )) && {
-    echo "ERROR on $yarn_node: $out";
+  err=$?
+  (( err != 0 && err != 32 )) && { # 32==already mounted
+    echo "ERROR $err on $yarn_node (yarn-master): $out";
     return 1; }
 
-  echo "$VOLNAME nfs mount setup on $node"
+  echo "$VOLNAME nfs mounted on $yarn_node"
   return 0
 }
 
@@ -78,5 +74,5 @@ VOLMNT="$($PREFIX/find_volmnt.sh $rhs_node $VOLNAME)"
 set_yarn || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
-echo "$VOLNAME is setup on yarn-master $yarn_node"
+echo "$VOLNAME is setup on $yarn_node (yarn-master)"
 exit 0

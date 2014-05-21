@@ -16,15 +16,16 @@ function chk_yarn() {
   local errcnt=0; local warncnt=0; local cnt
 
   # live check
-  if ! eval "$SSH ps -ef | grep -q '$yarn_node:/$VOLNAME.* nfs '" ; then
+  if ! eval "$SSH 'ps -ef | grep -q \"$yarn_node:/$VOLNAME.* nfs \"'" ; then
+    echo "ERROR: $VOLNAME not nfs-mounted on $yarn_node (yarn-master)"
     ((errcnt++))
   fi
 
   # fstab check
   cnt=$(eval "$SSH \"grep -c '$yarn_node:/$VOLNAME.* nfs ' /etc/fstab\"")
   if (( cnt == 0 )) ; then
-    echo "ERROR: $VOLNAME nfs mount missing in /etc/fstab on $yarn_node (yarn-master)"
-    ((errcnt++))
+    echo "WARN: $VOLNAME nfs mount missing from /etc/fstab on $yarn_node (yarn-master)"
+    ((warncnt++))
   elif (( cnt > 1 )) ; then
     echo "WARN: $VOLNAME nfs mount appears more than once in /etc/fstab on $yarn_node (yarn-master)"
     ((warncnt++))

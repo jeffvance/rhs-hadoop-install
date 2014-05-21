@@ -71,5 +71,5 @@ for setting in $out ; do
 done
 
 (( warncnt > 0 )) && exit 0 # no errors, just warnings
-(( ! QUIET )) && echo "All $VOLNAME performance settings are set correctly"
+(( ! QUIET )) && echo "All $VOLNAME performance settings are correct"
 exit 0

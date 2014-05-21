@@ -264,7 +264,7 @@ function check_xfs() {
 
 errcnt=0
 PREFIX="$(dirname $(readlink -f $0))"
-NODE="$(hostname)"
+NODE="$HOSTNAME"
 QUIET=0 # false (meaning not quiet)
 
 # parse cmd opts
@@ -294,8 +294,8 @@ check_dirs         || ((errcnt++))
 check_ambari_agent || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
-echo ************
-echo *** "$NODE is ready for Hadoop workloads"
-echo ************
+echo '************'
+echo "*** $NODE is ready for Hadoop workloads"
+echo '************'
 echo
 exit 0
