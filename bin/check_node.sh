@@ -16,11 +16,18 @@
 function check_ambari_agent() {
 
   local ambari_agent_pid='/var/run/ambari-agent/ambari-agent.pid'
-  local errcnt=0; local warncnt=0
+  local errcnt=0; local warncnt=0; local pid
 
   if [[ ! -f $ambari_agent_pid ]] ; then
-    (( ! QUIET )) && echo "WARN: ambari-agent is not running on $NODE"
-    ((warncnt++))
+    echo "ERROR: $ambari_agent_pid file missing on $NODE"
+    return 1
+  fi
+
+  # extract ambari-agent pid
+  pid=$(cat $ambari_agent_pid)
+  if ! ps -p $pid >& /dev/null ; then
+    "ERROR: ambari-agent process $pid is not running"
+    ((errcnt++))
   fi
 
   (( errcnt > 0 )) && return 1
@@ -287,5 +294,8 @@ check_dirs         || ((errcnt++))
 check_ambari_agent || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
-(( ! QUIET )) && echo "$NODE is ready for Hadoop workloads"
+echo ************
+echo *** "$NODE is ready for Hadoop workloads"
+echo ************
+echo
 exit 0

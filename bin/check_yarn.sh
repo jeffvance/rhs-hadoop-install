@@ -9,7 +9,7 @@
 LOCALHOST=$(hostname)
 errcnt=0
 
-# chk_yarn: verify that the a nfs mount for VOLNAME has been established on the
+# chk_yarn: verify that the nfs mount for VOLNAME has been established on the
 # yarn-master node. This include verifying both the "live" settings, determined
 # by ps, and the "persistent" settings, defined in /etc/fstab.
 function chk_yarn() {
@@ -24,15 +24,15 @@ function chk_yarn() {
   # fstab check
   cnt=$(eval "$SSH \"grep -c '$yarn_node:/$VOLNAME.* nfs ' /etc/fstab\"")
   if (( cnt == 0 )) ; then
-    echo "ERROR: $VOLNAME nfs mount missing in /etc/fstab"
+    echo "ERROR: $VOLNAME nfs mount missing in /etc/fstab on $yarn_node (yarn-master)"
     ((errcnt++))
   elif (( cnt > 1 )) ; then
-    echo "WARN: $VOLNAME nfs mount appears more than once in /etc/fstab"
+    echo "WARN: $VOLNAME nfs mount appears more than once in /etc/fstab on $yarn_node (yarn-master)"
     ((warncnt++))
   fi
 
   (( errcnt > 0 )) && return 1
-  echo "$VOLNAME mount setup correctly on $node with $warncnt warnings"
+  echo "$VOLNAME mount setup correctly on $yarn_node (yarn-master) with $warncnt warnings"
   return 0
 }
 

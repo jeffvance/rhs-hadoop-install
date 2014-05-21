@@ -148,14 +148,9 @@ function setup_nodes() {
       ((i++))
   done
 
-  # setup yarn-master node
-xxx
-
-  if (( errcnt > 0 )) ; then
-    echo "$errcnt setup node errors on nodes: $errnodes"
-    return 1
-  fi
-
+  (( errcnt > 0 )) && {
+    echo "$errcnt setup node errors on nodes: $errnodes";
+    return 1; }
   return 0
 }
 
