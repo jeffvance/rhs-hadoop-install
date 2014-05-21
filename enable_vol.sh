@@ -262,6 +262,10 @@ echo "*** Ambari mgmt node  : $MGMT_NODE"
 echo "*** Yarn-master server: $YARN_NODE"
 echo
 
+# prompt to continue before any changes are made...
+(( ! AUTO_YES )) && ! yesno "Enabling volume $VOLNAME. Continue? [y|N] " && \
+  exit 0
+
 # verify nodes spanned by the volume are ready for hadoop workloads, and if
 # not prompt user to fix problems.
 chk_and_fix_nodes || exit 1

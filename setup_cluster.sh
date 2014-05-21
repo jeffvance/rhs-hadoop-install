@@ -452,6 +452,9 @@ echo
 # figure out which nodes, if any, will be added to the storage pool
 define_pool ${NODES[@]} || exit 1
 
+# prompt to continue before any changes are made...
+(( ! AUTO_YES )) && ! yesno "  Continue? [y|N] " && exit 0
+
 # setup each node for hadoop workloads
 setup_nodes || exit 1
 

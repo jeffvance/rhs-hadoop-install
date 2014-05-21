@@ -186,7 +186,7 @@ function setup_iptables() {
       fi
   done
   
-  # save and restart iptables
+  # save iptables
   out="$(service iptables save)"
   err=$?
   (( ! QUIET )) && echo "iptables save: $out"
@@ -194,6 +194,8 @@ function setup_iptables() {
     echo "ERROR $err: iptables save: $out"
     ((errcnt++))
   fi
+
+  # restart iptables
   out="$(service iptables restart)"
   err=$?
   (( ! QUIET )) && echo "iptables restart: $out"

@@ -34,7 +34,7 @@ SYNTAX:
 
 $ME --version | --help
 
-$ME <volname> <volume-mnt-prefix> <node-list-spec>
+$ME [-y] <volname> <volume-mnt-prefix> <node-list-spec>
 
 where:
 
@@ -50,6 +50,8 @@ where:
   <volname> : name of the new volume.
   <vol-mnt-prefix> : path of the glusterfs-fuse mount point, eg. /mnt/glusterfs.
       Note: the volume name will be appended to this mount point.
+  -y : auto answer "yes" to all prompts. Default is to be promoted before the
+      script continues.
   --version : output only the version string.
   --help : this text.
 
@@ -66,10 +68,13 @@ function parse_cmd() {
   local errcnt=0
   local long_opts='help,version'
 
-  eval set -- "$(getopt -o '' --long $long_opts -- $@)"
+  eval set -- "$(getopt -o 'y' --long $long_opts -- $@)"
 
   while true; do
       case "$1" in
+        -y)
+          AUTO_YES=1; shift; continue
+        ;;
         --help)
           usage; exit 0
         ;;
@@ -207,7 +212,7 @@ function mk_volmnt() {
   local volmnt="$VOLMNT/$VOLNAME"
 
   # assign required and optional gluster-fuse mount options
-  local mntopts="$($PREXIX/bin/gen_req_gluster_mnt.sh),"
+  local mntopts="$($PREFIX/bin/gen_req_gluster_mnt.sh),"
   mntopts+="$($PREFIX/bin/gen_opt_gluster_mnt.sh),_netdev" # add _netdev here
 
   for node in ${NODES[@]}; do
@@ -328,6 +333,7 @@ function start_vol() {
 
 ME="$(basename $0 .sh)"
 LOCALHOST=$(hostname)
+AUTO_YES=0 # assume false
 BRKMNTS=(); NODES=()
 errcnt=0
 
@@ -357,6 +363,11 @@ echo
 
 # verify that each node is prepped for hadoop workloads
 chk_nodes  || exit 1
+
+# prompt to continue before any changes are made...
+echo
+(( ! AUTO_YES )) && ! yesno "Creating new volume $VOLNAME. Continue? [y|N] " && \
+  exit 0
 
 # create and start the replica 2 volume and set perf settings
 create_vol || exit 1
