@@ -13,7 +13,6 @@ QUIET=0 # false (meaning not quiet)
 VOLINFO_TMPFILE="$(mktemp --suffix '.volinfo')"
 LAST_N=3 # tail records containing vol settings (vol info cmd)
 TAG='Options Reconfigured:'
-LOCALHOST="$(hostname)"
 PREFIX="$(dirname $(readlink -f $0))"
 
 source $PREFIX/functions # need vol_exists()
@@ -42,7 +41,7 @@ VOLNAME="$1"
   exit -1; }
 
 [[ -n "$rhs_node" ]] && rhs_node_opt="-n $rhs_node" || rhs_node_opt=''
-[[ -z "$rhs_node" ]] && rhs_node="$LOCALHOST" 
+[[ -z "$rhs_node" ]] && rhs_node="$HOSTNAME" 
 NODES="$($PREFIX/find_nodes.sh $rhs_node_opt $VOLNAME)"
 
 if ! vol_exists $VOLNAME $rhs_node ; then
@@ -50,7 +49,7 @@ if ! vol_exists $VOLNAME $rhs_node ; then
   exit 1
 fi
 
-[[ "$rhs_node" == "$LOCALHOST" ]] && ssh='' || ssh="ssh $rhs_node"
+[[ "$rhs_node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $rhs_node"
 eval "$ssh gluster volume info $VOLNAME >$VOLINFO_TMPFILE 2>&1"
 err=$?
 if (( err != 0 )) ; then

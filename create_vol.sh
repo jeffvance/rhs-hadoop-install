@@ -167,7 +167,6 @@ function parse_brkmnts() {
 # errors.
 # Uses globals:
 #   BRKMNTS
-#   LOCALHOST
 #   NODES
 #   PREFIX
 # Side effect: all scripts under bin/ are copied to each node.
@@ -178,7 +177,7 @@ function chk_nodes() {
 
   # verify that each node is prepped for hadoop workloads
   for node in ${NODES[@]}; do
-      [[ "$node" == "$LOCALHOST" ]] && { ssh=''; scp='#'; } || \
+      [[ "$node" == "$HOSTNAME" ]] && { ssh=''; scp='#'; } || \
 				       { ssh="ssh $node"; scp='scp'; }
       eval "$scp -r -q $PREFIX/bin $node:/tmp"
       out="$(eval "
@@ -201,7 +200,6 @@ function chk_nodes() {
 # mount is persisted in /etc/fstab. Returns 1 on errors.
 # Assumptions: the bin scripts have been copied to each node in /tmp/bin.
 # Uses globals:
-#   LOCALHOST
 #   NODES
 #   PREFIX
 #   VOLMNT
@@ -216,7 +214,7 @@ function mk_volmnt() {
   mntopts+="$($PREFIX/bin/gen_opt_gluster_mnt.sh),_netdev" # add _netdev here
 
   for node in ${NODES[@]}; do
-      [[ "$node" == "$LOCALHOST" ]] && { ssh='('; ssh_close=')'; } \
+      [[ "$node" == "$HOSTNAME" ]] && { ssh='('; ssh_close=')'; } \
 			            || { ssh="ssh $node '"; ssh_close="'"; }
       out="$(eval "
 	$ssh
@@ -252,7 +250,6 @@ function mk_volmnt() {
 #      Currently this has been done by chk_nodes().
 # Uses globals:
 #   FIRST_NODE
-#   LOCALHOST
 #   VOLNAME
 #   VOLMNT
 function add_distributed_dirs() {
@@ -260,7 +257,7 @@ function add_distributed_dirs() {
   local err; local ssh
 
   # add the required distributed hadoop dirs
-  [[ "$FIRST_NODE" == "$LOCALHOST" ]] && ssh='' || ssh="ssh $FIRST_NODE"
+  [[ "$FIRST_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $FIRST_NODE"
   eval "$ssh /tmp/bin/add_dirs.sh -d $VOLMNT/$VOLNAME"
   err=$?
   if (( err != 0 )) ; then
@@ -332,7 +329,6 @@ function start_vol() {
 ## main ##
 
 ME="$(basename $0 .sh)"
-LOCALHOST=$(hostname)
 AUTO_YES=0 # assume false
 BRKMNTS=(); NODES=()
 errcnt=0

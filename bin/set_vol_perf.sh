@@ -10,7 +10,6 @@
 errcnt=0
 PREFIX="$(dirname $(readlink -f $0))"
 QUIET=0 # false (meaning not quiet)
-LOCALHOST="$(hostname)"
 
 source $PREFIX/functions # need vol_exists()
 
@@ -32,7 +31,7 @@ while getopts ':qn:' opt; do
 done
 shift $((OPTIND-1))
 VOLNAME="$1"
-[[ -z "$rhs_node" ]] && rhs_node="$LOCALHOST"
+[[ -z "$rhs_node" ]] && rhs_node="$HOSTNAME"
 
 [[ -z "$VOLNAME" ]] && {
   echo "Syntax error: volume name is required";
@@ -48,7 +47,7 @@ for setting in ${!VOL_SETTINGS[@]}; do
     cmd+="gluster volume set $VOLNAME $setting $val; "
 done
 
-[[ "$rhs_node" == "$LOCALHOST" ]] && ssh='' || ssh="ssh $rhs_node"
+[[ "$rhs_node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $rhs_node"
 out="$(eval "$ssh '$cmd'")"
 err=$?
 (( ! QUIET )) && echo "$setting $val: $out"

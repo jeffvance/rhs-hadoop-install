@@ -10,7 +10,6 @@
 #   -x=(no-node) if specified, means only output the block-devs portion,
 #      omit each node.
 
-LOCALHOST=$(hostname)
 INCL_NODE=1 # true, default
 PREFIX="$(dirname $(readlink -f $0))"
 
@@ -36,7 +35,7 @@ for brick in $($PREFIX/find_bricks.sh $rhs_node $VOLNAME); do
     node=${brick%:*}
     brickmnt=${brick#*:}    # remove node
     brickmnt=${brickmnt%/*} # remove volname
-    [[ "$node" == "$LOCALHOST" ]] && { ssh=''; ssh_close=''; } || \
+    [[ "$node" == "$HOSTNAME" ]] && { ssh=''; ssh_close=''; } || \
     				     { ssh="ssh $node '"; ssh_close="'"; }
     eval "$ssh 
 	   mnt=\$(grep $brickmnt /proc/mounts)

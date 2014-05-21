@@ -11,7 +11,6 @@
 #      storage node.
 
 PREFIX="$(dirname $(readlink -f $0))"
-LOCALHOST="$(hostname)"
 
 source $PREFIX/functions # need vol_exists()
 
@@ -28,9 +27,9 @@ done
 shift $((OPTIND-1))
 
 VOLNAME="$1" # optional, default=entire pool
-[[ -z "$rhs_node" ]] && rhs_node="$LOCALHOST"
+[[ -z "$rhs_node" ]] && rhs_node="$HOSTNAME"
 
-[[ "$rhs_node" == "$LOCALHOST" ]] && ssh='' || ssh="ssh $rhs_node"
+[[ "$rhs_node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $rhs_node"
 
 eval "$ssh gluster volume status $VOLNAME" >/tmp/volstatus.out
 if (( $? != 0 )) ; then

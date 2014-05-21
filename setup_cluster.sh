@@ -225,7 +225,6 @@ function parse_nodes_brkmnts_blkdevs() {
 # outside of the storage pool. Note: if the hadoop mgmt-node is outside of the
 # storage pool then it will not have the agent installed. Returns 1 on errors.
 # Uses globals:
-#   LOCALHOST
 #   NODES
 #   NODE_BLKDEVS
 #   NODE_BRKMNTS
@@ -246,7 +245,7 @@ function setup_nodes() {
     local brkmnt="$3" # can be blank
     local out; local err; local ssh; local scp
 
-    [[ "$node" == "$LOCALHOST" ]] && { ssh=''; scp='#'; } || \
+    [[ "$node" == "$HOSTNAME" ]] && { ssh=''; scp='#'; } || \
                                      { ssh="ssh $node"; scp='scp'; }
     eval "$scp -r -q $PREFIX/bin $node:/tmp"
     out="$(eval "
@@ -287,12 +286,11 @@ function setup_nodes() {
 # pool_exists: return 0 if the trusted storage pool exists, else 1.
 # Uses globals:
 #   FIRST_NODE
-#   LOCALHOST
 function pool_exists() {
 
   local ssh; local out
 
-  [[ "$FIRST_NODE" == "LOCALHOST" ]] && ssh='' || ssh="ssh $FIRST_NODE" 
+  [[ "$FIRST_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $FIRST_NODE" 
   out="$(eval "$ssh gluster peer status")"
   (( $? != 0 )) && return 1
 
@@ -382,7 +380,6 @@ function create_pool() {
 # ASSUMPTION: 1) bin/* has been copied to all storage nodes but has not been
 #   copied to nodes outside of the pool.
 # Uses globals:
-#   LOCALHOST
 #   MGMT_INSIDE
 #   MGMT_NODE
 function ambari_server() {
@@ -391,7 +388,7 @@ function ambari_server() {
 
   echo "Installing the ambari-server on $MGMT_NODE... this can take time"
 
-  if [[ "$MGMT_NODE" == "$LOCALHOST" ]] ; then # all scripts in place
+  if [[ "$MGMT_NODE" == "$HOSTNAME" ]] ; then # all scripts in place
     $PREFIX/bin/setup_ambari_server.sh || return 1
   else 
     # if the mgmt-node is inside the storage pool then all bin scripts have been
@@ -408,7 +405,6 @@ function ambari_server() {
 ## main ##
 
 ME="$(basename $0 .sh)"
-LOCALHOST=$(hostname)
 NODES=()
 declare -A NODE_BRKMNTS; declare -A NODE_BLKDEVS
 MGMT_INSIDE=0 # assume false
@@ -422,9 +418,9 @@ echo '***'
 
 parse_cmd $@ || exit -1
 if [[ -z "$MGMT_NODE" ]] ; then # omitted
-  echo "No management node specified therefore the localhost ($LOCALHOST) is assumed"
+  echo "No management node specified therefore the localhost ($HOSTNAME) is assumed"
   (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && exit -1
-  MGMT_NODE="$LOCALHOST"
+  MGMT_NODE="$HOSTNAME"
 fi
 
 # extract nodes, brick mnts and blk devs arrays from NODE_SPEC

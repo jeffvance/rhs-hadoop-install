@@ -5,11 +5,11 @@
 # It is assumed that localhost has already been validated (eg. check_node.sh
 # has been run) prior to setting up the node.
 # Syntax:
-#  --blkdev: block dev path(s) (optional), skip xfs and blk-mnts if missing
-#  --brkmnt: brick mnt path(s) (optional), skip xfs and blk-mnts if missing
+#  --blkdev: block dev path(s) (optional), skip xfs and blk-mnts if missing.
+#  --brkmnt: brick mnt path(s) (optional), skip xfs and blk-mnts if missing.
 #  --hadoop-mgmt-node: hostname or ip of the hadoop mgmt server (expected to
-#       be outside of the storage pool) (required)
-#  -q, if specified, means only set the exit code, do not output anything
+#       be outside of the storage pool) (optional, default=localhost).
+#  -q: only set the exit code, do not output anything.
 #
 # Note: the blkdev and brkmnt values can be a list of 1 or more paths separated
 #   by a comma (no spaces).
@@ -29,7 +29,6 @@ function parse_cmd() {
 
   local opts='q'
   local long_opts='blkdev:,brkmnt:,hadoop-mgmt-node:'
-  local errcnt=0
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
 
@@ -58,15 +57,12 @@ function parse_cmd() {
   done
 
   # check required args
-  [[ -z "$MGMT_NODE" ]] && {
-    echo "Syntax error: hadoop-mgmt-node is required";
-    ((errcnt++)); }
+  [[ -z "$MGMT_NODE" ]] && MGMT_NODE="$HOSTNAME"
 
   # convert list of 1 or more blkdevs and brkmnts to arrays
   BLKDEV=(${BLKDEV//,/ })
   BRICKMNT=(${BRICKMNT//,/ })
 
-  (( errcnt > 0 )) && return 1
   return 0
 }
 

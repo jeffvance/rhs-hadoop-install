@@ -12,7 +12,6 @@
 #      storage node.
 #   -q=only set the exit code, do not output anything.
 
-LOCALHOST=$(hostname)
 errcnt=0; q=''
 PREFIX="$(dirname $(readlink -f $0))"
 QUIET=0 # false (meaning not quiet)
@@ -51,7 +50,7 @@ NODES=''
 for brick in $($PREFIX/find_brick_mnts.sh $rhs_node $VOLNAME); do
     node=${brick%:*}; NODES+="$node "
     brkmnt=${brick#*:}
-    [[ "$node" == "$LOCALHOST" ]] && ssh='' || ssh="ssh $node"
+    [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
     eval "$ssh /tmp/bin/check_node.sh $q $brkmnt" || ((errcnt++))
 done
 

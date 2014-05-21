@@ -140,7 +140,6 @@ function edit_core_site() {
 ## main ##
 
 ME="$(basename $0 .sh)"
-LOCALHOST="$(hostname)"
 errcnt=0
 AUTO_YES=0 # false
 
@@ -151,14 +150,14 @@ echo '***'
 parse_cmd $@ || exit -1
 
 if [[ -z "$MGMT_NODE" ]] ; then # omitted
-  echo "No management node specified therefore the localhost ($LOCALHOST) is assumed"
+  echo "No management node specified therefore the localhost ($HOSTNAME) is assumed"
   (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && exit -1
-  MGMT_NODE="$LOCALHOST"
+  MGMT_NODE="$HOSTNAME"
 fi
 if [[ -z "$RHS_NODE" ]] ; then # omitted
-  echo "No RHS storage node specified therefore the localhost ($LOCALHOST) is assumed"
+  echo "No RHS storage node specified therefore the localhost ($HOSTNAME) is assumed"
   (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && exit -1
-  RHS_NODE="$LOCALHOST"
+  RHS_NODE="$HOSTNAME"
 fi
 
 vol_exists $VOLNAME $RHS_NODE || {

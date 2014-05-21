@@ -9,7 +9,6 @@
 #      storage node.
 
 PREFIX="$(dirname $(readlink -f $0))"
-LOCALHOST=$(hostname)
 errcnt=0
 
 # set_yarn: define the nfs mount for VOLNAME on the yarn-master node.
@@ -19,8 +18,8 @@ function set_yarn() {
   local volmnt="${VOLMNT}_nfs"
   local mntopts='defaults,_netdev'
 
-  [[ "$yarn_node" == "$LOCALHOST" ]] && { ssh='('; ssh_close=')'; } \
-				     || { ssh="ssh $yarn_node '"; ssh_close="'"; }
+  [[ "$yarn_node" == "$HOSTNAME" ]] && { ssh='('; ssh_close=')'; } \
+				    || { ssh="ssh $yarn_node '"; ssh_close="'"; }
   out="$(eval "
   	$ssh
 	  mkdir -p $volmnt

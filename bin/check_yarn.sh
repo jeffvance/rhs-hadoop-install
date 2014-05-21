@@ -6,7 +6,6 @@
 #   $1=volume name (required).
 #   -y=yarn-master node (required).
 
-LOCALHOST=$(hostname)
 errcnt=0
 
 # chk_yarn: verify that the nfs mount for VOLNAME has been established on the
@@ -58,7 +57,7 @@ VOLNAME="$1"
   echo "Syntax error: yarn-master node is required";
   exit -1; }
 
-[[ "$yarn_node" == "$LOCALHOST" ]] && SSH='' || SSH="ssh $yarn_node"
+[[ "$yarn_node" == "$HOSTNAME" ]] && SSH='' || SSH="ssh $yarn_node"
 
 chk_yarn || ((errcnt++))
 
