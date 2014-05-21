@@ -6,10 +6,13 @@
 #
 # create_vol.sh accepts a volume name, volume mount path prefix, and a list of
 # two or more "node:brick_mnt" pairs, and creates a new volume with the
-# appropriate performance setting set. Each node spanned by the new volume is
-# checked that it is setup for hadoop workloads by invoking check_nodes.sh. The
-# new volume is started. The volume is mounted with the correct glusterfs-fuse
-# mount options. Lastly, distributed, hadoop-specific directories are created.
+# appropriate performance settings set. Each node spanned by the new volume is
+# checked to make sure it is setup for hadoop workloads. The new volume is
+# startedxi and the volume is mounted with the correct glusterfs-fuse mount
+# options. Lastly, distributed, hadoop-specific directories are created.
+# Note: nodes that are not spanned by the new volume are not modified in any
+#   way. See enable_vol.sh, which establishes a nfs mount on the yarn-master
+#   node and handles core-site file changes.
 #
 # See useage() for syntax.
 
@@ -195,14 +198,17 @@ function chk_nodes() {
 # Uses globals:
 #   LOCALHOST
 #   NODES
+#   PREFIX
 #   VOLMNT
 #   VOLNAME
 function mk_volmnt() {
 
   local err; local out; local node; local ssh; local ssh_close
   local volmnt="$VOLMNT/$VOLNAME"
-  local \
-    mntopts='entry-timeout=0,attribute-timeout=0,use-readdirp=no,acl,_netdev'
+
+  # assign required and optional gluster-fuse mount options
+  local mntopts="$($PREXIX/bin/gen_req_gluster_mnt.sh),"
+  mntopts+="$($PREFIX/bin/gen_opt_gluster_mnt.sh),_netdev" # add _netdev here
 
   for node in ${NODES[@]}; do
       [[ "$node" == "$LOCALHOST" ]] && { ssh='('; ssh_close=')'; } \
@@ -345,8 +351,8 @@ vol_exists $VOLNAME $FIRST_NODE && {
 parse_brkmnts || exit 1
 
 echo
-echo "*** NODES=${NODES[@]}"
-echo "*** BRKMNTS=${BRKMNTS[@]}"
+echo "*** Nodes       : ${NODES[@]}"
+echo "*** Brick mounts: ${BRKMNTS[@]}"
 echo
 
 # verify that each node is prepped for hadoop workloads

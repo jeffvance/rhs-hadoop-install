@@ -106,6 +106,7 @@ function parse_cmd() {
   [[ -z "$VOLNAME" ]] && {
     echo "Syntax error: volume name is required";
     ((errcnt++)); }
+
   [[ -z "$YARN_NODE" ]] && {
     echo "Syntax error: the yarn-master node is required";
     ((errcnt++)); }
@@ -115,7 +116,7 @@ function parse_cmd() {
 }
 
 # setup_nodes: setup each node for hadoop workloads by invoking
-# bin/setup_datanodes.sh. Returns 1 on errors.
+# setup_datanodes.sh. Returns 1 on errors.
 # Uses globals:
 #   BLKDEVS
 #   BRKMNTS
@@ -137,9 +138,7 @@ function setup_nodes() {
 				       { ssh="ssh $node"; scp='scp'; }
       eval "$scp -r -q $PREFIX/bin $node:/tmp"
       eval "$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
-		--brkmnt $brkmnt \
-		--yarn-master $YARN_NODE \
-		--hadoop-mgmt-node $MGMT_NODE"
+		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE"
       err=$?
       if (( err != 0 )) ; then
         echo "ERROR $err: setup_datanode failed on $node"
@@ -148,6 +147,9 @@ function setup_nodes() {
       fi
       ((i++))
   done
+
+  # setup yarn-master node
+xxx
 
   if (( errcnt > 0 )) ; then
     echo "$errcnt setup node errors on nodes: $errnodes"
@@ -168,19 +170,25 @@ function setup_nodes() {
 #   VOLNAME
 function chk_and_fix_nodes() {
 
+  local errcnt=0
+
   # verify that the volume is setup for hadoop workload and potentially fix
-  if ! $PREFIX/bin/check_vol.sh -n $RHS_NODE $VOLNAME ; then # problems
+  if ! $PREFIX/bin/check_vol.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME ;
+  then # problems
     echo
-    echo "One or more nodes spanned by $VOLNAME has issues"
+    echo "Nodes spanned by $VOLNAME and/or the YARN-master node have issues"
     if (( AUTO_YES )) || yesno "  Correct above issues? [y|N] " ; then
       echo
-      setup_nodes || return 1
-      $PREFIX/bin/set_vol_perf.sh -n $RHS_NODE $VOLNAME || return 1
+      setup_nodes || ((errcnt++))
+      $PREFIX/bin/set_vol_perf.sh -n $RHS_NODE $VOLNAME || ((errcnt++))
+      $PREFIX/bin/setup_yarn.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME || \
+	((errcnt++))
     else
-      return 1
+      ((errcnt++))
     fi
   fi
 
+  (( errcnt > 0 )) && return 1
   return 0
 }
 
@@ -247,9 +255,11 @@ BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh -xn $RHS_NODE $VOLNAME))
 BLKDEVS=($($PREFIX/bin/find_blocks.sh -xn $RHS_NODE $VOLNAME))
 
 echo
-echo "*** NODES=${NODES[@]}"
-echo "*** BRKMNTS=${BRKMNTS[@]}"
-echo "*** BLKDEVS=${BLKDEVS[@]}"
+echo "*** Nodes             : ${NODES[@]}"
+echo "*** Brick mounts      : ${BRKMNTS[@]}"
+echo "*** Block devices     : ${BLKDEVS[@]}"
+echo "*** Ambari mgmt node  : $MGMT_NODE"
+echo "*** Yarn-master server: $YARN_NODE"
 echo
 
 # verify nodes spanned by the volume are ready for hadoop workloads, and if

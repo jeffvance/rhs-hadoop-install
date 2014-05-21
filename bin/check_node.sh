@@ -111,13 +111,13 @@ function check_open_ports() {
       port=${port/-/:} # use iptables range syntax
       # live check
       if ! iptables -n -L | grep -qs -E "^ACCEPT *$proto .*:$port"; then
-	(( ! QUIET )) && echo "WARN on $NODE: iptables: port(s) $port not open"
-	((warncnt++))
+	echo "ERROR on $NODE: iptables: port(s) $port not open"
+	((errcnt++))
       fi
       # file check
       if ! grep -qs -E "^-A .* -p $proto .* $port .*ACCEPT" $iptables_conf; then
 	(( ! QUIET )) && \
-	  echo "WARN on $NODE: $iptables_conf: port(s) $port not open"
+	  echo "WARN on $NODE: $iptables_conf file: port(s) $port not accepted"
 	((warncnt++))
       fi
   done

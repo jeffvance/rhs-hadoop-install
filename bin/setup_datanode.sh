@@ -7,8 +7,6 @@
 # Syntax:
 #  --blkdev: block dev path(s) (optional), skip xfs and blk-mnts if missing
 #  --brkmnt: brick mnt path(s) (optional), skip xfs and blk-mnts if missing
-#  --yarn-master: hostname or ip of the yarn-master server (expected to be out-
-#       side of the storage pool) (required)
 #  --hadoop-mgmt-node: hostname or ip of the hadoop mgmt server (expected to
 #       be outside of the storage pool) (required)
 #  -q, if specified, means only set the exit code, do not output anything
@@ -26,12 +24,11 @@ source $PREFIX/functions
 #   BLKDEV()
 #   BRICKMNT()
 #   MGMT_NODE
-#   YARN_NODE
 #   QUIET
 function parse_cmd() {
 
   local opts='q'
-  local long_opts='blkdev:,brkmnt:,yarn-master:,hadoop-mgmt-node:'
+  local long_opts='blkdev:,brkmnt:,hadoop-mgmt-node:'
   local errcnt=0
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
@@ -54,9 +51,6 @@ function parse_cmd() {
         --hadoop-mgmt-node)
           MGMT_NODE="$2"; shift 2; continue
         ;;
-        --yarn-master)
-          YARN_NODE="$2"; shift 2; continue
-        ;;
         --)
           shift; break
         ;;
@@ -64,8 +58,8 @@ function parse_cmd() {
   done
 
   # check required args
-  [[ -z "$YARN_NODE" || -z "$MGMT_NODE" ]] && {
-    echo "Syntax error: both yarn-master and hadoop-mgmt-node are required";
+  [[ -z "$MGMT_NODE" ]] && {
+    echo "Syntax error: hadoop-mgmt-node is required";
     ((errcnt++)); }
 
   # convert list of 1 or more blkdevs and brkmnts to arrays

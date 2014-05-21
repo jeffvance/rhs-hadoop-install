@@ -17,26 +17,24 @@
 # Note: cannot return -1, just in case you were wondering...
 function chk_mnt() {
 
-  local opts="$1"; local errcnt=0; local warncnt=0
+  local node="$1"; local opts="$2"
+  local errcnt=0; local warncnt=0; local mnt
 
-  if ! grep -wq acl <<<$opts; then
-    (( ! QUIET )) && echo "WARN: missing acl mount option"
-    ((warncnt++))
-  fi
-  if ! grep -wq "use-readdirp=no" <<<$opts; then
-    echo "ERROR: use-readdirp must be set to 'no'"
-    ((errcnt++))
-  fi
-  if ! grep -wq "attribute-timeout=0" <<<$opts; then
-    echo "ERROR: attribute-timeout must be set to zero"
-    ((errcnt++))
-  fi
-  if ! grep -wq "entry-timeout=0" <<<$opts; then
-    echo "ERROR: entry-timeout must be set to zero"
-    ((errcnt++))
-  fi
+  for mnt in $REQ_MNT_OPTS; do
+      if ! grep -q "$mnt" <<<$opts; then
+	echo "ERROR on $node: required gluster mount option $mnt must be set"
+	((errcnt++))
+      fi
+  done
 
-  (( errcnt > 0 ))  && return 1 # 1 or more errors
+  for mnt in $OPT_MNT_OPTS; do
+      if ! grep -q "$mnt" <<<$opts; then
+	echo "WARN on $node: recommended gluster mount option $mnt can be set"
+	((warncnt++))
+      fi
+  done
+
+  (( errcnt > 0  )) && return 1 # 1 or more errors
   (( warncnt > 0 )) && return 2 # 1 or more warnings
   return 0
 }
@@ -50,15 +48,14 @@ function check_vol_mnt_attrs() {
   local rc; local errcnt=0; local warncnt=0; local cnt; local mntopts
 
   # live check
-  mntopts="$(ssh $node "
-	ps -ef | grep 'glusterfs --.*$VOLNAME' | grep -v grep")"
+  mntopts="$(ssh $node "ps -ef | grep 'glusterfs --.*$VOLNAME' | grep -v grep")"
   mntopts=${mntopts#*glusterfs} # just the opts
-  chk_mnt "$mntopts"
+  chk_mnt $node "$mntopts"
   rc=$?
   (( rc == 1 )) && ((errcnt++)) || (( rc == 2 )) && ((warncnt++))
 
   # fstab check
-  cnt=$(ssh $node grep -c $VOLNAME /etc/fstab)
+  cnt=$(ssh $node "grep -c '$node:/$VOLNAME.* glusterfs ' /etc/fstab")
   if (( cnt == 0 )) ; then
     echo "ERROR: $VOLNAME mount missing in /etc/fstab"
     ((errcnt++))
@@ -66,9 +63,9 @@ function check_vol_mnt_attrs() {
     echo "ERROR: $VOLNAME appears more than once in /etc/fstab"
     ((errcnt++))
   else # cnt == 1
-    mntopts="$(ssh $node grep -w $VOLNAME /etc/fstab)"
+    mntopts="$(ssh $node "grep '$node:/$VOLNAME.* glusterfs ' /etc/fstab")"
     mntopts=${mntopts#* glusterfs }
-    chk_mnt "$mntopts"
+    chk_mnt $node "$mntopts"
     rc=$?
     (( rc == 1 )) && ((errcnt++)) || (( rc == 2 )) && ((warncnt++))
   fi
@@ -85,6 +82,10 @@ function check_vol_mnt_attrs() {
 errcnt=0; cnt=0
 PREFIX="$(dirname $(readlink -f $0))"
 QUIET=0 # false (meaning not quiet)
+REQ_MNT_OPTS="$($PREFIX/gen_req_gluster_mnt.sh)" # required mnt opts
+OPT_MNT_OPTS="$($PREFIX/gen_opt_gluster_mnt.sh)" # optional mnt opts
+REQ_MNT_OPTS="${REQ_MNT_OPTS//,/ }" # subst spaces for commas
+OPT_MNT_OPTS="${OPT_MNT_OPTS//,/ }" # subst spaces for commas
 
 # parse cmd opts
 while getopts ':qn:' opt; do

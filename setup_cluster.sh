@@ -251,8 +251,7 @@ function setup_nodes() {
     eval "$scp -r -q $PREFIX/bin $node:/tmp"
     out="$(eval "
 	$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
-		--brkmnt $brkmnt --yarn-master $YARN_NODE \
-		--hadoop-mgmt-node $MGMT_NODE
+		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE
  	")"
     err=$?
     echo "setup_datanode for $node: $out"
@@ -437,14 +436,14 @@ FIRST_NODE=${NODES[0]}
 check_ssh ${NODES[@]} || exit 1
 
 echo
-echo "*** NODES    : ${NODES[@]}"
-echo "*** BRKMNTS  :"
+echo "*** Nodes             : ${NODES[@]}"
+echo "*** Brick mounts      :"
 for node in ${NODES[@]}; do
-    echo "      $node: ${NODE_BRKMNTS[$node]}"
+    echo "      $node         : ${NODE_BRKMNTS[$node]}"
 done
-echo "*** BLKDEVS  :"
+echo "*** Block devices     :"
 for node in ${NODES[@]}; do
-    echo "      $node: ${NODE_BLKDEVS[$node]}"
+    echo "      $node         : ${NODE_BLKDEVS[$node]}"
 done
 echo "*** Ambari mgmt node  : $MGMT_NODE"
 echo "*** Yarn-master server: $YARN_NODE"
