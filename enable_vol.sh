@@ -153,10 +153,11 @@ function setup_nodes() {
   return 0
 }
 
-# chk_and_fix_nodes: calls check_vol.sh to verify that VOLNAME has been setup
-# for hadoop workloads, including each node spanned by the volume. If setup
-# issues are detected then the user is optionally prompted to fix the problems.
-# Returns 1 for errors.
+# chk_and_fix_nodes: the is the first opportunity to setup the yarn-master 
+# server because we need both the yarn-master node and a volume. Next, check_vol
+# is called to verify that VOLNAME has been setup for hadoop workloads, including
+# each node spanned by the volume. If setup issues are detected then the user is
+# optionally prompted to fix the problems. Returns 1 for errors.
 # Uses globals:
 #   AUTO_YES
 #   PREFIX
@@ -165,6 +166,9 @@ function setup_nodes() {
 function chk_and_fix_nodes() {
 
   local errcnt=0
+
+  # setup the yarn-master node
+  $PREFIX/bin/setup_yarn.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME || ((errcnt++))
 
   # verify that the volume is setup for hadoop workload and potentially fix
   if ! $PREFIX/bin/check_vol.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME ;
@@ -175,8 +179,6 @@ function chk_and_fix_nodes() {
       echo
       setup_nodes || ((errcnt++))
       $PREFIX/bin/set_vol_perf.sh -n $RHS_NODE $VOLNAME || ((errcnt++))
-      $PREFIX/bin/setup_yarn.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME || \
-	((errcnt++))
     else
       ((errcnt++))
     fi
