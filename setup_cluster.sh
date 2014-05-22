@@ -10,9 +10,15 @@
 #
 # setup_cluster.sh accepts a list of nodes:brick-mnts:block-devs, along with
 # the name of the yarn-master and hadoop-mgmt servers, and creates a new trusted
-# pool with each node in the node-list setup as a storage/data node. The yarn
-# and mgmt nodes are expected to be outside of the pool, and not to be the same
-# server; however these recommendations are not enforced by the script.
+# pool with each node in the node-list setup as a storage/data node. If the pool
+# already exists then the supplied nodes are setup anyway as a verification step.
+# The yarn and mgmt nodes are expected to be outside of the pool, and not to be
+# the same server; however these recommendations are not enforced by the script.
+#
+# Before any steps can be performed the user-created repo file is copied to all
+# nodes provided (including the yarn-master and management nodes), and a yum
+# install is done to install the rhs-hadoop plugin and the rhs-hadoop-install
+# installer. That is how this script become available.
 #
 # On each node the blk-device is setup as an xfs file system and mounted to the
 # brick mount dir, ntp config is verified, required gluster & ambari ports are
@@ -26,7 +32,7 @@
 # have the agent installed. Last, the ambari-server is installed and started on
 # the mgmt-node.
 #
-# Tasks related to volumes or ambari setup are not done here.
+# Tasks related to volumes and/or ambari setup are not done here.
 #
 # See usage() for syntax.
 
@@ -220,6 +226,65 @@ function parse_nodes_brkmnts_blkdevs() {
   return 0
 }
 
+# install_repo: copies the repo file expected to be on the install-from node
+# (localhost) to all storage nodes and to the yarn-master and ambari mgmt nodes,
+# and yum installs the packages. Returns 1 for errors.
+# Uses globals:
+#   MGMT_NODE
+#   NODES
+#   YARN_NODE
+function install_repo() {
+
+  local node; local errcnt=0
+  local repo_file='/etc/yum.repos.d/rhs-hadoop.repo'
+
+  # nested function copies to and installs package on the passed-in node.
+  # Returns 1 on errors.
+  function cp_install() {
+
+    local node="$1"; local err
+
+    # copy repo file to node
+    out="$(scp $repo_file $node:$repo_file)"
+    err=$?
+    if (( err != 0 )) ; then
+      echo "ERROR $err: coping $file to $node: $out"
+      return 1
+    fi
+
+    # yum install package
+    out="$(ssh $node 'yum install -y --nogpgcheck rhs-hadoop')"
+    err=$?
+    if (( err != 0 )) ; then
+      echo "ERROR $err: yum installing $file on $node: $out"
+      return 1
+    fi
+    return 0
+  }
+
+  ## main ##
+
+  [[ ! -f "$repo_file" ]] && {
+    echo "ERROR: $repo_file is missing. Cannot install rhs-hadoop package on other nodes";
+    return 1; }
+
+  for node in ${NODES[@]}; do # all storage nodes
+      [[ "$node" == "$HOSTNAME" ]] && continue # skip self (localhost)
+      cp_install $node || ((errcnt++))
+  done
+
+  # install on yarn-master and mgmt nodes
+  if [[ "$YARN_NODE" != "$HOSTNAME" ]] ; then
+     cp_install $YARN_NODE || ((errcnt++))
+  fi
+  if [[ "$MGMT_NODE" != "$HOSTNAME" ]] ; then
+    cp_install $MGMT_NODE || ((errcnt++))
+  fi
+
+  (( errcnt > 0 )) && return 1
+  return 0
+}
+
 # setup_nodes: setup each node for hadoop workloads by invoking bin/
 # setup_datanodes.sh, which is also run for the yarn-master node if it is
 # outside of the storage pool. Note: if the hadoop mgmt-node is outside of the
@@ -246,7 +311,7 @@ function setup_nodes() {
     local out; local err; local ssh; local scp
 
     [[ "$node" == "$HOSTNAME" ]] && { ssh=''; scp='#'; } || \
-                                     { ssh="ssh $node"; scp='scp'; }
+                                    { ssh="ssh $node"; scp='scp'; }
     eval "$scp -r -q $PREFIX/bin $node:/tmp"
     out="$(eval "
 	$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
@@ -450,6 +515,9 @@ define_pool ${NODES[@]} || exit 1
 
 # prompt to continue before any changes are made...
 (( ! AUTO_YES )) && ! yesno "  Continue? [y|N] " && exit 0
+
+# distribute and install the rhs-hadoop repo file to all nodes
+install_repo || exit 1
 
 # setup each node for hadoop workloads
 setup_nodes || exit 1
