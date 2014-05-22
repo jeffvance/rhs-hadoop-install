@@ -157,12 +157,12 @@ function restartService() {
 
   local service
 
-  for service in MAPREDUCE2 YARN HDFS ; do
+  for service in MAPREDUCE2 YARN GLUSTERFS ; do
       $PREFIX/ambari_service.sh -u $USERID -p $PASSWD --port $PORT \
 	  -h $AMBARI_HOST --action stop $service
   done
   
-  for service in HDFS MAPREDUCE2 YARN ; do
+  for service in GLUSTERFS MAPREDUCE2 YARN ; do
       $PREFIX/ambari_service.sh -u $USERID -p $PASSWD --port $PORT \
 	  -h $AMBARI_HOST --action start $service
   done
