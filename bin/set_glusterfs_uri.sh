@@ -153,9 +153,7 @@ function currentClusterName () {
 }
 
 function restartService() {
-### Subin: does the order of the services below matter???
-###        If not then why not combine the 2 for loops?
-###
+# Note: the order of the services in both for loops below matters.
 
   local service
 
