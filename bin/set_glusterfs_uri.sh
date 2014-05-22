@@ -13,7 +13,7 @@ PARAMS=''
 AMBARI_HOST='localhost'
 VOLNAME=''
 CLUSTER_NAME=""
-
+GLUSTERMOUNT=""
 # debug: execute cmd in $1 if _DEBUG is set to 'on'.
 # Uses globals:
 #   _DEBUG
@@ -152,6 +152,46 @@ function currentClusterName () {
   fi 
 }
 
+# currentMount: get the fs.glusterfs.mount value
+# config file. Returns 1 on errors.
+# Set globals:
+#   GLUSTERMOUNT
+function currentMount () {
+
+  local line1; local propLen; local lastChar
+  local key; local value; local keyvalue=()
+  local glustermount=""
+  glustermount=$($PREFIX/ambari_config_grep.sh fs.glusterfs.mount)
+
+  if [[ -z "$glustermount" ]]; then
+    echo "ERROR: fs.glusterfs.mount was not found in server response."
+    return 1
+  fi
+
+  debug echo "########## LINE = "$glustermount
+
+  line1="$glustermount"
+  propLen=${#line1}
+  lastChar=${line1:$propLen-1:1}
+  [[ "$lastChar" == "," ]] && line1=${line1:0:$propLen-1}
+
+  OIFS="$IFS"
+  IFS=':'
+  read -a keyvalue <<< "$line1"
+  IFS="$OIFS"
+  key=${keyvalue[0]}
+  value="${keyvalue[1]}"
+
+  value=$(echo "$value" | sed "s/[\"\,\ ]//g")
+  debug echo "########## VALUE = "$value
+  if [[ ! -z "$value" ]]; then   
+    GLUSTERMOUNT="$value"
+  else
+    echo "ERROR: fs.glusterfs.mount not found"
+    return 1
+  fi 
+}
+
 function restartService() {
 # Note: the order of the services in both for loops below matters.
 
@@ -194,7 +234,10 @@ CONFIG_UPDATE_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST --config
 debug echo "ambari_config_update.sh $CONFIG_UPDATE_PARAM" 
 $PREFIX/ambari_config_update.sh "$CONFIG_UPDATE_PARAM" 
 
-CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT set $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME /mnt/$VOLNAME"
+currentMount
+debug echo "########## GLUSTERMOUNT = "$GLUSTERMOUNT
+
+CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT set $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME $GLUSTERMOUNT/$VOLNAME"
 debug echo "ambari_config.sh $CONFIG_SET_PARAM"
 $PREFIX/ambari_config.sh $CONFIG_SET_PARAM
 restartService
