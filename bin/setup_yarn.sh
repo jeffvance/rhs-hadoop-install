@@ -33,7 +33,7 @@ function set_yarn() {
 	    echo $RHS_NODE:/$VOLNAME $volmnt nfs $mntopts 0 0 >>/etc/fstab
 	  fi
 	  # always attempt to create the dir and mount the vol
-	  mkdir -p $volmnt
+	  mkdir -p $volmnt 2>&1
 	  mount $volmnt 2>&1 # mount via fstab, exit with mount returncode
 	$ssh_close
       ")"
