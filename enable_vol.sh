@@ -191,17 +191,18 @@ function chk_and_fix_nodes() {
 #   VOLNAME
 function edit_core_site() {
 
-  local mgmt_node; local mgmt_u; local mgmt_p; local mgmt_port
+  local mgmt_u; local mgmt_p; local mgmt_port
 
   echo "Enable $VOLNAME in all core-site.xml files..."
 
-  [[ -n "$MGMT_NODE" ]] && mgmt_node="-h $MGMT_NODE"
   [[ -n "$MGMT_USER" ]] && mgmt_u="-u $MGMT_USER"
   [[ -n "$MGMT_PASS" ]] && mgmt_p="-p $MGMT_PASS"
   [[ -n "$MGMT_PORT" ]] && mgmt_port="--port $MGMT_PORT"
 
-  $PREFIX/bin/set_glusterfs_uri.sh $mgmt_node $mgmt_u $mgmt_p $mgmt_port \
-	 $VOLNAME || exit 1
+  $PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE $mgmt_u $mgmt_p $mgmt_port \
+	 $VOLNAME || return 1
+
+  return 0
 }
 
 
