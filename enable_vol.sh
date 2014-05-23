@@ -217,7 +217,7 @@ echo '***'
 
 parse_cmd $@ || exit -1
 
-default_opts MGMT_NODE 'management' YARN_NODE 'yarn-master' \
+default_nodes MGMT_NODE 'management' YARN_NODE 'yarn-master' \
 	RHS_NODE 'RHS storage' || exit -1
 
 vol_exists $VOLNAME $RHS_NODE || {
