@@ -47,8 +47,9 @@ for setting in ${!VOL_SETTINGS[@]}; do
     cmd+="gluster volume set $VOLNAME $setting $val; "
 done
 
-[[ "$rhs_node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $rhs_node"
-out="$(eval "$ssh '$cmd'")"
+[[ "$rhs_node" == "$HOSTNAME" ]] && { ssh=''; ssh_close=''; } \
+                                 || { ssh="ssh $rhs_node '"; ssh_close="'"; }
+out="$(eval "$ssh $cmd $ssh_close")"
 err=$?
 (( ! QUIET )) && echo "$setting $val: $out"
 ((errcnt+=err))
