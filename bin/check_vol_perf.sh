@@ -6,10 +6,8 @@
 #   $1=Volume name
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
-#   -q=only set the exit code, do not output anything
 
 warncnt=0
-QUIET=0 # false (meaning not quiet)
 VOLINFO_TMPFILE="$(mktemp --suffix '.volinfo')"
 LAST_N=3 # tail records containing vol settings (vol info cmd)
 TAG='Options Reconfigured:'
@@ -21,14 +19,11 @@ source $PREFIX/functions # need vol_exists()
 declare -A EXPCT_SETTINGS=$($PREFIX/gen_vol_perf_settings.sh)
 
 # parse cmd opts
-while getopts ':qn:' opt; do
+while getopts ':n:' opt; do
     case "$opt" in
       n)
         rhs_node="$OPTARG"
         ;;
-      q)
-	QUIET=1 # true
-	;;
       \?) # invalid option
 	;;
     esac
@@ -64,12 +59,11 @@ for setting in $out ; do
     k=${setting%:*} # strip off the value part
     v=${setting#*:} # strip off the key part
     if [[ "$v" != "${EXPCT_SETTINGS[$k]}" ]] ; then
-      (( ! QUIET )) && \
-	echo "WARN: $k set to \"$v\", expect \"${EXPCT_SETTINGS[$k]}\""
+      echo "WARN: $k set to \"$v\", expect \"${EXPCT_SETTINGS[$k]}\""
       ((warncnt++))
     fi
 done
 
 (( warncnt > 0 )) && exit 0 # no errors, just warnings
-(( ! QUIET )) && echo "All $VOLNAME performance settings are correct"
+echo "All $VOLNAME performance settings are correct"
 exit 0

@@ -9,7 +9,6 @@
 
 errcnt=0
 PREFIX="$(dirname $(readlink -f $0))"
-QUIET=0 # false (meaning not quiet)
 
 source $PREFIX/functions # need vol_exists()
 
@@ -17,13 +16,10 @@ source $PREFIX/functions # need vol_exists()
 declare -A VOL_SETTINGS=$($PREFIX/gen_vol_perf_settings.sh)
 
 # parse cmd opts
-while getopts ':qn:' opt; do
+while getopts ':n:' opt; do
     case "$opt" in
       n)
         rhs_node="$OPTARG"
-        ;;
-      q)
-        QUIET=1 # true
         ;;
       \?) # invalid option
         ;;
@@ -48,12 +44,12 @@ for setting in ${!VOL_SETTINGS[@]}; do
 done
 
 [[ "$rhs_node" == "$HOSTNAME" ]] && { ssh=''; ssh_close=''; } \
-                                 || { ssh="ssh $rhs_node '"; ssh_close="'"; }
+				 || { ssh="ssh $rhs_node '"; ssh_close="'"; }
 out="$(eval "$ssh $cmd $ssh_close")"
 err=$?
-(( ! QUIET )) && echo "$setting $val: $out"
+echo "$setting $val: $out"
 ((errcnt+=err))
 
 (( errcnt > 0 )) && exit 1
-(( ! QUIET )) && echo "${#VOL_SETTINGS[@]} volume settings successfully set"
+echo "${#VOL_SETTINGS[@]} volume settings successfully set"
 exit 0

@@ -10,21 +10,16 @@
 # Syntax:
 #  $1=distributed gluster mount (single) or brick mount(s) (per-node) path 
 #     (required).
-#  -q=only set the exit code, do not output anything.
 #  -d=output only the distributed dirs, skip local dirs.
 #  -l=output only the local dirs, skip distributed dirs.
 
 errcnt=0; cnt=0
 HADOOP_G='hadoop'
 PREFIX="$(dirname $(readlink -f $0))"
-QUIET=0 # false (meaning not quiet)
 
 # parse cmd opts
-while getopts ':qdl' opt; do
+while getopts ':dl' opt; do
     case "$opt" in
-      q)
-        QUIET=1 # true
-        ;;
       d) # only distributed dirs
         DIST=true # else, undefined
         ;;
@@ -71,16 +66,15 @@ for dir in $MNT; do # to handle a list of local mounts
 	err=$?
 
 	if (( err == 0 )) ; then
-	  (( ! QUIET )) && echo "$path created/updated with perms $perm"
+	  echo "$path created/updated with perms $perm"
 	  ((cnt++))
 	else
-	  (( ! QUIET )) && \
-	    echo "$(hostname): creation of path $path failed with error $err"
+	  echo "$(hostname): creation of path $path failed with error $err"
 	  ((errcnt++))
 	fi
     done
 done
 
 (( errcnt > 0 )) && exit 1
-(( ! QUIET )) && echo "$cnt new Hadoop directories added/updated"
+echo "$cnt new Hadoop directories added/updated"
 exit 0

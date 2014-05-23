@@ -5,10 +5,8 @@
 # checks. So, we check: ntp config, required gluster and ambari ports being
 # open, ambari agent running, selinux not enabled, hadoop users and local hadoop
 # directories exist.
-#
 # Syntax:
 #  $1= xfs brick mount directory path including the volume name
-#  -q, if specified, means only set the exit code, do not output anything
 
 ## functions ##
 
@@ -31,8 +29,7 @@ function check_ambari_agent() {
   fi
 
   (( errcnt > 0 )) && return 1
-  (( ! QUIET )) && \
-    echo "ambari-agent is running on $NODE with $warncnt warnings"
+  echo "ambari-agent is running on $NODE with $warncnt warnings"
   return 0
 }
 
@@ -47,22 +44,20 @@ function check_brick_mount() {
 
   out="$(xfs_info $BRICKMNT 2>&1)"
   err=$?
-  (( ! QUIET )) && echo "xfs_info on $BRICKMNT: $out"
+  echo "xfs_info on $BRICKMNT: $out"
   if (( err != 0 )) ; then
     echo "ERROR $err: $out"
     ((errcnt++))
   else
     out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
     if (( out != isize )) ; then
-      (( ! QUIET )) && \
-	echo "WARN: xfs size on $BRICKMNT expected to be $isize; found $out"
+      echo "WARN: xfs size on $BRICKMNT expected to be $isize; found $out"
 	((warncnt++))
     fi
   fi
 
   (( errcnt > 0 )) && return 1
-  (( ! QUIET )) && \
-    echo "xfs brick mount setup correctly on $NODE with $warncnt warnings"
+  echo "xfs brick mount setup correctly on $NODE with $warncnt warnings"
   return 0
 }
 
@@ -79,7 +74,7 @@ function check_dirs() {
       owner=${tuple##*:}
 
       if [[ ! -d $dir ]] ; then
-	(( ! QUIET )) && echo "ERROR: $dir is missing on $NODE"
+	echo "ERROR: $dir is missing on $NODE"
 	((errcnt++))
 	continue # next dir
       fi
@@ -88,19 +83,18 @@ function check_dirs() {
       out="$(stat -c %a $dir)"
       [[ ${#out} == 3 ]] && out="0$out"; # leading 0
       if [[ $out != $perm ]] ; then
-	(( ! QUIET )) && echo "WARN: $dir perms are $out, expected to be: $perm"
+	echo "WARN: $dir perms are $out, expected to be: $perm"
 	((warncnt++))
       fi
       out="$(stat -c %U $dir)"
       if [[ $out != $owner ]] ; then
-	(( ! QUIET )) && echo "WARN: $dir owner is $out, expected to be: $owner"
+	echo "WARN: $dir owner is $out, expected to be: $owner"
 	((warncnt++))
       fi
   done
 
   (( errcnt > 0 )) && return 1
-  (( ! QUIET )) && \
-    echo "all required dirs present on $NODE with $warncnt warnings"
+  echo "all required dirs present on $NODE with $warncnt warnings"
   return 0
 }
 
@@ -123,15 +117,13 @@ function check_open_ports() {
       fi
       # file check
       if ! grep -qs -E "^-A .* -p $proto .* $port .*ACCEPT" $iptables_conf; then
-	(( ! QUIET )) && \
-	  echo "WARN on $NODE: $iptables_conf file: port(s) $port not accepted"
+	echo "WARN on $NODE: $iptables_conf file: port(s) $port not accepted"
 	((warncnt++))
       fi
   done
 
   (( errcnt > 0 )) && return 1
-  (( ! QUIET )) && \
-    echo "all required ports are open on $NODE with $warncnt warnings"
+  echo "all required ports are open on $NODE with $warncnt warnings"
   return 0
 }
 
@@ -163,7 +155,7 @@ function validate_ntp_conf(){
   fi
 
   (( errcnt > 0 )) && return 1
-  (( ! QUIET )) && echo "NTP time-server $timeserver is acceptable"
+  echo "NTP time-server $timeserver is acceptable"
   return 0
 }
 
@@ -178,7 +170,7 @@ function check_ntp() {
   # is ntpd configured to run on reboot?
   chkconfig ntpd 
   if (( $? != 0 )); then
-    (( ! QUIET )) && echo "WARN: ntpd not configured to run on reboot"
+    echo "WARN: ntpd not configured to run on reboot"
     ((warncnt++))
   fi
 
@@ -190,7 +182,7 @@ function check_ntp() {
   fi
 
   (( errcnt > 0 )) && return 1
-  (( ! QUIET )) && echo "ntpd is running on $NODE with $warncnt warnings"
+  echo "ntpd is running on $NODE with $warncnt warnings"
   return 0
 }
 
@@ -201,12 +193,12 @@ function check_selinux() {
 
   # report selinux state
   out=$(sestatus | head -n 1 | awk '{print $3}') # enforcing, permissive
-  (( ! QUIET )) && echo "selinux on $NODE is set to: $out"
+  echo "selinux on $NODE is set to: $out"
  
   [[ "$out" == 'enabled' ]] && ((errcnt++))
 
   (( errcnt > 0 )) && return 1
-  (( ! QUIET )) && echo "selinux configured correctly on $NODE"
+  echo "selinux configured correctly on $NODE"
   return 0
 }
 
@@ -223,8 +215,7 @@ function check_users() {
   done
 
   (( errcnt > 0 )) && return 1
-  (( ! QUIET )) && \
-    echo "all required users present on $NODE with $warncnt warnings"
+  echo "all required users present on $NODE with $warncnt warnings"
   return 0
 }
 
@@ -240,22 +231,21 @@ function check_xfs() {
   else
     out="$(xfs_info $BRICKMNT 2>&1)"
     err=$?
-    (( ! QUIET )) && echo "xfs_info on $BRICKMNT: $out"
+    echo "xfs_info on $BRICKMNT: $out"
     if (( err != 0 )) ; then
       echo "ERROR $err: $out"
       ((errcnt++))
     else
       out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
       if (( out != $isize )) ; then
-        (( ! QUIET )) && \
-	  echo "WARN: xfs for $BRICKMNT on $NODE expected to be $isize in size; instead sized at $out"
+        echo "WARN: xfs for $BRICKMNT on $NODE expected to be $isize in size; instead sized at $out"
 	((warncnt++))
       fi
     fi
   fi
 
   (( errcnt > 0 )) && return 1
-  (( ! QUIET )) && echo "xfs setup correctly on $NODE with $warncnt warnings"
+  echo "xfs setup correctly on $NODE with $warncnt warnings"
   return 0
 }
 
@@ -265,20 +255,6 @@ function check_xfs() {
 errcnt=0
 PREFIX="$(dirname $(readlink -f $0))"
 NODE="$HOSTNAME"
-QUIET=0 # false (meaning not quiet)
-
-# parse cmd opts
-while getopts ':q' opt; do
-    case "$opt" in
-      q)
-        QUIET=1 # true
-        ;;
-      \?) # invalid option
-        ;;
-    esac
-done
-shift $((OPTIND-1))
-
 BRICKMNT="$1" # includes the vol name in path
 [[ -z "$BRICKMNT" ]] && {
   echo "Syntax error: xfs brick mount path is required";

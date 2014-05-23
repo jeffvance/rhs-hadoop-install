@@ -10,23 +10,18 @@
 #   -y=yarn-master node (required).
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
-#   -q=only set the exit code, do not output anything.
 
 errcnt=0; q=''
 PREFIX="$(dirname $(readlink -f $0))"
-QUIET=0 # false (meaning not quiet)
 
 # parse cmd opts
-while getopts ':qy:n:' opt; do
+while getopts ':y:n:' opt; do
     case "$opt" in
       n)
         rhs_node="$OPTARG"
         ;;
       y)
         yarn_node="$OPTARG"
-        ;;
-      q)
-        QUIET=1 # true
         ;;
       \?) # invalid option
         ;;
@@ -43,7 +38,6 @@ VOLNAME="$1"
   echo "Syntax error: yarn-master node is required";
   exit -1; }
 
-(( QUIET )) && q='-q'
 [[ -n "$rhs_node" ]] && rhs_node="-n $rhs_node" || rhs_node=''
 
 NODES=''
@@ -51,13 +45,13 @@ for brick in $($PREFIX/find_brick_mnts.sh $rhs_node $VOLNAME); do
     node=${brick%:*}; NODES+="$node "
     brkmnt=${brick#*:}
     [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
-    eval "$ssh /tmp/bin/check_node.sh $q $brkmnt" || ((errcnt++))
+    eval "$ssh /tmp/bin/check_node.sh $brkmnt" || ((errcnt++))
 done
 
-$PREFIX/check_vol_mount.sh $q $rhs_node $VOLNAME $NODES || ((errcnt++))
-$PREFIX/check_vol_perf.sh $q $rhs_node $VOLNAME || ((errcnt++))
+$PREFIX/check_vol_mount.sh $rhs_node $VOLNAME $NODES || ((errcnt++))
+$PREFIX/check_vol_perf.sh $rhs_node $VOLNAME || ((errcnt++))
 $PREFIX/check_yarn.sh -y $yarn_node $VOLNAME || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
-(( ! QUIET )) && echo "$VOLNAME is ready for hadoop workloads"
+echo "$VOLNAME is ready for hadoop workloads"
 exit 0

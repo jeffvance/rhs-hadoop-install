@@ -9,7 +9,6 @@
 #  --brkmnt: brick mnt path(s) (optional), skip xfs and blk-mnts if missing.
 #  --hadoop-mgmt-node: hostname or ip of the hadoop mgmt server (expected to
 #       be outside of the storage pool) (optional, default=localhost).
-#  -q: only set the exit code, do not output anything.
 #
 # Note: the blkdev and brkmnt values can be a list of 1 or more paths separated
 #   by a comma (no spaces).
@@ -24,19 +23,14 @@ source $PREFIX/functions
 #   BLKDEV()
 #   BRICKMNT()
 #   MGMT_NODE
-#   QUIET
 function parse_cmd() {
 
-  local opts='q'
   local long_opts='blkdev:,brkmnt:,hadoop-mgmt-node:'
 
-  eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
+  eval set -- "$(getopt -o '' --long $long_opts -- $@)"
 
   while true; do
       case "$1" in
-        -q)
-          QUIET=1; shift; continue # true
-        ;;
         --blkdev) # optional
 	  shift
 	  [[ "${1:0:2}" == '--' ]] && continue # missing option value
@@ -114,7 +108,7 @@ function setup_ambari_agent() {
   if [[ -f $AMBARI_AGENT_PID ]] ; then
     out="$(ambari-agent stop 2>&1)"
     err=$?
-    (( ! QUIET )) && echo "ambari-agent stop: $out"
+    echo "ambari-agent stop: $out"
     if (( err != 0 )) ; then
       echo "WARN $err: couldn't stop ambari agent: $out"
     fi
@@ -123,7 +117,7 @@ function setup_ambari_agent() {
   # install agent
   out="$(yum -y install ambari-agent 2>&1)"
   err=$?
-  (( ! QUIET )) && echo "ambari-agent install: $out"
+  echo "ambari-agent install: $out"
   if (( err != 0 && err != 1 )) ; then # 1--> nothing-to-do
     echo "ERROR $err: ambari-agent install: $out"
     return 1
@@ -140,7 +134,7 @@ function setup_ambari_agent() {
   # start the agent now
   out="$(ambari-agent start 2>&1)"
   err=$?
-  (( ! QUIET )) && echo "ambari-agent start: $out"
+  echo "ambari-agent start: $out"
   if (( err != 0 )) ; then
     echo "ERROR $err: ambari-agent start: $out"
     return 1
@@ -149,7 +143,7 @@ function setup_ambari_agent() {
   # persist the agent after reboot
   out="$(chkconfig ambari-agent on 2>&1)"
   err=$?
-  (( ! QUIET )) && echo "ambari-agent chkconfig on: $out"
+  echo "ambari-agent chkconfig on: $out"
   if (( err != 0 )) ; then
     echo "ERROR $err: ambari-agent chkconfig on: $out"
     return 1
@@ -174,7 +168,7 @@ function setup_iptables() {
 	out="$(iptables -A INPUT -m state --state NEW -m $proto \
 		-p $proto --dport $port -j ACCEPT)"
 	err=$?
-	(( ! QUIET )) && echo "iptables: $out"
+	echo "iptables: $out"
 	if (( err != 0 )) ; then
 	  echo "ERROR $err: iptables port $port: $out"
  	  ((errcnt++))
@@ -185,7 +179,7 @@ function setup_iptables() {
   # save iptables
   out="$(service iptables save)"
   err=$?
-  (( ! QUIET )) && echo "iptables save: $out"
+  echo "iptables save: $out"
   if (( err != 0 )) ; then
     echo "ERROR $err: iptables save: $out"
     ((errcnt++))
@@ -194,7 +188,7 @@ function setup_iptables() {
   # restart iptables
   out="$(service iptables restart)"
   err=$?
-  (( ! QUIET )) && echo "iptables restart: $out"
+  echo "iptables restart: $out"
   if (( err != 0 )) ; then
     echo "ERROR $err: iptables restart: $out"
     ((errcnt++))
@@ -215,11 +209,11 @@ function setup_selinux() {
 
   # set selinux to permissive (audit errors reported but not enforced)
   out="$(setenforce $permissive 2>&1)"
-  (( ! QUIET )) && echo "$out"
+  echo "$out"
 
   # keep selinux permissive on reboots
   if [[ ! -f $conf ]] ; then
-    (( ! QUIET )) && echo "WARN: SELinux config file $conf missing"
+    echo "WARN: SELinux config file $conf missing"
     return # nothing more to do...
   fi
 
@@ -227,7 +221,7 @@ function setup_selinux() {
   out="$(sed -i -e "/^$selinux_key/c\\$selinux_key$permissive" $conf)"
   err=$?
   if (( err != 0 )) ; then
-    (( ! QUIET )) && echo "ERROR $err: setting selinux permissive in $CONF"
+    echo "ERROR $err: setting selinux permissive in $CONF"
     return 1
   fi
 }
@@ -244,7 +238,7 @@ function setup_xfs() {
       if ! xfs_info $blkdev >& /dev/null ; then
 	out="$(mkfs -t xfs -i size=$isize -f $blkdev 2>&1)"
 	err=$?
-	(( ! QUIET )) && echo "mkfs.xfs on $blkdev: $out"
+	echo "mkfs.xfs on $blkdev: $out"
 	if (( err != 0 )) ; then
 	  echo "ERROR $err: mkfs.xfs on $blkdev: $out"
 	  ((errcnt++))
@@ -259,11 +253,9 @@ function setup_xfs() {
 
 ## main ##
 
-QUIET=0 # false (meaning not quiet)
 errcnt=0; q=''
 
 parse_cmd $@ || exit -1
-(( QUIET )) && q='-q'
 
 setup_xfs          || ((errcnt++))
 mount_blkdev       || ((errcnt++))
@@ -271,12 +263,12 @@ setup_selinux      || ((errcnt++))
 setup_iptables     || ((errcnt++))
 setup_ambari_agent || ((errcnt++))
 
-$PREFIX/add_groups.sh $q              || ((errcnt++))
-$PREFIX/add_users.sh $q               || ((errcnt++))
+$PREFIX/add_groups.sh              || ((errcnt++))
+$PREFIX/add_users.sh               || ((errcnt++))
 if [[ -n "$BRICKMNT" ]] ; then # need brick mount prefix
-  $PREFIX/add_dirs.sh -l $q $BRICKMNT || ((errcnt++)) # just local dirs
+  $PREFIX/add_dirs.sh -l $BRICKMNT || ((errcnt++)) # just local dirs
 fi
 
 (( errcnt > 0 )) && exit 1
-(( ! QUIET )) && echo "Node $(hostname) successfully setup"
+echo "Node $(hostname) successfully setup"
 exit 0

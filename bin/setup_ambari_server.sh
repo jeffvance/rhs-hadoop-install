@@ -3,11 +3,8 @@
 # setup_ambari_server.sh installs and starts the ambari-server on this node 
 # (localhost). The active flag is set to true in the meta info xml file. This
 # makes ambari aware of alternative HCFS file systems, like RHS/glusterfs.
-# Syntax:
-#  -q, if specified, means only set the exit code, do not output anything
 
 PREFIX="$(dirname $(readlink -f $0))"
-QUIET=0 # false (meaning not quiet)
 warncnt=0
 AMBARI_SERVER_PID='/var/run/ambari-server/ambari-server.pid'
 METAINFO_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.0.6.GlusterFS/metainfo.xml'
@@ -15,18 +12,6 @@ ACTIVE_FALSE='<active>false<'; ACTIVE_TRUE='<active>true<'
 
 ## functions ##
 source $PREFIX/functions
-
-# parse cmd opts
-while getopts ':q' opt; do
-    case "$opt" in
-      q)
-        QUIET=1 # true
-        ;;
-      \?) # invalid option
-        ;;
-    esac
-done
-shift $((OPTIND-1))
 
 # wget the ambari repo
 get_ambari_repo
@@ -36,12 +21,12 @@ if [[ -f $AMBARI_SERVER_PID ]] ; then
   out="$(ambari-server stop 2>&1)"
   err=$?
   (( err != 0 )) && { \
-    (( ! QUIET )) && echo "WARN $err: couldn't stop ambari server: $out";
+    echo "WARN $err: couldn't stop ambari server: $out";
     ((warncnt++)); }
   out="$(ambari-server reset -s 2>&1)"
   err=$?
   (( err != 0 )) && { \
-    (( ! QUIET )) && echo "WARN $err: couldn't reset ambari server: $out";
+    echo "WARN $err: couldn't reset ambari server: $out";
     ((warncnt++)); }
 fi
 
@@ -77,9 +62,8 @@ fi
 out="$(chkconfig ambari-server on 2>&1)"
 err=$?
 (( err != 0 )) && { \
-  (( ! QUIET )) && echo "WARN $err: chkconfig ambari-server on: $out";
+  echo "WARN $err: chkconfig ambari-server on: $out";
   ((warncnt++)); }
 
-(( ! QUIET )) && \
-  echo "ambari-server installed and running with $warncnt warnings"
+echo "ambari-server installed and running with $warncnt warnings"
 exit 0

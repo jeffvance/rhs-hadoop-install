@@ -9,7 +9,6 @@
 #   $2=optional list of nodes to check
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
-#   -q=only set the exit code, do not output anything
 
 
 # given the passed-in vol mount opts, verify the correct settings. Returns 1 
@@ -71,8 +70,7 @@ function check_vol_mnt_attrs() {
   fi
 
   (( errcnt > 0 )) && return 1
-  (( ! QUIET )) && \
-    echo "$VOLNAME mount setup correctly on $node with $warncnt warnings"
+  echo "$VOLNAME mount setup correctly on $node with $warncnt warnings"
   return 0
 }
 
@@ -81,21 +79,17 @@ function check_vol_mnt_attrs() {
 
 errcnt=0; cnt=0
 PREFIX="$(dirname $(readlink -f $0))"
-QUIET=0 # false (meaning not quiet)
 REQ_MNT_OPTS="$($PREFIX/gen_req_gluster_mnt.sh)" # required mnt opts
 OPT_MNT_OPTS="$($PREFIX/gen_opt_gluster_mnt.sh)" # optional mnt opts
 REQ_MNT_OPTS="${REQ_MNT_OPTS//,/ }" # subst spaces for commas
 OPT_MNT_OPTS="${OPT_MNT_OPTS//,/ }" # subst spaces for commas
 
 # parse cmd opts
-while getopts ':qn:' opt; do
+while getopts ':n:' opt; do
     case "$opt" in
       n)
         rhs_node="$OPTARG"
         ;;
-      q)
-	QUIET=1 # true
-	;;
       \?) # invalid option
 	;;
     esac
@@ -118,6 +112,5 @@ for node in $NODES; do
 done
 
 (( errcnt > 0 )) && exit 1
-(( ! QUIET )) && echo \
-   "The $cnt nodes spanned by $VOLNAME have the correct vol mount settings"
+echo "The $cnt nodes spanned by $VOLNAME have the correct vol mount settings"
 exit 0

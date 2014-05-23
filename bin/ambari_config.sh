@@ -17,8 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-#
-#		NOTE : This File is taken from Apache Ambari Server code
+# NOTE : This File is taken from Apache Ambari Server code
 #
 usage () {
   echo "Usage: configs.sh [-u userId] [-p password] [-port port] <ACTION> <AMBARI_HOST> <CLUSTER_NAME> <CONFIG_TYPE> [CONFIG_FILENAME | CONFIG_KEY [CONFIG_VALUE]]";
