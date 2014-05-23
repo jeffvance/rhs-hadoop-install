@@ -47,7 +47,7 @@ function default_nodes() {
   while (( $# > 0 )) ; do
     varname=$1; node=${!varname}; human_name="$2"
     if [[ -z "$node" ]] ; then # node omitted
-      echo "No $2 node specified therefore the localhost ($HOSTNAME) is assumed"
+      echo "No $human_name node specified therefore the localhost ($HOSTNAME) is assumed"
       (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && return 1
       eval $varname="$HOSTNAME"
     fi
