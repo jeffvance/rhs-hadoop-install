@@ -11,26 +11,8 @@
 PREFIX="$(dirname $(readlink -f $0))"
 errcnt=0
 
-# inside_pool: return 0 if the passed-in node is inside the storage pool, else
-# return 1.
-# Uses globals:
-#   PREFIX
-#   RHS_NODE_OPT
-#   VOLNAME
-function inside_pool() {
-
-  local test_node="$1" # is this node inside the pool?
-  local node
-
-  for node in $($PREFIX/find_nodes.sh -u $RHS_NODE_OPT $VOLNAME); do
-    [[ "$node" == "$test_node" ]] && return 0 # test node is inside pool
-  done
-  return 1 # test node is not inside pool
-}
-
-# set_yarn: if the yarn node does not already have VOLNAME nfs-mounted then
-# append the nfs volume mount to fstab and mount it. 
-# Assumption: the yarn-node is outside of the storage pool.
+# set_yarn: if the yarn node does not already have VOLNAME mounted then
+# append an nfs volume mount to fstab and mount it. 
 # Uses globals:
 #   RHS_NODE
 #   VOLMNT
@@ -47,10 +29,10 @@ function set_yarn() {
   out="$(eval "
   	$ssh
 	  # append to fstab if not present
-	  if ! grep -qs \"$RHS_NODE:/$VOLNAME.* nfs \" /etc/fstab ; then
+	  if ! grep -qs $volmnt /etc/fstab ; then
 	    echo $RHS_NODE:/$VOLNAME $volmnt nfs $mntopts 0 0 >>/etc/fstab
 	  fi
-	  # always attempt to create the dir and mount the vol, ok if not needed
+	  # always attempt to create the dir and mount the vol
 	  mkdir -p $volmnt
 	  mount $volmnt 2>&1 # mount via fstab, exit with mount returncode
 	$ssh_close
@@ -94,11 +76,8 @@ VOLNAME="$1"
 # get volume mount
 VOLMNT="$($PREFIX/find_volmnt.sh $RHS_NODE_OPT $VOLNAME)" # includes volname
 
-# set up the volume nfs mount if the yarn node is outside of the pool. Note: if
-# the yarn node is inside the pool then the gluster-fuse mount will suffice.
-if ! inside_pool $YARN_NODE ; then
-  set_yarn || ((errcnt++))
-fi
+# set up a nfs mount for the volume if it's not already mounted
+set_yarn || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
 echo "$VOLNAME is setup on $YARN_NODE (yarn-master)"

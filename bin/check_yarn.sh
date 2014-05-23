@@ -8,31 +8,32 @@
 
 errcnt=0
 
-# chk_yarn: verify that the nfs mount for VOLNAME has been established on the
-# yarn-master node. This include verifying both the "live" settings, determined
-# by ps, and the "persistent" settings, defined in /etc/fstab.
+# chk_yarn: verify that the volume has been established mounted on the yarn-
+# master node. This includes verifying both the "live" settings, determined
+# by ps, and the "persistent" settings, defined in /etc/fstab. The volume can
+# be nfs mounted, CIFS mounted, gluster-fuse mounted, etc -- doesn't matter.
 function chk_yarn() {
 
   local errcnt=0; local warncnt=0; local cnt
 
   # live check
-  if ! eval "$SSH 'ps -ef | grep -q \"$yarn_node:/$VOLNAME.* nfs \"'" ; then
-    echo "ERROR: $VOLNAME not nfs-mounted on $yarn_node (yarn-master)"
+  if ! eval "$SSH ps -ef | grep -q :/$VOLNAME\\s $SSH_CLOSE" ; then
+    echo "ERROR: $VOLNAME not mounted on $YARN_NODE (yarn-master)"
     ((errcnt++))
   fi
 
   # fstab check
-  cnt=$(eval "$SSH \"grep -c '$yarn_node:/$VOLNAME.* nfs ' /etc/fstab\"")
+  cnt=$(eval "$SSH grep -c :/$VOLNAME\\s /etc/fstab $SSH_CLOSE")
   if (( cnt == 0 )) ; then
-    echo "WARN: $VOLNAME nfs mount missing from /etc/fstab on $yarn_node (yarn-master)"
+    echo "WARN: $VOLNAME mount missing from /etc/fstab on $YARN_NODE (yarn-master)"
     ((warncnt++))
   elif (( cnt > 1 )) ; then
-    echo "WARN: $VOLNAME nfs mount appears more than once in /etc/fstab on $yarn_node (yarn-master)"
+    echo "WARN: $VOLNAME mount appears more than once in /etc/fstab on $YARN_NODE (yarn-master)"
     ((warncnt++))
   fi
 
   (( errcnt > 0 )) && return 1
-  echo "$VOLNAME mount setup correctly on $yarn_node (yarn-master) with $warncnt warnings"
+  echo "$VOLNAME mount setup correctly on $YARN_NODE (yarn-master) with $warncnt warnings"
   return 0
 }
 
@@ -41,7 +42,7 @@ function chk_yarn() {
 while getopts ':y:' opt; do
     case "$opt" in
       y)
-        yarn_node="$OPTARG"
+        YARN_NODE="$OPTARG"
         ;;
       \?) # invalid option
         ;;
@@ -54,14 +55,15 @@ VOLNAME="$1"
   echo "Syntax error: volume name is required";
   exit -1; }
 
-[[ -z "$yarn_node" ]] && {
+[[ -z "$YARN_NODE" ]] && {
   echo "Syntax error: yarn-master node is required";
   exit -1; }
 
-[[ "$yarn_node" == "$HOSTNAME" ]] && SSH='' || SSH="ssh $yarn_node"
+[[ "$YARN_NODE" == "$HOSTNAME" ]] && { SSH=''; SSH_CLOSE=''; } \
+				  || { SSH="ssh $YARN_NODE '"; SSH_CLOSE="'"; }
 
 chk_yarn || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
-echo "$VOLNAME is setup correctly on yarn-master $yarn_node"
+echo "$VOLNAME is setup correctly on yarn-master $YARN_NODE"
 exit 0
