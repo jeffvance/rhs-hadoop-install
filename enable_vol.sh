@@ -153,7 +153,7 @@ function setup_nodes() {
   return 0
 }
 
-# chk_and_fix_nodes: the is the first opportunity to setup the yarn-master 
+# chk_and_fix_nodes: this is the first opportunity to setup the yarn-master 
 # server because we need both the yarn-master node and a volume. Next, check_vol
 # is called to verify that VOLNAME has been setup for hadoop workloads, including
 # each node spanned by the volume. If setup issues are detected then the user is
