@@ -25,12 +25,12 @@ $ME --version | --help
 
 $ME [-y] [--user <ambari-admin-user>] [--pass <ambari-admin-password>] \\
            [--port <port-num>] [--hadoop-management-node <node>] \\
-           [--rhs-node <node>] --yarn-master <node> <volname>
+           [--rhs-node <node>] [--yarn-master <node>] <volname>
 where:
 
   <volname> : the RHS volume to be enabled for hadoop workloads.
-  --yarn-master : hostname or ip of the yarn-master server which is expected to
-      be outside of the storage pool.
+  --yarn-master : (optional) hostname or ip of the yarn-master server which is
+      expected to be outside of the storage pool. Default is localhost.
   --rhs_node : (optional) hostname of any of the storage nodes. This is needed in
       order to access the gluster command. Default is localhost which, must have
       gluster cli access.
@@ -107,11 +107,6 @@ function parse_cmd() {
     echo "Syntax error: volume name is required";
     ((errcnt++)); }
 
-  [[ -z "$YARN_NODE" ]] && {
-    echo "Syntax error: the yarn-master node is required";
-    ((errcnt++)); }
-
-  (( errcnt > 0 )) && return 1
   return 0
 }
 
@@ -222,16 +217,8 @@ echo '***'
 
 parse_cmd $@ || exit -1
 
-if [[ -z "$MGMT_NODE" ]] ; then # omitted
-  echo "No management node specified therefore the localhost ($HOSTNAME) is assumed"
-  (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && exit -1
-  MGMT_NODE="$HOSTNAME"
-fi
-if [[ -z "$RHS_NODE" ]] ; then # omitted
-  echo "No RHS storage node specified therefore the localhost ($HOSTNAME) is assumed"
-  (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && exit -1
-  RHS_NODE="$HOSTNAME"
-fi
+default_opts MGMT_NODE 'management' YARN_NODE 'yarn-master' \
+	RHS_NODE 'RHS storage' || exit -1
 
 vol_exists $VOLNAME $RHS_NODE || {
   echo "ERROR volume $VOLNAME does not exist";

@@ -53,7 +53,7 @@ SYNTAX:
 
 $ME --version | --help
 
-$ME [-y] [--hadoop-management-node <node>] --yarn-master <node> \\
+$ME [-y] [--hadoop-management-node <node>] [--yarn-master <node>] \\
               <nodes-spec-list>
 where:
 
@@ -68,8 +68,8 @@ where:
       mount path and block device path. If a brick mount path is omitted but a
       block device path is specified then the block device path is proceded by
       two ':'s, eg. "<nodeN>::<blkdevN>"
-  --yarn-master : hostname or ip of the yarn-master server which is expected to
-      be outside of the storage pool.
+  --yarn-master : (optional) hostname or ip of the yarn-master server which is
+      expected to be outside of the storage pool. Default is localhost.
   --hadoop-mgmt-node : (optional) hostname or ip of the hadoop mgmt server which
       is expected to be outside of the storage pool. Default is localhost.
   -y : auto answer "yes" to all prompts. Default is to be promoted before the
@@ -121,10 +121,6 @@ function parse_cmd() {
   NODE_SPEC=($@) # array of nodes, brick-mnts, blk-devs -- each separated by ":"
   [[ -z "$NODE_SPEC" || ${#NODE_SPEC[@]} < 2 ]] && {
     echo "Syntax error: expect list of 2 or more nodes plus brick mount(s) and block dev(s)";
-    ((errcnt++)); }
-
-  [[ -z "$YARN_NODE" ]] && {
-    echo "Syntax error: the yarn-master node is required";
     ((errcnt++)); }
 
   (( errcnt > 0 )) && return 1
@@ -482,11 +478,8 @@ echo "*** $ME: version $(cat $PREFIX/VERSION)"
 echo '***'
 
 parse_cmd $@ || exit -1
-if [[ -z "$MGMT_NODE" ]] ; then # omitted
-  echo "No management node specified therefore the localhost ($HOSTNAME) is assumed"
-  (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && exit -1
-  MGMT_NODE="$HOSTNAME"
-fi
+
+default_nodes MGMT_NODE 'management' YARN_NODE 'yarn-master' || exit -1
 
 # extract nodes, brick mnts and blk devs arrays from NODE_SPEC
 parse_nodes_brkmnts_blkdevs || exit -1

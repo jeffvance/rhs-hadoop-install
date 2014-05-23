@@ -32,6 +32,31 @@ function check_ssh() {
   return 0
 }
 
+# default_nodes: Detects the any/all of the supplied *_node options has been 
+# omitted and prompts the user to confirm if they wish to use localhost as 
+# the missing node's default value. Following each option is its human readable
+# name, eg 'MGMT_NODE' 'management'. Returns 1 if the answer is no.
+# Note: the *name* of the variable is passed not its value.
+# Note: the node variable is set to HOSTNAME if the user answers yes.
+# Uses globals:
+#   AUTO_YES
+function default_nodes() {
+
+  local varname; local human_name; local node
+
+  while (( $# > 0 )) ; do
+    varname=$1; node=${!varname}; human_name="$2"
+    if [[ -z "$node" ]] ; then # node omitted
+      echo "No $2 node specified therefore the localhost ($HOSTNAME) is assumed"
+      (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && return 1
+      eval $varname="$HOSTNAME"
+    fi
+    shift 2
+  done
+
+  return 0
+}
+
 # display: append the passed-in message to localhost's logfile, and potentially
 # write the message to stdout, depending on the value of the passed-in priority
 # setting. A timestamp is prepending (only) to the logfile msg.
