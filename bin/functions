@@ -1,11 +1,14 @@
 ## constants ##
+
 # log threshold values
 LOG_DEBUG=0
-LOG_INFO=1    # default for --verbose
-LOG_SUMMARY=2 # default
-LOG_REPORT=3  # suppress all output, other than final reporting
-LOG_QUIET=9   # value for --quiet = suppress all output
-LOG_FORCE=99  # force write regardless of VERBOSE setting
+LOG_VERBOSE=2
+LOG_NORMAL=4 # default
+LOG_QUIET=6
+LOG_FORCE=9  # force write regardless of VERBOSE setting
+
+# log file path
+LOGFILE='/var/log/rhs-hadoop-install.log'
 
 ## functions ##
 
@@ -30,6 +33,12 @@ function check_ssh() {
 
   (( errcnt > 0 )) && return 1
   return 0
+}
+
+# debug: call display() using LOG_DEBUG.
+function debug() {
+
+  display "$1" "$2" $LOG_DEBUG
 }
 
 # default_nodes: Detects the any/all of the supplied *_node options has been 
@@ -59,20 +68,23 @@ function default_nodes() {
 
 # display: append the passed-in message to localhost's logfile, and potentially
 # write the message to stdout, depending on the value of the passed-in priority
-# setting. A timestamp is prepending (only) to the logfile msg.
-# NOTE: $LOGFILE should be defined if logging is desired.
+# setting. A timestamp is prepended to the logfile msg.
+# NOTE: $LOGFILE must be defined if logging is desired.
 # NOTE: $VERBOSE should be defined if "threshold" echos are desired.
-#   $1=msg,
-#   $2=msg prioriy, optional, default=$LOG_SUMMARY,
-#   $3=logfile,     optional, default=$LOGFILE which can be empty.
+#   $1="-n" or "-e" other echo option, or if no option then $1 = msg,
+#   $2=msg prioriy, optional, default=$LOG_VERBOSE,
+#   $3=logfile,     optional, default=$LOGFILE.
 function display(){
 
-  local pri=${2:-$LOG_SUMMARY}
+  local opt=''
+  [[ ${1:0:1} == '-' ]] && { opt="$1"; shift; }
+
+  local pri=${2:-$LOG_NORMAL} # default msg priority
   local log=${3:-$LOGFILE}
-  local verbose=${VERBOSE:-$LOG_DEBUG}
+  local verbose=${VERBOSE:-$LOG_DEBUG} # if VERBOSE not set output msg
 
   [[ -n "$log" ]] && echo "[$(date +%T)] $1" >> $log
-  (( pri >= verbose )) && echo -e "$1"
+  (( pri >= verbose )) && echo $opt "$1"
 }
 
 # get_ambari_repo: wget the ambari repo file in the correct location.
@@ -98,6 +110,17 @@ function get_ambari_repo(){
   return 0
 }
 
+# quiet: call display() using LOG_QUIET.
+function quiet() {
+
+  display "$1" "$2" $LOG_QUIET
+}
+
+# verbose: call display() using LOG_VERBOSE.
+function verbose() {
+
+  display "$1" "$2" $LOG_VERBOSE
+}
 
 # vol_exists: invokes gluster vol info to see if VOLNAME exists. Returns 1 on
 # errors. 
