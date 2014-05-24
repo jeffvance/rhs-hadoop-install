@@ -35,7 +35,7 @@ function check_ssh() {
   return 0
 }
 
-# debug: call display() using LOG_DEBUG.
+# debug: call display() using LOG_DEBUG. $1 can be echo option(s) or the msg.
 function debug() {
 
   display "$1" "$2" $LOG_DEBUG
@@ -110,13 +110,13 @@ function get_ambari_repo(){
   return 0
 }
 
-# quiet: call display() using LOG_QUIET.
+# quiet: call display() using LOG_QUIET. $1 can be echo option(s) or the msg.
 function quiet() {
 
   display "$1" "$2" $LOG_QUIET
 }
 
-# verbose: call display() using LOG_VERBOSE.
+# verbose: call display() using LOG_VERBOSE. $1 can be echo option(s) or the msg.
 function verbose() {
 
   display "$1" "$2" $LOG_VERBOSE
