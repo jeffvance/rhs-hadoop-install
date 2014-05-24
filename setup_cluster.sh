@@ -201,18 +201,18 @@ function parse_nodes_brkmnts_blkdevs() {
   # warning if mgmt or yarn-master nodes are inside the storage pool
   if (( MGMT_INSIDE || YARN_INSIDE )) ; then
     if (( MGMT_INSIDE && YARN_INSIDE )) ; then
-      echo -e "WARN: the yarn-master and hadoop management nodes are inside the storage pool\nwhich is sub-optimal."
+      warn -e "the yarn-master and hadoop management nodes are inside the storage pool\nwhich is sub-optimal."
     elif (( MGMT_INSIDE )) ; then
-      echo "WARN: the hadoop management node is inside the storage pool which is sub-optimal."
+      warn "the hadoop management node is inside the storage pool which is sub-optimal."
     else
-      echo "WARN: the yarn-master node is inside the storage pool which is sub-optimal."
+      warn "the yarn-master node is inside the storage pool which is sub-optimal."
     fi
     (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && return 1
   fi
 
   # warning if yarn-master == mgmt node
   if [[ "$YARN_NODE" == "$MGMT_NODE" ]] ; then
-    echo "WARN: the yarn-master and hadoop-mgmt-nodes are the same which is sub-optimal."
+    warn "the yarn-master and hadoop-mgmt-nodes are the same which is sub-optimal."
     (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && return 1
   fi
 
@@ -237,28 +237,35 @@ function install_repo() {
 
     local node="$1"; local err
 
+    verbose "--- installing  $repo file on $node..."
+
     # copy repo file to node
     out="$(scp $repo_file $node:$repo_file)"
+    debug "scp repo $repo_file to $node: $out"
     err=$?
     if (( err != 0 )) ; then
-      echo "ERROR $err: coping $file to $node: $out"
+      err $err "coping $file to $node: $out"
       return 1
     fi
 
     # yum install package
     out="$(ssh $node 'yum install -y --nogpgcheck rhs-hadoop')"
+    debug "yum install rhs-hadoop: $out"
     err=$?
     if (( err != 0 )) ; then
-      echo "ERROR $err: yum installing $file on $node: $out"
+      err $err "yum installing $file on $node: $out"
       return 1
     fi
+
     return 0
   }
 
   ## main ##
 
+  verbose "--- copying $repo file and installong on all nodes..."
+
   [[ ! -f "$repo_file" ]] && {
-    echo "ERROR: $repo_file is missing. Cannot install rhs-hadoop package on other nodes";
+    err "$repo_file is missing. Cannot install rhs-hadoop package on other nodes";
     return 1; }
 
   for node in ${NODES[@]}; do # all storage nodes
@@ -267,9 +274,11 @@ function install_repo() {
   done
 
   # install on yarn-master and mgmt nodes
+  debug "installing repo file to yarn-master, $YARN_NODE..."
   if [[ "$YARN_NODE" != "$HOSTNAME" ]] ; then
      cp_install $YARN_NODE || ((errcnt++))
   fi
+  debug "installing repo file to mgmt-node, $MGMT_NODE..."
   if [[ "$MGMT_NODE" != "$HOSTNAME" ]] ; then
     cp_install $MGMT_NODE || ((errcnt++))
   fi
@@ -305,15 +314,17 @@ function setup_nodes() {
 
     [[ "$node" == "$HOSTNAME" ]] && { ssh=''; scp='#'; } || \
                                     { ssh="ssh $node"; scp='scp'; }
-    eval "$scp -r -q $PREFIX/bin $node:/tmp"
+
+    out="$(eval "$scp -r -q $PREFIX/bin $node:/tmp")"
+    debug "scp bin/* to $node:/tmp: $out"
     out="$(eval "
 	$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
 		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE
  	")"
     err=$?
-    echo "setup_datanode for $node: $out"
+    verbose "setup_datanode for $node: $out"
     if (( $? != 0 )) ; then
-      echo "ERROR: $err: in setup_datanode"
+      err $err "in setup_datanode"
       return 1
     fi
 
@@ -330,11 +341,12 @@ function setup_nodes() {
   done
 
   if (( ! YARN_INSIDE )) ; then
+    verbose "setting up yarn-master..."
     do_node $YARN_NODE || ((errcnt++)) # blkdev and brkmnt are blank
   fi
 
   if (( errcnt > 0 )) ; then
-    echo "$errcnt setup node errors on nodes: $errnodes"
+    verbose "$errcnt setup node errors on nodes: $errnodes"
     return 1
   fi
 
@@ -374,11 +386,14 @@ function define_pool() {
   local nodes=($@)
   local node; local uniq=()
 
+  verbose "--- defining storage pool..."
+
   if pool_exists ; then
-    echo "Storage pool exists..."
+    verbose "storage pool exists"
     # find all nodes in trusted pool
     POOL=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE)) # nodes in existing pool
     FIRST_NODE=${POOL[0]} # peer probe from this node
+    debug "existing storage pool nodes: ${POOL[@]}"
 
     # find nodes in pool that are not supplied nodes (ie. unique)
     for node in ${nodes[@]}; do
@@ -388,16 +403,18 @@ function define_pool() {
 
     # are we adding nodes, or just checking existing nodes?
     POOL=(${uniq[@]}) # nodes to potentially add to existing pool, can be 0
+    debug "nodes to add to existing pool: ${POOL[@]}"
+
     if (( ${#uniq[@]} > 0 )) ; then # we have nodes not in pool
       echo
-      echo -e "The following nodes are not in the existing storage pool:\n  ${uniq[@]}"
+      force -e "The following nodes are not in the existing storage pool:\n  ${uniq[@]}"
       (( ! AUTO_YES )) && ! yesno  "  Add nodes? [y|N] " && return 1 # will exit
     else # no unique nodes
-      echo "No new nodes being added so only verifying existing nodes..."
+      verbose "No new nodes being added so only verifying existing nodes..."
     fi
 
   else # no pool
-    echo "Will create a storage pool consisting of ${#nodes[@]} new nodes..."
+    verbose "Will create a storage pool consisting of ${#nodes[@]} new nodes..."
     POOL=(${nodes[@]})
   fi
 
@@ -414,20 +431,23 @@ function create_pool() {
 
   local node; local err; local errcnt=0; local errnodes=''; local out
 
+  verbose "--- creating storage pool..."
+
   # create or add-to storage pool
   for node in ${POOL[@]}; do
       [[ "$node" == "$FIRST_NODE" ]] && continue # skip
-      out="$(ssh $FIRST_NODE "gluster peer probe $node")"
+      out="$(ssh $FIRST_NODE "gluster peer probe $node 2>&1")"
+      debug "peer probe of $node from $FIRST_NODE: $out"
       err=$?
       if (( err != 0 )) ; then
-	echo "ERROR $err: peer probe failed on $node"
+	err $err "peer probe failed on $node"
 	errnodes+="$node "
 	((errcnt++))
       fi
   done
 
   if (( errcnt > 0 )) ; then
-    echo "$errcnt peer probe errors on nodes: $errnodes"
+    verbose "$errcnt peer probe errors on nodes: $errnodes"
     return 1
   fi
   return 0
@@ -470,9 +490,9 @@ YARN_INSIDE=0 # assume false
 AUTO_YES=0    # assume false
 errnodes=''; errcnt=0
 
-echo '***'
-echo "*** $ME: version $(cat $PREFIX/VERSION)"
-echo '***'
+quiet '***'
+quiet "*** $ME: version $(cat $PREFIX/VERSION)"
+quiet '***'
 
 parse_cmd $@ || exit -1
 
@@ -487,17 +507,17 @@ FIRST_NODE=${NODES[0]}
 check_ssh ${NODES[@]} || exit 1
 
 echo
-echo "*** Nodes             : ${NODES[@]}"
-echo "*** Brick mounts      :"
+quiet "*** Nodes             : ${NODES[@]}"
+quiet "*** Brick mounts      :"
 for node in ${NODES[@]}; do
-    echo "      $node         : ${NODE_BRKMNTS[$node]}"
+    quiet "      $node         : ${NODE_BRKMNTS[$node]}"
 done
 echo "*** Block devices     :"
 for node in ${NODES[@]}; do
-    echo "      $node         : ${NODE_BLKDEVS[$node]}"
+    quiet "      $node         : ${NODE_BLKDEVS[$node]}"
 done
-echo "*** Ambari mgmt node  : $MGMT_NODE"
-echo "*** Yarn-master server: $YARN_NODE"
+quiet "*** Ambari mgmt node  : $MGMT_NODE"
+quiet "*** Yarn-master server: $YARN_NODE"
 echo
 
 # figure out which nodes, if any, will be added to the storage pool
