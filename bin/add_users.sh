@@ -11,7 +11,7 @@ errcnt=0; cnt=0
 PREFIX="$(dirname $(readlink -f $0))"
 
 for user in $($PREFIX/gen_users.sh); do
-    if ! getent passwd $user >/dev/null ; then
+    if ! getent passwd $user >& /dev/null ; then
       useradd --system -g $HADOOP_G $user 2>&1
       err=$?
       if (( err == 0 )) ; then

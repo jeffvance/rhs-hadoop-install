@@ -4,6 +4,9 @@
 # 1) CDN register each node, including yarn and mgmt nodes
 # 2) option to skip setting up default ports
 # 3) wait for nodes to join trusted pool
+# 4) useradd's on yarn-master for nfs consistency
+# 5) check for UID/GID consistency across cluster if not using LDAP
+#    may need new flag for this?
 #
 # setup_cluster.sh accepts a list of nodes:brick-mnts:block-devs, along with
 # the name of the yarn-master and hadoop-mgmt servers, and creates a new trusted

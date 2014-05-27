@@ -1,5 +1,10 @@
 #!/bin/bash
 #
+# TODO:
+# 1) add hadoop-users to yarn-master
+# 2) verify uid consistency
+# 3) detect which RMI port #s are being used and open them.
+#
 # enable_vol.sh accepts a volume name, discovers and checks the volume mount on
 # each node spanned by the volume to be sure they are setup for hadoop workloads,
 # and then updates the core-site file to contain the volume. 
@@ -129,7 +134,7 @@ function setup_nodes() {
       blkdev=${BLKDEVS[$i]}
 
       [[ "$node" == "$HOSTNAME" ]] && { ssh=''; scp='#'; } || \
-				       { ssh="ssh $node"; scp='scp'; }
+				      { ssh="ssh $node"; scp='scp'; }
       eval "$scp -r -q $PREFIX/bin $node:/tmp"
       eval "$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
 		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE"

@@ -209,7 +209,7 @@ function check_users() {
   local user; local errcnt=0; local warncnt=0
 
   for user in $($PREFIX/gen_users.sh); do
-      id -u $user >& /dev/null && continue
+      getent passwd $user >& /dev/null && continue
       echo "ERROR: $user is missing from $NODE"
       ((errcnt++))
   done
