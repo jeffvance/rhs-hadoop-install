@@ -198,6 +198,45 @@ function setup_iptables() {
   return 0
 }
 
+# setup_ntp: validate the ntp conf file, start ntpd, synch time. Returns 1 on
+# errors.
+function setup_ntp() {
+
+  local errcnt=0; local warncnt=0; local out; local cnt=0; local err
+
+  # validate ntp config file
+  validate_ntp_conf || ((errcnt++))
+
+  # stop ntpd so that ntpd -qg can potentially do a large time change
+  while ps -C ntpd >& /dev/null ; do
+    service ntpd stop >& /dev/null
+    (( cnt > 2 )) && break
+    ((cnt++))
+  done
+  (( cnt > 2 )) && {
+    echo "ERROR: cannot stop ntpd so that time can be synched";
+    ((errcnt++)); }
+
+  # set time to ntp clock time now (ntpdate is being deprecated)
+  # note: ntpd can't be running...
+  out="$(ntpd -qg 2>&1)"
+  err=$?
+  (( err != 0 )) && {
+    echo "WARN $err: ntpd -qg (aka ntpdate) error: $out"; 
+    ((warncnt++)); }
+
+  # start ntpd
+  out="$(service ntpd start 2>&1)"
+  err=$?
+  (( err != 0 )) && {
+    echo "WARN $err: ntpd start error: $out";
+    ((errcnt++)); }
+
+  (( errcnt > 0 }} && return 1
+  echo "ntp setup with $warncnt warnings"
+  return 0
+}
+
 # setup_selinux: if selinux is enabled then set it to permissive. This seems
 # to be a requirement for HDP.
 function setup_selinux() {
@@ -261,6 +300,7 @@ setup_xfs          || ((errcnt++))
 mount_blkdev       || ((errcnt++))
 setup_selinux      || ((errcnt++))
 setup_iptables     || ((errcnt++))
+setup_ntp          || ((errcnt++))
 setup_ambari_agent || ((errcnt++))
 
 $PREFIX/add_groups.sh              || ((errcnt++))

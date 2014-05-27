@@ -127,38 +127,6 @@ function check_open_ports() {
   return 0
 }
 
-# validate_ntp_conf: validate the ntp config file by ensuring there is at least
-# one time-server suitable for ntp use.
-function validate_ntp_conf(){
-
-  local timeserver; local i=1; local errcnt=0
-  local ntp_conf='/etc/ntp.conf'
-  local servers=(); local numServers
-
-  servers=($(grep "^ *server " $ntp_conf|awk '{print $2}')) # time-servers 
-  numServers=${#servers[@]}
-
-  if (( numServers == 0 )) ; then
-    echo "ERROR: no server entries in $ntp_conf"
-    ((errcnt++))
-  fi
-
-  for timeserver in "${servers[@]}" ; do
-      ntpdate -q $timeserver >& /dev/null
-      (( $? == 0 )) && break # exit loop, found valid time-server
-      ((i++))
-  done
-
-  if (( i > numServers )) ; then
-    echo "ERROR: no suitable time-servers found in $ntp_conf"
-    ((errcnt++))
-  fi
-
-  (( errcnt > 0 )) && return 1
-  echo "NTP time-server $timeserver is acceptable"
-  return 0
-}
-
 # check_ntp: verify that ntp is running and the config file has 1 or more
 # suitable server records.
 function check_ntp() {
