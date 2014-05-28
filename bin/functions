@@ -111,7 +111,8 @@ function get_ambari_repo(){
 
   [[ -d $REPO_DIR ]] || mkdir -p $REPO_DIR
 
-  out="$(wget -O $REPO_DIR/$REPO_FILE $REPO_URL 2>&1)" # overwrites existing repo
+  # 20 sec max time, overwrites existing repo
+  out="$(wget --timeout 20 -O $REPO_DIR/$REPO_FILE $REPO_URL 2>&1)"
   err=$?
   if (( err != 0 )) ; then
     echo "ERROR $err: ambari repo wget: $out"

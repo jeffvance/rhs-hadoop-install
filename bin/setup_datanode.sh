@@ -168,7 +168,6 @@ function setup_iptables() {
 	out="$(iptables -A INPUT -m state --state NEW -m $proto \
 		-p $proto --dport $port -j ACCEPT)"
 	err=$?
-	echo "iptables: $out"
 	if (( err != 0 )) ; then
 	  echo "ERROR $err: iptables port $port: $out"
  	  ((errcnt++))
@@ -229,10 +228,10 @@ function setup_ntp() {
   out="$(service ntpd start 2>&1)"
   err=$?
   (( err != 0 )) && {
-    echo "WARN $err: ntpd start error: $out";
+    echo "ERROR $err: ntpd start error: $out";
     ((errcnt++)); }
 
-  (( errcnt > 0 }} && return 1
+  (( errcnt > 0 )) && return 1
   echo "ntp setup with $warncnt warnings"
   return 0
 }

@@ -8,7 +8,11 @@
 # Syntax:
 #  $1= xfs brick mount directory path including the volume name
 
+PREFIX="$(dirname $(readlink -f $0))"
+
 ## functions ##
+
+source $PREFIX/functions
 
 # check_ambari_agent: see if the ambari agent is running on this node.
 function check_ambari_agent() {
@@ -221,7 +225,6 @@ function check_xfs() {
 ## main ##
 
 errcnt=0
-PREFIX="$(dirname $(readlink -f $0))"
 NODE="$HOSTNAME"
 BRICKMNT="$1" # includes the vol name in path
 [[ -z "$BRICKMNT" ]] && {

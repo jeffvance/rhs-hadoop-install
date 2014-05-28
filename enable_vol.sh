@@ -168,14 +168,11 @@ function chk_and_fix_nodes() {
   local errcnt=0
 
   # setup the yarn-master node
-echo "**** start with setup_yarn"
   $PREFIX/bin/setup_yarn.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME || ((errcnt++))
-echo "**** done with setup_yarn"
 
   # verify that the volume is setup for hadoop workload and potentially fix
   if ! $PREFIX/bin/check_vol.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME ;
   then # problems
-echo "**** done with check_vol, have issues"
     echo
     echo "Nodes spanned by $VOLNAME and/or the YARN-master node have issues"
     if (( AUTO_YES )) || yesno "  Correct above issues? [y|N] " ; then
@@ -186,7 +183,6 @@ echo "**** done with check_vol, have issues"
       ((errcnt++))
     fi
   fi
-echo "**** done with check_vol, no issues"
 
   (( errcnt > 0 )) && return 1
   return 0

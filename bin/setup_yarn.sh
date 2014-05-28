@@ -26,7 +26,6 @@ function set_yarn() {
 
   [[ "$YARN_NODE" != "$HOSTNAME" ]] && { ssh="ssh $YARN_NODE '"; ssh_close="'"; }
 
-echo "***** ssh=$ssh, ssh_close=$ssh_close, volmnt=$volmnt"
   out="$(eval "
   	$ssh
 	  # append to fstab if not present
@@ -39,7 +38,6 @@ echo "***** ssh=$ssh, ssh_close=$ssh_close, volmnt=$volmnt"
 	$ssh_close
       ")"
   err=$?
-echo "**** err=$err"
   (( err != 0 && err != 32 )) && { # 32==already mounted
     echo "ERROR $err on $YARN_NODE (yarn-master): $out";
     return 1; }
