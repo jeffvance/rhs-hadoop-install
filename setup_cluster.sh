@@ -7,6 +7,7 @@
 # 4) useradd's on yarn-master for nfs consistency
 # 5) check for UID/GID consistency across cluster if not using LDAP
 #    may need new flag for this?
+# 6) fuse mnt rather than nfs mnt for yarn-master
 #
 # setup_cluster.sh accepts a list of nodes:brick-mnts:block-devs, along with
 # the name of the yarn-master and hadoop-mgmt servers, and creates a new trusted
@@ -418,11 +419,13 @@ function define_pool() {
 }
 
 # create_pool: create the trusted pool or add new nodes to the existing pool.
+# Note: the yarn-master server is include in the pool but will have no storage.
 # Note: gluster peer probe returns 0 if the node is already in the pool. It
 #   returns 1 if the node is unknown.
 # Uses globals:
 #   FIRST_NODE
 #   POOL
+#   YARN_NODE
 function create_pool() {
 
   local node; local err; local errcnt=0; local errnodes=''; local out
@@ -430,7 +433,7 @@ function create_pool() {
   verbose "--- creating storage pool..."
 
   # create or add-to storage pool
-  for node in ${POOL[@]}; do
+  for node in ${POOL[@]} $YARN_NODE; do
       [[ "$node" == "$FIRST_NODE" ]] && continue # skip
       out="$(ssh $FIRST_NODE "gluster peer probe $node 2>&1")"
       err=$?

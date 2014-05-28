@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # setup_yarn.sh setup the supplied yarn-master node for the passed-in volume. So
-# far, this includes assigning the nfs mount.
+# far, this includes assigning the glusterfs-fuse mount.
 # Syntax:
 #   $1=volume name (required).
 #   -y=yarn-master node (required).
@@ -12,8 +12,9 @@ PREFIX="$(dirname $(readlink -f $0))"
 errcnt=0
 
 # set_yarn: if the yarn node does not already have VOLNAME mounted then
-# append an nfs volume mount to fstab and mount it. 
+# append an glusterfs-fuse volume mount to fstab and mount it. 
 # Uses globals:
+#   PREFIX
 #   RHS_NODE
 #   VOLMNT
 #   VOLNAME
@@ -22,7 +23,7 @@ function set_yarn() {
 
   local err; local out; local ssh=''; local ssh_close=''
   local volmnt="$VOLMNT" # same name as gluster-fuse mnt
-  local mntopts='defaults,_netdev'
+  local mntopts="$($PREFIX/bin/gen_req_gluster_mnt.sh),_netdev" # add _netdev
 
   [[ "$YARN_NODE" != "$HOSTNAME" ]] && { ssh="ssh $YARN_NODE '"; ssh_close="'"; }
 
@@ -30,7 +31,7 @@ function set_yarn() {
   	$ssh
 	  # append to fstab if not present
 	  if ! grep -qs $volmnt /etc/fstab ; then
-	    echo $RHS_NODE:/$VOLNAME $volmnt nfs $mntopts 0 0 >>/etc/fstab
+	    echo $RHS_NODE:/$VOLNAME $volmnt glusterfs $mntopts 0 0 >>/etc/fstab
 	  fi
 	  # always attempt to create the dir and mount the vol
 	  mkdir -p $volmnt 2>&1
@@ -42,7 +43,7 @@ function set_yarn() {
     echo "ERROR $err on $YARN_NODE (yarn-master): $out";
     return 1; }
 
-  echo "$VOLNAME nfs mounted on $YARN_NODE (yarn-master)"
+  echo "$VOLNAME glusterfs-fuse mounted on $YARN_NODE (yarn-master)"
   return 0
 }
 
@@ -79,7 +80,7 @@ VOLMNT="$($PREFIX/find_volmnt.sh $RHS_NODE_OPT $VOLNAME)" # includes volname
   echo "ERROR: $VOLNAME not mounted (on $RHS_NODE)";
   exit 1; }
 
-# set up a nfs mount for the volume if it's not already mounted
+# set up a glusterfs-fuse mount for the volume if it's not already mounted
 set_yarn || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1

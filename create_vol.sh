@@ -217,12 +217,12 @@ function mk_volmnt() {
 			            || { ssh="ssh $node '"; ssh_close="'"; }
       out="$(eval "
 	$ssh
-	  mkdir -p $volmnt
 	  # append mount to fstab, if not present
 	  if ! grep -qs $volmnt /etc/fstab ; then
 	    echo $node:/$VOLNAME $volmnt glusterfs $mntopts 0 0 >>/etc/fstab
 	  fi
-	  mount $volmnt # mount via fstab
+	  mkdir -p $volmnt
+	  mount $volmnt 2>&1 # mount via fstab
 	  rc=\$?
 	  if (( rc != 0 && rc != 32 )) ; then # 32=already mounted
 	    echo Error \$rc: mounting $volmnt with $mntopts options
