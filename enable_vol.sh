@@ -168,11 +168,14 @@ function chk_and_fix_nodes() {
   local errcnt=0
 
   # setup the yarn-master node
+echo "**** start with setup_yarn"
   $PREFIX/bin/setup_yarn.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME || ((errcnt++))
+echo "**** done with setup_yarn"
 
   # verify that the volume is setup for hadoop workload and potentially fix
   if ! $PREFIX/bin/check_vol.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME ;
   then # problems
+echo "**** done with check_vol, have issues"
     echo
     echo "Nodes spanned by $VOLNAME and/or the YARN-master node have issues"
     if (( AUTO_YES )) || yesno "  Correct above issues? [y|N] " ; then
@@ -183,6 +186,7 @@ function chk_and_fix_nodes() {
       ((errcnt++))
     fi
   fi
+echo "**** done with check_vol, no issues"
 
   (( errcnt > 0 )) && return 1
   return 0
@@ -232,20 +236,21 @@ vol_exists $VOLNAME $RHS_NODE || {
 
 NODES=($($PREFIX/bin/find_nodes.sh -n $RHS_NODE $VOLNAME)) # spanned by vol
 if (( $? != 0 )) ; then
-  echo "${NODE[@]}" # from find_nodes
+  echo "${NODE[*]}" # from find_nodes
   exit 1
 fi
 
 # check for passwordless ssh connectivity to nodes
-check_ssh ${NODES[@]} || exit 1
+check_ssh ${NODES[*]} $YARN_NODE || exit 1
 
 BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh -xn $RHS_NODE $VOLNAME))
 BLKDEVS=($($PREFIX/bin/find_blocks.sh -xn $RHS_NODE $VOLNAME))
 
 echo
-echo "*** Nodes             : ${NODES[@]}"
-echo "*** Brick mounts      : ${BRKMNTS[@]}"
-echo "*** Block devices     : ${BLKDEVS[@]}"
+echo "*** Volume            : $VOLNAME"
+echo "*** Nodes             : ${NODES[*]}"
+echo "*** Brick mounts      : ${BRKMNTS[*]}"
+echo "*** Block devices     : ${BLKDEVS[*]}"
 echo "*** Ambari mgmt node  : $MGMT_NODE"
 echo "*** Yarn-master server: $YARN_NODE"
 echo

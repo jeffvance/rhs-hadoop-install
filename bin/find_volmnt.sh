@@ -32,8 +32,12 @@ else  # use supplied node
   ssh="ssh $rhs_node '"; ssh_close="'"
 fi
 
-eval "$ssh 
+out="$(eval "$ssh 
 	mnt=(\$(grep -w $VOLNAME /proc/mounts)) # array
 	echo \${mnt[1]} # node:/volmnt
       $ssh_close
-"
+")"
+
+[[ -z "$out" ]] && exit 1
+echo $out
+exit 0

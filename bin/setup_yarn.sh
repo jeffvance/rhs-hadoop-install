@@ -26,6 +26,7 @@ function set_yarn() {
 
   [[ "$YARN_NODE" != "$HOSTNAME" ]] && { ssh="ssh $YARN_NODE '"; ssh_close="'"; }
 
+echo "***** ssh=$ssh, ssh_close=$ssh_close, volmnt=$volmnt"
   out="$(eval "
   	$ssh
 	  # append to fstab if not present
@@ -38,6 +39,7 @@ function set_yarn() {
 	$ssh_close
       ")"
   err=$?
+echo "**** err=$err"
   (( err != 0 && err != 32 )) && { # 32==already mounted
     echo "ERROR $err on $YARN_NODE (yarn-master): $out";
     return 1; }
@@ -75,6 +77,9 @@ VOLNAME="$1"
 
 # get volume mount
 VOLMNT="$($PREFIX/find_volmnt.sh $RHS_NODE_OPT $VOLNAME)" # includes volname
+[[ -z "$VOLMNT" ]] && {
+  echo "ERROR: $VOLNAME not mounted (on $RHS_NODE)";
+  exit 1; }
 
 # set up a nfs mount for the volume if it's not already mounted
 set_yarn || ((errcnt++))

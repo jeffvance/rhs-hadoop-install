@@ -352,8 +352,9 @@ vol_exists $VOLNAME $FIRST_NODE && {
 parse_brkmnts || exit 1
 
 echo
-echo "*** Nodes       : ${NODES[@]}"
-echo "*** Brick mounts: ${BRKMNTS[@]}"
+echo "*** Volume      : $VOLNAME"
+echo "*** Nodes       : ${NODES[*]}"
+echo "*** Brick mounts: ${BRKMNTS[*]}"
 echo
 
 # verify that each node is prepped for hadoop workloads

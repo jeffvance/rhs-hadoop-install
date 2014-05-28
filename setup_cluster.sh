@@ -244,7 +244,6 @@ function install_repo() {
 
     # copy repo file to node
     out="$(scp $repo_file $node:$repo_file)"
-    debug "scp repo $repo_file to $node: $out"
     err=$?
     if (( err != 0 )) ; then
       err $err "coping $file to $node: $out"
@@ -253,7 +252,6 @@ function install_repo() {
 
     # yum install package
     out="$(ssh $node 'yum install -y --nogpgcheck rhs-hadoop')"
-    debug "yum install rhs-hadoop: $out"
     err=$?
     if (( err != 0 )) ; then
       err $err "yum installing $file on $node: $out"
@@ -277,11 +275,9 @@ function install_repo() {
   done
 
   # install on yarn-master and mgmt nodes
-  debug "installing repo file to yarn-master, $YARN_NODE..."
   if [[ "$YARN_NODE" != "$HOSTNAME" ]] ; then
      cp_install $YARN_NODE || ((errcnt++))
   fi
-  debug "installing repo file to mgmt-node, $MGMT_NODE..."
   if [[ "$MGMT_NODE" != "$HOSTNAME" ]] ; then
     cp_install $MGMT_NODE || ((errcnt++))
   fi
@@ -319,7 +315,6 @@ function setup_nodes() {
                                     { ssh="ssh $node"; scp='scp'; }
 
     out="$(eval "$scp -r -q $PREFIX/bin $node:/tmp")"
-    debug "scp bin/* to $node:/tmp: $out"
     out="$(eval "
 	$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
 		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE
@@ -396,7 +391,6 @@ function define_pool() {
     # find all nodes in trusted pool
     POOL=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE)) # nodes in existing pool
     FIRST_NODE=${POOL[0]} # peer probe from this node
-    debug "existing storage pool nodes: ${POOL[@]}"
 
     # find nodes in pool that are not supplied nodes (ie. unique)
     for node in ${nodes[@]}; do
@@ -406,18 +400,17 @@ function define_pool() {
 
     # are we adding nodes, or just checking existing nodes?
     POOL=(${uniq[@]}) # nodes to potentially add to existing pool, can be 0
-    debug "nodes to add to existing pool: ${POOL[@]}"
 
     if (( ${#uniq[@]} > 0 )) ; then # we have nodes not in pool
       echo
       force -e "The following nodes are not in the existing storage pool:\n  ${uniq[@]}"
       (( ! AUTO_YES )) && ! yesno  "  Add nodes? [y|N] " && return 1 # will exit
     else # no unique nodes
-      verbose "No new nodes being added so only verifying existing nodes..."
+      quiet "No new nodes being added so only verifying existing nodes..."
     fi
 
   else # no pool
-    verbose "Will create a storage pool consisting of ${#nodes[@]} new nodes..."
+    quiet "Will create a storage pool consisting of ${#nodes[@]} new nodes..."
     POOL=(${nodes[@]})
   fi
 
@@ -440,7 +433,6 @@ function create_pool() {
   for node in ${POOL[@]}; do
       [[ "$node" == "$FIRST_NODE" ]] && continue # skip
       out="$(ssh $FIRST_NODE "gluster peer probe $node 2>&1")"
-      debug "peer probe of $node from $FIRST_NODE: $out"
       err=$?
       if (( err != 0 )) ; then
 	err $err "peer probe failed on $node"
@@ -507,15 +499,15 @@ parse_nodes_brkmnts_blkdevs || exit -1
 FIRST_NODE=${NODES[0]}
 
 # check for passwordless ssh connectivity to nodes
-check_ssh ${NODES[@]} || exit 1
+check_ssh ${NODES[*]} $YARN_NODE || exit 1
 
 echo
-quiet "*** Nodes             : ${NODES[@]}"
+quiet "*** Nodes             : ${NODES[*]}"
 quiet "*** Brick mounts      :"
 for node in ${NODES[@]}; do
     quiet "      $node         : ${NODE_BRKMNTS[$node]}"
 done
-echo "*** Block devices     :"
+quiet "*** Block devices     :"
 for node in ${NODES[@]}; do
     quiet "      $node         : ${NODE_BLKDEVS[$node]}"
 done
