@@ -4,10 +4,6 @@
 # 1) CDN register each node, including yarn and mgmt nodes
 # 2) option to skip setting up default ports
 # 3) wait for nodes to join trusted pool
-# 4) useradd's on yarn-master for nfs consistency
-# 5) check for UID/GID consistency across cluster if not using LDAP
-#    may need new flag for this?
-# 6) fuse mnt rather than nfs mnt for yarn-master
 #
 # setup_cluster.sh accepts a list of nodes:brick-mnts:block-devs, along with
 # the name of the yarn-master and hadoop-mgmt servers, and creates a new trusted
@@ -260,14 +256,11 @@ function copy_bin() {
 }
 
 # install_repo: copies the repo file expected to be on the install-from node
-# (localhost) to all storage nodes and to the yarn-master and ambari mgmt nodes,
-# and yum installs the packages. Returns 1 for errors.
-# Uses globals:
-#   MGMT_NODE
-#   NODES
-#   YARN_NODE
+# (localhost) to the passed-in nodes, and yum installs the packages. Returns 1
+# for errors.
 function install_repo() {
 
+  local nodes=($@)
   local node; local errcnt=0
   local repo_file='/etc/yum.repos.d/rhs-hadoop.repo'
 
@@ -306,18 +299,10 @@ function install_repo() {
     err "$repo_file is missing. Cannot install rhs-hadoop package on other nodes";
     return 1; }
 
-  for node in ${NODES[@]}; do # all storage nodes
+  for node in ${nodes[@]}; do
       [[ "$node" == "$HOSTNAME" ]] && continue # skip self (localhost)
       cp_install $node || ((errcnt++))
   done
-
-  # install on yarn-master and mgmt nodes
-  if [[ "$YARN_NODE" != "$HOSTNAME" ]] ; then
-     cp_install $YARN_NODE || ((errcnt++))
-  fi
-  if [[ "$MGMT_NODE" != "$HOSTNAME" ]] ; then
-    cp_install $MGMT_NODE || ((errcnt++))
-  fi
 
   (( errcnt > 0 )) && return 1
   return 0
@@ -402,6 +387,21 @@ function pool_exists() {
   return 0
 }
 
+# uniq_nodes: find the unique nodes in the lis of nodes provided.
+# Sets globals:
+#   UNIQ_NODES
+function uniq_nodes() {
+
+  local nodes=($@)
+  local node
+  UNIQ_NODES=() # global
+
+  for node in ${nodes[@]}; do
+      [[ "${UNIQ_NODES[*]}" =~ $node ]] && continue
+      UNIQ_NODES+=($node)
+  done
+}
+    
 # define_pool: If the trusted pool already exists then figure out which nodes are
 # new (can be none) and assign them to the global POOL array, which is used for
 # the gluster peer probe. Returns 1 if it's not ok to add node(s) to the pool.
@@ -429,7 +429,7 @@ function define_pool() {
 
     # find nodes in pool that are not supplied nodes (ie. unique)
     for node in ${nodes[@]}; do
-	[[ "${POOL[@]}" =~ $node ]] && continue
+	[[ "${POOL[*]}" =~ $node ]] && continue
 	uniq+=($node)
     done
 
@@ -508,6 +508,23 @@ function ambari_server() {
   return 0 
 }
 
+# verify_gid_uids: checks that the UIDs and GIDs for the hadoop users and hadoop
+# group are the same numeric value across all of the passed-in nodes. Returns 1
+# on inconsistency errors.
+# Uses globals:
+#   PREFIX
+function verify_gid_uids() {
+
+  local nodes="$@"
+  local errcnt=0
+
+  $PREFIX/bin/check_gids.sh $nodes || ((errcnt++))
+  $PREFIX/bin/check_uids.sh $nodes || ((errcnt++))
+
+  (( errcnt > 0 )) && return 1
+  return 0
+} 
+
 
 ## main ##
 
@@ -556,11 +573,15 @@ define_pool ${NODES[@]} || exit 1
 # prompt to continue before any changes are made...
 (( ! AUTO_YES )) && ! yesno "  Continue? [y|N] " && exit 0
 
+# for cases when the mgmt and/or yarn node are inside the pool there is some
+# efficiency in reducing the nodes to just the unique nodes
+uniq_nodes ${NODES[*]} $YARN_NODE $MGMT_NODE # sets UNIQ_NODES, no errors
+
 # distribute and install the rhs-hadoop repo file to all nodes
-install_repo || exit 1
+install_repo ${UNIQ_NODES[*]} || exit 1
 
 # copy bin/* files to /tmp/ on all nodes including mgmt- and yarn-nodes
-copy_bin ${NODES[*]} $YARN_NODE $MGMT_NODE || exit 1
+copy_bin ${UNIQ_NODES[*]} || exit 1
 
 # setup each node for hadoop workloads
 setup_nodes || exit 1
@@ -572,6 +593,9 @@ fi
 
 # install and start the ambari server on the MGMT_NODE
 ambari_server || exit 1
+
+# verify user UID and group GID consistency across the cluster
+verify_gid_uids ${UNIQ_NODES[*]} || exit 1
 
 quiet "All nodes verified/setup for hadoop workloads with no errors"
 exit 0

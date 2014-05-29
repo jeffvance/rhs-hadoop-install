@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # setup_yarn.sh setup the supplied yarn-master node for the passed-in volume. So
-# far, this includes assigning the glusterfs-fuse mount.
+# far, this includes creating the glusterfs-fuse mount.
 # Syntax:
 #   $1=volume name (required).
 #   -y=yarn-master node (required).
@@ -12,7 +12,9 @@ PREFIX="$(dirname $(readlink -f $0))"
 errcnt=0
 
 # set_yarn: if the yarn node does not already have VOLNAME mounted then
-# append an glusterfs-fuse volume mount to fstab and mount it. 
+# append an glusterfs-fuse volume mount to fstab and mount it. Note: since
+# the yarn-master node is expected to be a RHEL server we have to install
+# glusterfs-fuse first.
 # Uses globals:
 #   PREFIX
 #   RHS_NODE
@@ -22,6 +24,7 @@ errcnt=0
 function set_yarn() {
 
   local err; local out; local ssh=''; local ssh_close=''
+  local fuse_rpm='glusterfs-fuse'
   local volmnt="$VOLMNT" # same name as gluster-fuse mnt
   local mntopts="$($PREFIX/gen_req_gluster_mnt.sh),_netdev" # add _netdev
 
@@ -29,6 +32,10 @@ function set_yarn() {
 
   out="$(eval "
   	$ssh
+	  # install glusterfs-fuse if not present
+	  if ! rpm -ql $fuse_rpm >& /dev/null ; then
+	    yum -y install $fuse_rpm
+	  fi
 	  # append to fstab if not present
 	  if ! grep -qs $volmnt /etc/fstab ; then
 	    echo $RHS_NODE:/$VOLNAME $volmnt glusterfs $mntopts 0 0 >>/etc/fstab
