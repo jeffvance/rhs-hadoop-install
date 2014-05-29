@@ -23,7 +23,7 @@ function set_yarn() {
 
   local err; local out; local ssh=''; local ssh_close=''
   local volmnt="$VOLMNT" # same name as gluster-fuse mnt
-  local mntopts="$($PREFIX/bin/gen_req_gluster_mnt.sh),_netdev" # add _netdev
+  local mntopts="$($PREFIX/gen_req_gluster_mnt.sh),_netdev" # add _netdev
 
   [[ "$YARN_NODE" != "$HOSTNAME" ]] && { ssh="ssh $YARN_NODE '"; ssh_close="'"; }
 

@@ -207,7 +207,7 @@ function parse_nodes_brkmnts_blkdevs() {
     if (( MGMT_INSIDE && YARN_INSIDE )) ; then
       warn -e "the yarn-master and hadoop management nodes are inside the storage pool\nwhich is sub-optimal."
     elif (( MGMT_INSIDE )) ; then
-      warn "the hadoop management node is inside the storage pool which is sub-optimal."
+      warn "the hadoop mgmt node is inside the storage pool which is sub-optimal."
     else
       warn "the yarn-master node is inside the storage pool which is sub-optimal."
     fi
@@ -234,7 +234,7 @@ function copy_bin() {
   local nodes_seen='' # don't duplicate the copy
 
   for node in $@ ; do
-      [[ "$nodes_seen" ~= " $node " ]] && continue # dup node
+      [[ "$nodes_seen" =~ " $node " ]] && continue # dup node
       nodes_seen+=" $node " # frame with spaces
 
       [[ "$node" == "$HOSTNAME" ]] && cmd="cp -r $PREFIX/bin /tmp" \
@@ -488,9 +488,10 @@ function ambari_server() {
   [[ "$MGMT_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $MGMT_NODE"
 
   out="$(eval "$ssh /tmp/bin/setup_ambari_server.sh")"
+  verbose "setup_ambari_server: $out"
   err=$?
   if (( err != 0 )) ; then
-    err $err "out: $out"
+    err $err "$out"
     return 1
   fi
   return 0 
@@ -560,5 +561,5 @@ fi
 # install and start the ambari server on the MGMT_NODE
 ambari_server || exit 1
 
-echo "All nodes verified/setup for hadoop workloads with no errors"
+quiet "All nodes verified/setup for hadoop workloads with no errors"
 exit 0
