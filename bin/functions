@@ -85,7 +85,11 @@ function display() {
 # force: call display() using LOG_FORCE. $1 can be echo option(s) or the msg.
 function force() {
 
-  display "$1" "$2" $LOG_FORCE
+  local opt=''
+  if (( ${#1} == 2 )) && [[ ${1:0:1} == '-' && ${1:1:1} =~ [a-z] ]] ; then
+    opt="$1"; shift # assume echo option
+  fi
+  display $opt "$1" $LOG_FORCE
 }
 
 # err: call force(). Prepend "ERROR" to msg.
@@ -94,10 +98,11 @@ function force() {
 # $3= message.
 function err() {
 
-  local opt=''; local num=' '
-
-  [[ ${1:0:1} == '-'   ]] && { opt="$1"; shift;  }
-  [[ ${1:0:1} =~ [0-9] ]] && { num=" $1"; shift; }
+  local num=''; local opt=''
+  if (( ${#1} == 2 )) && [[ ${1:0:1} == '-' && ${1:1:1} =~ [a-z] ]] ; then
+    opt="$1"; shift # assume echo option
+  fi
+  [[ ${1:0:1} =~ [0-9] ]] && { num=" $1"; shift; } # assume error number
 
   force $opt "ERROR$num: $1"
 } 
@@ -126,11 +131,11 @@ function get_ambari_repo(){
 # quiet: call display() using LOG_QUIET. $1 can be an echo option or the msg.
 function quiet() {
 
-  local opt
+  local opt=''
   if (( ${#1} == 2 )) && [[ ${1:0:1} == '-' && ${1:1:1} =~ [a-z] ]] ; then
     opt="$1"; shift # assume echo option
   fi
-  display "$1" $LOG_QUIET
+  display $opt "$1" $LOG_QUIET
 }
 
 # validate_ntp_conf: validate the ntp config file by ensuring there is at least
@@ -192,10 +197,11 @@ function vol_exists() {
 # $3= message.
 function warn() {
 
-  local opt=''; local num=' '
-
-  [[ ${1:0:1} == '-'   ]] && { opt="$1"; shift;  }
-  [[ ${1:0:1} =~ [0-9] ]] && { num=" $1"; shift; }
+  local num=''; local opt=''
+  if (( ${#1} == 2 )) && [[ ${1:0:1} == '-' && ${1:1:1} =~ [a-z] ]] ; then
+    opt="$1"; shift # assume echo option
+  fi
+  [[ ${1:0:1} =~ [0-9] ]] && { num=" $1"; shift; } # assume warning number
 
   force $opt "WARN$num: $1"
 } 

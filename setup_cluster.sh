@@ -223,6 +223,31 @@ function parse_nodes_brkmnts_blkdevs() {
   return 0
 }
 
+
+# copy_bin: copies all bin/* files to /tmp/ on the passed-in nodes. Returns 1
+# on errors.
+# Uses globals:
+#   PREFIX
+function copy_bin() {
+
+  local node; local err; local errcnt=0; local out; local cmd
+  local nodes_seen='' # don't duplicate the copy
+
+  for node in $@ ; do
+      [[ "$nodes_seen" ~= " $node " ]] && continue # dup node
+      nodes_seen+=" $node " # frame with spaces
+
+      [[ "$node" == "$HOSTNAME" ]] && cmd="cp -r $PREFIX/bin /tmp" \
+				   || cmd="scp -qr $PREFIX/bin $node:/tmp"
+      out="$(eval "$cmd")"
+      err=$?
+      if (( err != 0 )) ; then
+	((errcnt++))
+	err $err "could not copy bin/* to /tmp on $node"
+      fi
+  done
+}
+
 # install_repo: copies the repo file expected to be on the install-from node
 # (localhost) to all storage nodes and to the yarn-master and ambari mgmt nodes,
 # and yum installs the packages. Returns 1 for errors.
@@ -310,12 +335,10 @@ function setup_nodes() {
     local node="$1"
     local blkdev="$2" # can be blank
     local brkmnt="$3" # can be blank
-    local out; local err; local ssh; local scp
+    local out; local err; local ssh
 
-    [[ "$node" == "$HOSTNAME" ]] && { ssh=''; scp='#'; } || \
-                                    { ssh="ssh $node"; scp='scp'; }
+    [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
 
-    out="$(eval "$scp -r -q $PREFIX/bin $node:/tmp")"
     out="$(eval "
 	$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
 		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE
@@ -453,27 +476,23 @@ function create_pool() {
 
 # ambari_server: install and start the ambari server on the MGMT_NODE. Returns
 # 1 on errors.
-# ASSUMPTION: 1) bin/* has been copied to all storage nodes but has not been
-#   copied to nodes outside of the pool.
+# ASSUMPTION: 1) bin/* has been copied to /tmp on all nodes
 # Uses globals:
-#   MGMT_INSIDE
 #   MGMT_NODE
 function ambari_server() {
 
-  local out; local ssh; local scp
+  local err; local out; local ssh
 
-  echo "Installing the ambari-server on $MGMT_NODE... this can take time"
+  verbose "Installing the ambari-server on $MGMT_NODE... this can take time"
 
-  if [[ "$MGMT_NODE" == "$HOSTNAME" ]] ; then # all scripts in place
-    $PREFIX/bin/setup_ambari_server.sh || return 1
-  else 
-    # if the mgmt-node is inside the storage pool then all bin scripts have been
-    # copied, else need to copy the setup_ambari_server script
-    (( MGMT_INSIDE )) || scp -q -r $PREFIX/bin $MGMT_NODE:/tmp
-    # setup the ambari server on the mgmt-node
-    ssh $MGMT_NODE "/tmp/bin/setup_ambari_server.sh" || return 1
+  [[ "$MGMT_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $MGMT_NODE"
+
+  out="$(eval "$ssh /tmp/bin/setup_ambari_server.sh")"
+  err=$?
+  if (( err != 0 )) ; then
+    err $err "out: $out"
+    return 1
   fi
-
   return 0 
 }
 
@@ -526,6 +545,9 @@ define_pool ${NODES[@]} || exit 1
 
 # distribute and install the rhs-hadoop repo file to all nodes
 install_repo || exit 1
+
+# copy bin/* files to /tmp/ on all nodes including mgmt- and yarn-nodes
+copy_bin ${NODES[*]} $YARN_NODE $MGMT_NODE
 
 # setup each node for hadoop workloads
 setup_nodes || exit 1
