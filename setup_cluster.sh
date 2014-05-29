@@ -246,6 +246,7 @@ function copy_bin() {
 
       [[ "$node" == "$HOSTNAME" ]] && cmd="cp -r $PREFIX/bin /tmp" \
 				   || cmd="scp -qr $PREFIX/bin $node:/tmp"
+      verbose "--- installing bin/ to /tmp on $node..."
       out="$(eval "$cmd")"
       err=$?
       if (( err != 0 )) ; then
@@ -276,7 +277,7 @@ function install_repo() {
 
     local node="$1"; local err
 
-    verbose "--- installing  $repo file on $node..."
+    verbose "--- installing $repo_file on $node..."
 
     # copy repo file to node
     out="$(scp $repo_file $node:$repo_file)"
@@ -299,7 +300,7 @@ function install_repo() {
 
   ## main ##
 
-  verbose "--- copying $repo file and installong on all nodes..."
+  verbose "--- copying $repo_file and installing on all nodes..."
 
   [[ ! -f "$repo_file" ]] && {
     err "$repo_file is missing. Cannot install rhs-hadoop package on other nodes";
@@ -355,7 +356,7 @@ function setup_nodes() {
  	")"
     err=$?
     verbose "setup_datanode for $node: $out"
-    if (( $? != 0 )) ; then
+    if (( err != 0 )) ; then
       err $err "in setup_datanode"
       return 1
     fi
@@ -498,8 +499,8 @@ function ambari_server() {
   [[ "$MGMT_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $MGMT_NODE"
 
   out="$(eval "$ssh /tmp/bin/setup_ambari_server.sh")"
-  verbose "setup_ambari_server: $out"
   err=$?
+  verbose "setup_ambari_server: $out"
   if (( err != 0 )) ; then
     err $err "$out"
     return 1

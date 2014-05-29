@@ -172,7 +172,11 @@ function validate_ntp_conf(){
 # verbose: call display() using LOG_VERBOSE. $1 can be echo option(s) or the msg.
 function verbose() {
 
-  display "$1" "$2" $LOG_VERBOSE
+  local opt=''
+  if (( ${#1} == 2 )) && [[ ${1:0:1} == '-' && ${1:1:1} =~ [a-z] ]] ; then
+    opt="$1"; shift # assume echo option
+  fi
+  display $opt "$1" $LOG_VERBOSE
 }
 
 # vol_exists: invokes gluster vol info to see if VOLNAME exists. Returns 1 on
@@ -191,7 +195,7 @@ function vol_exists() {
   return 0
 }
 
-# warn: call force(). Prepend "WARN" to msg.
+# warn: call force(). Prepend "WARN" and optional warn number to msg.
 # $1= echo option or next arg,
 # $2= warning number or next arg,
 # $3= message.
