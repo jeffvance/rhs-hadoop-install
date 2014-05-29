@@ -116,26 +116,25 @@ function parse_cmd() {
 }
 
 # setup_nodes: setup each node for hadoop workloads by invoking
-# setup_datanodes.sh. Returns 1 on errors.
+# setup_datanodes.sh. Returns 1 on errors. Assumes all nodes have current
+# bin/ scripts in /tmp.
 # Uses globals:
 #   BLKDEVS
 #   BRKMNTS
 #   MGMT_NODE
 #   NODES
-#   PREFIX
 #   YARN_NODE
 function setup_nodes() {
 
   local i=0; local err; local errcnt=0; local errnodes=''
-  local node; local brkmnt; local blkdev; local ssh; local scp
+  local node; local brkmnt; local blkdev; local ssh
 
   for node in ${NODES[@]}; do
       brkmnt=${BRKMNTS[$i]}
       blkdev=${BLKDEVS[$i]}
 
-      [[ "$node" == "$HOSTNAME" ]] && { ssh=''; scp='#'; } || \
-				      { ssh="ssh $node"; scp='scp'; }
-      eval "$scp -r -q $PREFIX/bin $node:/tmp"
+      [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
+
       eval "$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
 		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE"
       err=$?

@@ -163,25 +163,20 @@ function parse_brkmnts() {
 
 # chk_nodes: verify that each node that will be spanned by the new volume is 
 # prepped for hadoop workloads by invoking bin/check_node.sh. Returns 1 on 
-# errors.
+# errors. Assumes all nodes have current bin/ scripts in /tmp.
 # Uses globals:
 #   BRKMNTS
 #   NODES
-#   PREFIX
 # Side effect: all scripts under bin/ are copied to each node.
 function chk_nodes() {
 
-  local i=0; local node; local err; local out
-  local ssh; local scp
+  local i=0; local node; local err; local out; local ssh
 
   # verify that each node is prepped for hadoop workloads
   for node in ${NODES[@]}; do
-      [[ "$node" == "$HOSTNAME" ]] && { ssh=''; scp='#'; } || \
-				       { ssh="ssh $node"; scp='scp'; }
-      eval "$scp -r -q $PREFIX/bin $node:/tmp"
-      out="$(eval "
-	$ssh /tmp/bin/check_node.sh ${BRKMNTS[$i]}
-      ")"
+      [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
+
+      out="$(eval "$ssh /tmp/bin/check_node.sh ${BRKMNTS[$i]}")"
       err=$?
       if (( err != 0 )) ; then
 	echo "ERROR on $node: $out"
