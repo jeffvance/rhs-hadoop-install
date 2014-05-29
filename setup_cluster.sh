@@ -86,11 +86,12 @@ EOF
 #   AUTO_YES
 #   MGMT_NODE
 #   NODE_SPEC
+#   VERBOSE
 #   YARN_NODE
 function parse_cmd() {
 
   local opts='y'
-  local long_opts='help,version,yarn-master:,hadoop-mgmt-node:'
+  local long_opts='help,version,yarn-master:,hadoop-mgmt-node:,verbose,quiet'
   local errcnt=0
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
@@ -102,6 +103,12 @@ function parse_cmd() {
 	;;
 	--version) # version is already output, so nothing to do here
 	  exit 0
+	;;
+	--verbose)
+	  VERBOSE=$LOG_VERBOSE; shift; continue
+	;;
+	--quiet)
+	  VERBOSE=$LOG_QUIET; shift; continue
 	;;
 	-y)
 	  AUTO_YES=1; shift; continue
@@ -246,6 +253,9 @@ function copy_bin() {
 	err $err "could not copy bin/* to /tmp on $node"
       fi
   done
+
+  (( errcnt > 0 )) && return 1
+  return 0
 }
 
 # install_repo: copies the repo file expected to be on the install-from node
@@ -506,6 +516,7 @@ declare -A NODE_BRKMNTS; declare -A NODE_BLKDEVS
 MGMT_INSIDE=0 # assume false
 YARN_INSIDE=0 # assume false
 AUTO_YES=0    # assume false
+VERBOSE=$LOG_QUIET # default
 errnodes=''; errcnt=0
 
 quiet '***'
@@ -548,7 +559,7 @@ define_pool ${NODES[@]} || exit 1
 install_repo || exit 1
 
 # copy bin/* files to /tmp/ on all nodes including mgmt- and yarn-nodes
-copy_bin ${NODES[*]} $YARN_NODE $MGMT_NODE
+copy_bin ${NODES[*]} $YARN_NODE $MGMT_NODE || exit 1
 
 # setup each node for hadoop workloads
 setup_nodes || exit 1
