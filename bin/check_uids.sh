@@ -36,7 +36,9 @@ for u in $($PREFIX/gen_users.sh); do # list of hadoop users
       ((errcnt++))
       echo -e "ERROR: \"$u\" user has inconsistent UID across supplied nodes.\n UIDs: ${uniq_uids[*]}"
       for (( i=0; i<${#NODES[@]}; i++ )); do
-	  echo "    node: ${NODES[$i]} has $u UID: ${uids[$i]}"
+	  node="${NODES[$i]}"; let fill=(16-${#node})
+	  node="$node $(printf ' %.0s' $(seq $fill))" # left-justify
+	  echo "       $node has $u UID: ${uids[$i]}"
       done
     fi
 done

@@ -51,12 +51,13 @@ SYNTAX:
 $ME --version | --help
 
 $ME [-y] [--hadoop-management-node <node>] [--yarn-master <node>] \\
+              [--quiet | --verbose | --debug] \\
               <nodes-spec-list>
 where:
 
-  <node-spec-list> : a list of two or more <node-spec>s.
-  <node-spec> : a storage node followed by a ':', followed by a brick mount path,
-      followed by another ':', followed by a block device path. Eg:
+  <node-spec-list>: a list of two or more <node-spec>s.
+  <node-spec>     : a storage node followed by a ':', followed by a brick mount
+      path, followed by another ':', followed by a block device path. Eg:
          <node1><:brickmnt1>:<blkdev1>  <node2>[:<brickmnt2>][:<blkdev2>] ...
       Each node is expected to be separate from the management and yarn-master
       nodes. Only the brick mount path and the block device path associated with
@@ -65,14 +66,18 @@ where:
       mount path and block device path. If a brick mount path is omitted but a
       block device path is specified then the block device path is proceded by
       two ':'s, eg. "<nodeN>::<blkdevN>"
-  --yarn-master : (optional) hostname or ip of the yarn-master server which is
+  --yarn-master   : (optional) hostname or ip of the yarn-master server which is
       expected to be outside of the storage pool. Default is localhost.
-  --hadoop-mgmt-node : (optional) hostname or ip of the hadoop mgmt server which
+  --hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server which
       is expected to be outside of the storage pool. Default is localhost.
-  -y : auto answer "yes" to all prompts. Default is to be promoted before the
-      script continues.
-  --version : output only the version string.
-  --help : this text.
+  -y              : (optional) auto answer "yes" to all prompts. Default is to 
+      answer a confirmation prompt.
+  --quiet         : (optional) output only basic progress/step messages. Default.
+  --verbose       : (optional) output --quiet plus more details of each step.
+  --debug         : (optional) output --verbose plus greater details useful for
+      debugging.
+  --version       : output only the version string.
+  --help          : this text.
 
 EOF
 }
@@ -87,7 +92,7 @@ EOF
 function parse_cmd() {
 
   local opts='y'
-  local long_opts='help,version,yarn-master:,hadoop-mgmt-node:,verbose,quiet'
+  local long_opts='help,version,yarn-master:,hadoop-mgmt-node:,verbose,quiet,debug'
   local errcnt=0
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
@@ -100,11 +105,14 @@ function parse_cmd() {
 	--version) # version is already output, so nothing to do here
 	  exit 0
 	;;
+	--quiet)
+	  VERBOSE=$LOG_QUIET; shift; continue
+	;;
 	--verbose)
 	  VERBOSE=$LOG_VERBOSE; shift; continue
 	;;
-	--quiet)
-	  VERBOSE=$LOG_QUIET; shift; continue
+	--debug)
+	  VERBOSE=$LOG_DEBUG; shift; continue
 	;;
 	-y)
 	  AUTO_YES=1; shift; continue
@@ -241,12 +249,12 @@ function show_todo() {
 
   echo
   quiet "*** Nodes             : ${NODES[*]}"
-  quiet "*** Brick mounts      :"
+  quiet "*** Brick mounts"
   for node in ${NODES[@]}; do
       quiet "      $node         : ${NODE_BRKMNTS[$node]}"
   done
 
-  quiet "*** Block devices     :"
+  quiet "*** Block devices"
   for node in ${NODES[@]}; do
       quiet "      $node         : ${NODE_BLKDEVS[$node]}"
   done
@@ -265,13 +273,15 @@ function copy_bin() {
   local node; local err; local errcnt=0; local out; local cmd
   local nodes_seen='' # don't duplicate the copy
 
+  verbose "--- copying bin/ to /tmp on all nodes..."
+
   for node in $@ ; do
       [[ "$nodes_seen" =~ " $node " ]] && continue # dup node
       nodes_seen+=" $node " # frame with spaces
 
       [[ "$node" == "$HOSTNAME" ]] && cmd="cp -r $PREFIX/bin /tmp" \
 				   || cmd="scp -qr $PREFIX/bin $node:/tmp"
-      verbose "--- installing bin/ to /tmp on $node..."
+      debug "copy bin/ to /tmp on $node"
       out="$(eval "$cmd")"
       err=$?
       if (( err != 0 )) ; then
@@ -299,7 +309,7 @@ function install_repo() {
 
     local node="$1"; local err
 
-    verbose "--- installing $repo_file on $node..."
+    verbose "installing repo file on $node"
 
     # copy repo file to node
     out="$(scp $repo_file $node:$repo_file)"
@@ -310,7 +320,7 @@ function install_repo() {
     fi
 
     # yum install package
-    out="$(ssh $node 'yum install -y --nogpgcheck rhs-hadoop')"
+    out="$(ssh $node 'yum install -y --nogpgcheck rhs-hadoop 2>&1')"
     err=$?
     if (( err != 0 )) ; then
       err $err "yum installing $file on $node: $out"
@@ -325,7 +335,7 @@ function install_repo() {
   verbose "--- copying $repo_file and installing on all nodes..."
 
   [[ ! -f "$repo_file" ]] && {
-    err "$repo_file is missing. Cannot install rhs-hadoop package on other nodes";
+    err "$repo_file is missing. Cannot install rhs-hadoop package on cluster";
     return 1; }
 
   for node in ${nodes[@]}; do
@@ -497,6 +507,7 @@ function create_pool() {
   # create or add-to storage pool
   for node in ${POOL[@]} $YARN_NODE; do
       [[ "$node" == "$FIRST_NODE" ]] && continue # skip
+      debug "gluster peer probe $node (from $FIRST_NODE)"
       out="$(ssh $FIRST_NODE "gluster peer probe $node 2>&1")"
       err=$?
       if (( err != 0 )) ; then

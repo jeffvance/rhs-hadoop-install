@@ -34,6 +34,18 @@ function check_ssh() {
   return 0
 }
 
+# debug: call display() using LOG_DEBUG. $1 can be an echo option or the msg.
+# "DEBUG" is prepended to the msg.
+function debug() {
+
+  local opt=''
+  if (( ${#1} == 2 )) && [[ ${1:0:1} == '-' && ${1:1:1} =~ [a-z] ]] ; then
+    opt="$1"; shift # assume echo option
+  fi
+  display $opt "DEBUG: $1" $LOG_DEBUG
+}
+
+
 # default_nodes: Detects the any/all of the supplied *_node options has been 
 # omitted and prompts the user to confirm if they wish to use localhost as 
 # the missing node's default value. Following each option is its human readable
