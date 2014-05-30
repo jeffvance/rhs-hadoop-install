@@ -55,29 +55,33 @@ $ME [-y] [--hadoop-management-node <node>] [--yarn-master <node>] \\
               <nodes-spec-list>
 where:
 
-  <node-spec-list>: a list of two or more <node-spec>s.
-  <node-spec>     : a storage node followed by a ':', followed by a brick mount
-      path, followed by another ':', followed by a block device path. Eg:
-         <node1><:brickmnt1>:<blkdev1>  <node2>[:<brickmnt2>][:<blkdev2>] ...
-      Each node is expected to be separate from the management and yarn-master
-      nodes. Only the brick mount path and the block device path associated with
-      the first node are required. If omitted from the other <node-spec-list>
-      members then each node assumes the values of the first node for brick
-      mount path and block device path. If a brick mount path is omitted but a
-      block device path is specified then the block device path is proceded by
-      two ':'s, eg. "<nodeN>::<blkdevN>"
-  --yarn-master   : (optional) hostname or ip of the yarn-master server which is
-      expected to be outside of the storage pool. Default is localhost.
-  --hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server which
-      is expected to be outside of the storage pool. Default is localhost.
-  -y              : (optional) auto answer "yes" to all prompts. Default is to 
-      answer a confirmation prompt.
-  --quiet         : (optional) output only basic progress/step messages. Default.
-  --verbose       : (optional) output --quiet plus more details of each step.
-  --debug         : (optional) output --verbose plus greater details useful for
-      debugging.
-  --version       : output only the version string.
-  --help          : this text.
+<node-spec-list>: a list of two or more <node-spec>s.
+<node-spec>     : a storage node followed by a ':', followed by a brick mount
+                  path, followed by another ':', followed by a block device path.
+                  Eg: <node1><:brickmnt1>:<blkdev1> <node2>[:<brickmnt2>]
+                      [:<blkdev2>] [<node3>] ...
+                  Each node is expected to be separate from the management and 
+                  yarn-master nodes. Only the brick mount path and the block
+                  device path associated with the first node are required. If
+                  omitted from the other <node-spec-list> members then each node
+                  assumes the values of the first node for brick mount path and
+                  block device path. If a brick mount path is omitted but a
+                  block device path is specified then the block device path is
+                  proceded by two ':'s, eg. "<nodeN>::<blkdevN>"
+--yarn-master   : (optional) hostname or ip of the yarn-master server which is
+                  expected to be outside of the storage pool. Default is
+                  localhost.
+--hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server which
+                  is expected to be outside of the storage pool. Default is
+                  localhost.
+-y              : (optional) auto answer "yes" to all prompts. Default is to 
+                  answer a confirmation prompt.
+--quiet         : (optional) output only basic progress/step messages. Default.
+--verbose       : (optional) output --quiet plus more details of each step.
+--debug         : (optional) output --verbose plus greater details useful for
+                  debugging.
+--version       : output only the version string.
+--help          : this text.
 
 EOF
 }
