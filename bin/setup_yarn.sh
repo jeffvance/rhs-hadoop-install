@@ -34,7 +34,7 @@ function set_yarn() {
   	$ssh
 	  # install glusterfs-fuse if not present
 	  if ! rpm -ql $fuse_rpm >& /dev/null ; then
-	    yum -y install $fuse_rpm
+	    yum -y install $fuse_rpm 2>&1
 	  fi
 	  # append to fstab if not present
 	  if ! grep -qs $volmnt /etc/fstab ; then

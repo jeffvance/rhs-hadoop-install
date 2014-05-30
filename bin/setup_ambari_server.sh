@@ -31,7 +31,7 @@ if [[ -f $AMBARI_SERVER_PID ]] ; then
 fi
 
 # install the ambari server -- may want to capture this long output...
-yum -y install ambari-server
+yum -y install ambari-server 2>&1
 err=$?
 if (( err != 0 && err != 1 )) ; then # 1--> nothing-to-do
   echo "ERROR $err: ambari server install: $out"

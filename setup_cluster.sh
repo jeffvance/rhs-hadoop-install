@@ -386,11 +386,10 @@ function setup_nodes() {
 		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE
  	")"
     err=$?
-
+    debug "setup_datanode for $node: $out"
     verbose "+++"
     verbose "+++ completed node $node with status of $err"
     verbose "+++"
-    debug "setup_datanode for $node: $out"
 
     if (( err != 0 )) ; then
       err $err "in setup_datanode"
@@ -455,7 +454,7 @@ function uniq_nodes() {
       UNIQ_NODES+=($node)
   done
 
-  debug "unique nodes (incld yarn and mgmt): ${UNIQ_NODES[@]}"
+  debug "unique nodes (includes yarn and mgmt): ${UNIQ_NODES[*]}"
 }
     
 # define_pool: If the trusted pool already exists then figure out which nodes are

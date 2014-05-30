@@ -36,7 +36,7 @@ for g in $($PREFIX/gen_groups.sh); do # list of hadoop groups (1 now)
     uniq_gids=($(printf '%s\n' "${gids[@]}" | sort -u))
     if (( ${#uniq_gids[@]} > 1 )) ; then
       ((errcnt++))
-      echo -e "ERROR: \"$g\" group has inconsistent GIDs across supplied nodes.\n GIDs: ${uniq_gids[*]}"
+      echo -e "\"$g\" group has inconsistent GIDs across supplied nodes.\n GIDs: ${uniq_gids[*]}"
       for (( i=0; i<${#NODES[@]}; i++ )); do
 	  node="${NODES[$i]}"; let fill=(16-${#node})
 	  node="$node $(printf ' %.0s' $(seq $fill))" # left-justify 
