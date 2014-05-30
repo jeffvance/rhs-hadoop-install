@@ -134,7 +134,7 @@ function parse_cmd() {
 # parse_nodes_brkmnts_blkdevs: set the global NODE_BRKMNTS and NODE_BLKDEVS 
 # arrays based on NODE_SPEC. The format of these assoc arrays is:
 #   NODE_BRKMNTS[<node>]="<brickmnt>[,<brkmnt1>][,<brmknt2>]..."
-#   NODE_BLKDEVS[<node>]="<brickmnt>[,<brkmnt1>][,<brmknt2>]..."
+#   NODE_BLKDEVS[<node>]="<blkdev>[,<blkdev>][,<blkdev>]..."
 # The brick mount and block dev values are a comma separated list. Most times
 # the list contains only one brick-mnt/block-dev, but to handle the case of the
 # same node repeated with different brick-mnt and/or block-dev paths we use a 
@@ -149,7 +149,7 @@ function parse_cmd() {
 #   MGMT_NODE
 # Sets globals:
 #   MGMT_INSIDE
-#   NODES
+#   NODES (*unique* storage nodes)
 #   NODE_BLKDEVS
 #   NODE_BRKMNTS
 #   YARN_INSIDE
@@ -168,7 +168,6 @@ function parse_nodes_brkmnts_blkdevs() {
   # parse out list of nodes, format: "node[:brick-mnt][:blk-dev]"
   for node_spec in ${NODE_SPEC[@]}; do
       node=${node_spec%%:*}
-      NODES+=($node)
       # fill in missing brk-mnts and/or blk-devs
       case "$(grep -o ':' <<<"$node_spec" | wc -l)" in # num of ":"s
           0) # brkmnt and blkdev omitted
@@ -199,6 +198,9 @@ function parse_nodes_brkmnts_blkdevs() {
       [[ "$node" == "$MGMT_NODE" ]] && MGMT_INSIDE=1 # true
   done
 
+  # assign unique storage nodes
+  NODES=(${!NODE_BRKMNTS[@]}) # same as using NODE_BLKDEVS indices...
+
   # remove last trailing comma from each node's brk/blk value
   for node in ${NODES[@]}; do
       NODE_BRKMNTS[$node]=${NODE_BRKMNTS[$node]%*,}
@@ -226,6 +228,33 @@ function parse_nodes_brkmnts_blkdevs() {
   return 0
 }
 
+# show_todo: show summary of actions to be done.
+# Uses globals:
+#   BLKDEVS
+#   BRKMNTS
+#   MGMT_NODE
+#   NODES
+#   YARN_NODE
+function show_todo() {
+
+  local node
+
+  echo
+  quiet "*** Nodes             : ${NODES[*]}"
+  quiet "*** Brick mounts      :"
+  for node in ${NODES[@]}; do
+      quiet "      $node         : ${NODE_BRKMNTS[$node]}"
+  done
+
+  quiet "*** Block devices     :"
+  for node in ${NODES[@]}; do
+      quiet "      $node         : ${NODE_BLKDEVS[$node]}"
+  done
+
+  quiet "*** Ambari mgmt node  : $MGMT_NODE"
+  quiet "*** Yarn-master server: $YARN_NODE"
+  echo
+}
 
 # copy_bin: copies all bin/* files to /tmp/ on the passed-in nodes. Returns 1
 # on errors.
@@ -340,12 +369,12 @@ function setup_nodes() {
 		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE
  	")"
     err=$?
+
     verbose "setup_datanode for $node: $out"
     if (( err != 0 )) ; then
       err $err "in setup_datanode"
       return 1
     fi
-
     return 0
   }
 
@@ -367,7 +396,6 @@ function setup_nodes() {
     verbose "$errcnt setup node errors on nodes: $errnodes"
     return 1
   fi
-
   return 0
 }
 
@@ -547,35 +575,25 @@ default_nodes MGMT_NODE 'management' YARN_NODE 'yarn-master' || exit -1
 
 # extract nodes, brick mnts and blk devs arrays from NODE_SPEC
 parse_nodes_brkmnts_blkdevs || exit -1
+
 # use the first storage node for all gluster cli cmds
 FIRST_NODE=${NODES[0]}
 
-# check for passwordless ssh connectivity to nodes
-check_ssh ${NODES[*]} $YARN_NODE || exit 1
+# for cases where storage nodes are repeated and/or the mgmt and/or yarn nodes
+# are inside the pool, there is some improved efficiency in reducing the nodes
+# to just the unique nodes
+uniq_nodes ${NODES[*]} $YARN_NODE $MGMT_NODE # sets UNIQ_NODES global
 
-echo
-quiet "*** Nodes             : ${NODES[*]}"
-quiet "*** Brick mounts      :"
-for node in ${NODES[@]}; do
-    quiet "      $node         : ${NODE_BRKMNTS[$node]}"
-done
-quiet "*** Block devices     :"
-for node in ${NODES[@]}; do
-    quiet "      $node         : ${NODE_BLKDEVS[$node]}"
-done
-quiet "*** Ambari mgmt node  : $MGMT_NODE"
-quiet "*** Yarn-master server: $YARN_NODE"
-echo
+# check for passwordless ssh connectivity to nodes
+check_ssh ${UNIQ_NODES[*]} || exit 1
+
+show_todo
 
 # figure out which nodes, if any, will be added to the storage pool
 define_pool ${NODES[@]} || exit 1
 
 # prompt to continue before any changes are made...
 (( ! AUTO_YES )) && ! yesno "  Continue? [y|N] " && exit 0
-
-# for cases when the mgmt and/or yarn node are inside the pool there is some
-# efficiency in reducing the nodes to just the unique nodes
-uniq_nodes ${NODES[*]} $YARN_NODE $MGMT_NODE # sets UNIQ_NODES, no errors
 
 # distribute and install the rhs-hadoop repo file to all nodes
 install_repo ${UNIQ_NODES[*]} || exit 1
