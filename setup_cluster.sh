@@ -313,11 +313,10 @@ function install_repo() {
 
     local node="$1"; local err
 
-    verbose "installing repo file on $node"
-
     # copy repo file to node
     out="$(scp $repo_file $node:$repo_file)"
     err=$?
+    debug "copying repo file to $node in $(dirname $repo_file)"
     if (( err != 0 )) ; then
       err $err "coping $file to $node: $out"
       return 1
@@ -326,6 +325,7 @@ function install_repo() {
     # yum install package
     out="$(ssh $node 'yum install -y --nogpgcheck rhs-hadoop 2>&1')"
     err=$?
+    debug "yum install repo file on $node"
     if (( err != 0 )) ; then
       err $err "yum installing $file on $node: $out"
       return 1
@@ -378,13 +378,20 @@ function setup_nodes() {
 
     [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
 
+    verbose "+++"
+    verbose "+++ begin node $node"
+    verbose "+++"
     out="$(eval "
 	$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
 		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE
  	")"
     err=$?
 
-    verbose "setup_datanode for $node: $out"
+    verbose "+++"
+    verbose "+++ completed node $node with status of $err"
+    verbose "+++"
+    debug "setup_datanode for $node: $out"
+
     if (( err != 0 )) ; then
       err $err "in setup_datanode"
       return 1
@@ -393,6 +400,8 @@ function setup_nodes() {
   }
 
   # main #
+  verbose "--- setup_datanode on all nodes..."
+
   for node in ${NODES[@]}; do
       brkmnt=${NODE_BRKMNTS[$node]} # 1 or more brk-mnt path(s)
       blkdev=${NODE_BLKDEVS[$node]} # 1 or more blk-dev path(s)
@@ -402,14 +411,15 @@ function setup_nodes() {
   done
 
   if (( ! YARN_INSIDE )) ; then
-    verbose "setting up yarn-master..."
+    verbose "setting up $YARN_NODE as the yarn-master server..."
     do_node $YARN_NODE || ((errcnt++)) # blkdev and brkmnt are blank
   fi
 
   if (( errcnt > 0 )) ; then
-    verbose "$errcnt setup node errors on nodes: $errnodes"
+    err "$errcnt setup_datanode errors on nodes: $errnodes"
     return 1
   fi
+  verbose "--- setup_datanode complete on all nodes..."
   return 0
 }
 
@@ -418,10 +428,12 @@ function setup_nodes() {
 #   FIRST_NODE
 function pool_exists() {
 
-  local ssh; local out
+  local ssh; local out; local err
 
   [[ "$FIRST_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $FIRST_NODE" 
   out="$(eval "$ssh gluster peer status")"
+  err=$?
+  debug "gluster peer status: $out"
   (( $? != 0 )) && return 1
 
   # peer status returns 0 even when no pool exists, so parse output
@@ -442,6 +454,8 @@ function uniq_nodes() {
       [[ "${UNIQ_NODES[*]}" =~ $node ]] && continue
       UNIQ_NODES+=($node)
   done
+
+  debug "unique nodes (incld yarn and mgmt): ${UNIQ_NODES[@]}"
 }
     
 # define_pool: If the trusted pool already exists then figure out which nodes are
@@ -465,9 +479,11 @@ function define_pool() {
 
   if pool_exists ; then
     verbose "storage pool exists"
+
     # find all nodes in trusted pool
     POOL=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE)) # nodes in existing pool
     FIRST_NODE=${POOL[0]} # peer probe from this node
+    debug "existing pool nodes: ${POOL[@]}"
 
     # find nodes in pool that are not supplied nodes (ie. unique)
     for node in ${nodes[@]}; do
@@ -477,6 +493,7 @@ function define_pool() {
 
     # are we adding nodes, or just checking existing nodes?
     POOL=(${uniq[@]}) # nodes to potentially add to existing pool, can be 0
+    debug "unique nodes to add to pool: ${POOL[@]}"
 
     if (( ${#uniq[@]} > 0 )) ; then # we have nodes not in pool
       echo
@@ -504,27 +521,24 @@ function define_pool() {
 #   YARN_NODE
 function create_pool() {
 
-  local node; local err; local errcnt=0; local errnodes=''; local out
+  local node; local err; local errcnt=0; local out
 
-  verbose "--- creating storage pool..."
+  verbose "--- creating trusted storage pool..."
 
   # create or add-to storage pool
   for node in ${POOL[@]} $YARN_NODE; do
       [[ "$node" == "$FIRST_NODE" ]] && continue # skip
-      debug "gluster peer probe $node (from $FIRST_NODE)"
       out="$(ssh $FIRST_NODE "gluster peer probe $node 2>&1")"
       err=$?
+      debug "gluster peer probe $node (from $FIRST_NODE): $out"
       if (( err != 0 )) ; then
 	err $err "peer probe failed on $node"
-	errnodes+="$node "
 	((errcnt++))
       fi
   done
 
-  if (( errcnt > 0 )) ; then
-    verbose "$errcnt peer probe errors on nodes: $errnodes"
-    return 1
-  fi
+  (( errcnt > 0 )) && return 1
+  verbose "--- trusted storage pool created"
   return 0
 }
 
@@ -537,17 +551,19 @@ function ambari_server() {
 
   local err; local out; local ssh
 
-  verbose "Installing the ambari-server on $MGMT_NODE... this can take time"
+  verbose "--- installing ambari-server on $MGMT_NODE... this can take time"
 
   [[ "$MGMT_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $MGMT_NODE"
 
   out="$(eval "$ssh /tmp/bin/setup_ambari_server.sh")"
   err=$?
-  verbose "setup_ambari_server: $out"
+  debug "setup_ambari_server: $out"
   if (( err != 0 )) ; then
     err $err "$out"
     return 1
   fi
+
+  verbose "--- installing ambari-server completed on $MGMT_NODE"
   return 0 
 }
 
@@ -559,12 +575,28 @@ function ambari_server() {
 function verify_gid_uids() {
 
   local nodes="$@"
-  local errcnt=0
+  local errcnt=0; local out; local err
 
-  $PREFIX/bin/check_gids.sh $nodes || ((errcnt++))
-  $PREFIX/bin/check_uids.sh $nodes || ((errcnt++))
+  verbose "--- verifying consistent hadoop UIDs and GIDs across nodes..."
+
+  out="$($PREFIX/bin/check_gids.sh $nodes)"
+  err=$?
+  debug "check_gids out: $out"
+  if (( err != 0 )) ; then
+    ((errcnt++))
+    err "$out"
+  fi
+
+  out="$($PREFIX/bin/check_uids.sh $nodes)"
+  err=$?
+  debug "check_uids out: $out"
+  if (( err != 0 )) ; then
+    ((errcnt++))
+    err "$out"
+  fi
 
   (( errcnt > 0 )) && return 1
+  verbose "--- completed verifying hadoop UIDs and GIDs"
   return 0
 } 
 
