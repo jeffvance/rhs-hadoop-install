@@ -204,7 +204,10 @@ function setup_ntp() {
   local errcnt=0; local warncnt=0; local out; local cnt=0; local err
 
   # validate ntp config file
-  validate_ntp_conf || ((errcnt++))
+  if ! validate_ntp_conf ; then  # we're hosed: can't sync time nor start ntpd
+    echo "ERROR: cannot proceed with ntp validation due to config file error"
+    return 1
+  fi
 
   # stop ntpd so that ntpd -qg can potentially do a large time change
   while ps -C ntpd >& /dev/null ; do

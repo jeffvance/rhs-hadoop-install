@@ -151,12 +151,17 @@ function quiet() {
 }
 
 # validate_ntp_conf: validate the ntp config file by ensuring there is at least
-# one time-server suitable for ntp use.
+# one time-server suitable for ntp use. Return 1 for errors.
 function validate_ntp_conf(){
 
   local timeserver; local i=1; local errcnt=0
   local ntp_conf='/etc/ntp.conf'
   local servers=(); local numServers
+
+  if [[ ! -f $ntp_conf ]] ; then
+    echo "ERROR: ntp config file \"$ntp_conf\" is missing"
+    return 1 # nothing more we can do...
+  fi
 
   servers=($(grep "^ *server " $ntp_conf|awk '{print $2}')) # time-servers
   numServers=${#servers[@]}
@@ -166,7 +171,7 @@ function validate_ntp_conf(){
     ((errcnt++))
   fi
 
-  for timeserver in "${servers[@]}" ; do
+  for timeserver in ${servers[@]} ; do
       ntpdate -q $timeserver >& /dev/null
       (( $? == 0 )) && break # exit loop, found valid time-server
       ((i++))

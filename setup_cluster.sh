@@ -252,15 +252,15 @@ function show_todo() {
   local node
 
   echo
-  quiet "*** Nodes             : ${NODES[*]}"
+  quiet "*** Nodes             : $(echo ${NODES[*]} | tr ' ' ', ')"
   quiet "*** Brick mounts"
   for node in ${NODES[@]}; do
-      quiet "      $node         : ${NODE_BRKMNTS[$node]}"
+      quiet "      $node         : $(echo ${NODE_BRKMNTS[$node]} | tr ' ' ', ')"
   done
 
   quiet "*** Block devices"
   for node in ${NODES[@]}; do
-      quiet "      $node         : ${NODE_BLKDEVS[$node]}"
+      quiet "      $node         : $(echo ${NODE_BLKDEVS[$node]} | tr ' ' ', ')"
   done
 
   quiet "*** Ambari mgmt node  : $MGMT_NODE"
@@ -380,7 +380,6 @@ function setup_nodes() {
 
     verbose "+++"
     verbose "+++ begin node $node"
-    verbose "+++"
     out="$(eval "
 	$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
 		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE
@@ -389,7 +388,6 @@ function setup_nodes() {
     debug "setup_datanode for $node: $out"
     verbose "+++"
     verbose "+++ completed node $node with status of $err"
-    verbose "+++"
 
     if (( err != 0 )) ; then
       err $err "in setup_datanode"
@@ -415,10 +413,10 @@ function setup_nodes() {
   fi
 
   if (( errcnt > 0 )) ; then
-    err "$errcnt setup_datanode errors on nodes: $errnodes"
+    err "total setup_datanode errors: $errcnt"
     return 1
   fi
-  verbose "--- setup_datanode complete on all nodes..."
+  verbose "--- setup_datanode completed on all nodes..."
   return 0
 }
 
