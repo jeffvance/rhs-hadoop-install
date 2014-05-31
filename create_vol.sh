@@ -390,7 +390,6 @@ echo
 chk_nodes  || exit 1
 
 # prompt to continue before any changes are made...
-echo
 (( ! AUTO_YES )) && ! yesno "Creating new volume $VOLNAME. Continue? [y|N] " && \
   exit 0
 
