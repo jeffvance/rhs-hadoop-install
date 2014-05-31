@@ -26,33 +26,38 @@ function usage() {
 
   cat <<EOF
 
-$ME creates and prepares a new volume designated for hadoop workloads. The 
-replica factor is hard-coded to 2, per RHS requirements.
+$ME creates and prepares a new volume designated for hadoop workloads.
+The replica factor is hard-coded to 2, per RHS requirements.
 
 SYNTAX:
 
 $ME --version | --help
 
-$ME [-y] <volname> <volume-mnt-prefix> <node-list-spec>
+$ME [-y] [--quiet | --verbose | --debug] \\
+           <volname> <volume-mnt-prefix> <node-list-spec>
 
 where:
 
-  <node-spec-list> : a list of two or more <node-spec>s.
-  <node-spec> : a storage node followed by a ':', followed by a brick mount
-      path.  Eg:
-         <node1><:brickmnt1>  <node2>[:<brickmnt2>] ...
-      Each node is expected to be separate from the management and yarn-master
-      nodes. Only the brick mount path associated with the first node is
-      required. If omitted from the other <node-spec-list> members then each node
-      assumes the value of the first node for the brick mount path.
-
-  <volname> : name of the new volume.
-  <vol-mnt-prefix> : path of the glusterfs-fuse mount point, eg. /mnt/glusterfs.
-      Note: the volume name will be appended to this mount point.
-  -y : auto answer "yes" to all prompts. Default is to be promoted before the
-      script continues.
-  --version : output only the version string.
-  --help : this text.
+<node-spec-list>: a list of two or more <node-spec>s.
+<node-spec>     : a storage node followed by a ':', followed by a brick mount
+                  path.  Eg:
+                     <node1><:brickmnt1>  <node2>[:<brickmnt2>] ...
+                  Each node is expected to be separate from the management and
+                  yarn-master nodes. Only the brick mount path associated with
+                  the first node is required. If omitted from the other
+                  <node-spec-list> members then each node assumes the value of
+                  the first node for the brick mount path.
+<volname>       : name of the new volume.
+<vol-mnt-prefix>: path of the glusterfs-fuse mount point, eg. /mnt/glusterfs.
+                  Note: the volume name will be appended to this mount point.
+-y              : auto answer "yes" to all prompts. Default is to be promoted 
+                  before the script continues.
+--quiet         : (optional) output only basic progress/step messages. Default.
+--verbose       : (optional) output --quiet plus more details of each step.
+--debug         : (optional) output --verbose plus greater details useful for
+                  debugging.
+--version       : output only the version string.
+--help          : this text.
 
 EOF
 }
@@ -65,20 +70,29 @@ EOF
 function parse_cmd() {
 
   local errcnt=0
-  local long_opts='help,version'
+  local long_opts='help,version,quiet,verbose,debug'
 
   eval set -- "$(getopt -o 'y' --long $long_opts -- $@)"
 
   while true; do
       case "$1" in
-        -y)
-          AUTO_YES=1; shift; continue
-        ;;
         --help)
           usage; exit 0
         ;;
         --version) # version is already output, so nothing to do here
           exit 0
+        ;;
+        --quiet)
+          VERBOSE=$LOG_QUIET; shift; continue
+        ;;
+        --verbose)
+          VERBOSE=$LOG_VERBOSE; shift; continue
+        ;;
+        --debug)
+          VERBOSE=$LOG_DEBUG; shift; continue
+        ;;
+        -y)
+          AUTO_YES=1; shift; continue
         ;;
         --)
           shift; break
@@ -157,7 +171,6 @@ function parse_brkmnts() {
 	  ;;
       esac
   done
-
   return 0
 }
 
@@ -167,10 +180,12 @@ function parse_brkmnts() {
 # Uses globals:
 #   BRKMNTS
 #   NODES
-# Side effect: all scripts under bin/ are copied to each node.
+#   VOLNAME
 function chk_nodes() {
 
-  local i=0; local node; local err; local out; local ssh
+  local i=0; local node; local err; local errcnt=0; local out; local ssh
+
+  verbose "--- checking all nodes spanned by $VOLNAME..."
 
   # verify that each node is prepped for hadoop workloads
   for node in ${NODES[@]}; do
@@ -178,14 +193,16 @@ function chk_nodes() {
 
       out="$(eval "$ssh /tmp/bin/check_node.sh ${BRKMNTS[$i]}")"
       err=$?
+      debug "check_node on $node: $out"
       if (( err != 0 )) ; then
-	echo "ERROR on $node: $out"
-	return 1
+	err $err "$node: $out"
+	((errcnt++))
       fi
       ((i++))
   done
 
-  echo "All nodes passed check for hadoop workloads"
+  (( errcnt > 0 )) && return 1
+  verbose "all nodes passed check for hadoop workloads"
   return 0
 }
 
@@ -200,16 +217,19 @@ function chk_nodes() {
 #   VOLNAME
 function mk_volmnt() {
 
-  local err; local out; local node; local ssh; local ssh_close
-  local volmnt="$VOLMNT/$VOLNAME"
+  local err; local errcnt=0; local out; local node
+  local ssh; local ssh_close; local volmnt="$VOLMNT/$VOLNAME"
 
   # assign required and optional gluster-fuse mount options
   local mntopts="$($PREFIX/bin/gen_req_gluster_mnt.sh),"
   mntopts+="$($PREFIX/bin/gen_opt_gluster_mnt.sh),_netdev" # add _netdev here
 
-  for node in ${NODES[@]}; do
-      [[ "$node" == "$HOSTNAME" ]] && { ssh='('; ssh_close=')'; } \
-			            || { ssh="ssh $node '"; ssh_close="'"; }
+  verbose "--- creating glusterfs-fuse mount for $VOLNAME..."
+  debug "mount opts: $mntopts"
+
+  for node in ${NODES[*]}; do
+      [[ "$node" == "$HOSTNAME" ]] && { ssh=''; ssh_close=''; } \
+			           || { ssh="ssh $node '"; ssh_close="'"; }
       out="$(eval "
 	$ssh
 	  # append mount to fstab, if not present
@@ -217,48 +237,49 @@ function mk_volmnt() {
 	    echo $node:/$VOLNAME $volmnt glusterfs $mntopts 0 0 >>/etc/fstab
 	  fi
 	  mkdir -p $volmnt
-	  mount $volmnt 2>&1 # mount via fstab
-	  rc=\$?
-	  if (( rc != 0 && rc != 32 )) ; then # 32=already mounted
-	    echo Error \$rc: mounting $volmnt with $mntopts options
-	    exit 1 # from ssh or sub-shell
-	  fi
-	  exit 0 # from ssh or sub-shell
+	  mount $volmnt 2>&1 # mount via fstab, exit with mount returncode
 	$ssh_close
       ")"
-      if (( $? != 0 )) ; then
-	echo "ERROR on $node: $out"
-	return 1
+      err=$?
+      debug "mount on $node: $out"
+      if (( err != 0 && err != 32 )) ; then # 32==already mounted
+	((errcnt++))
+	err $err "$node: $out"
       fi
   done
 
+  (( errcnt > 0 )) && return 1
+  verbose "--- created glusterfs-fuse mount for $VOLNAME"
   return 0
 }
 
 # add_distributed_dirs: create, if needed, the distributed hadoop directories.
 # Returns 1 on errors.
-# Note: the gluster-fuse mount, by convention is the VOLMNT prefix with the
+# Note: the gluster-fuse mount, by convention, is the VOLMNT prefix with the
 #   volume name appended.
-# DEPENDENCY:
-#   1) all bin/* scripts have been copied to /tmp/bin on the FIRST_NODE.
-#      Currently this has been done by chk_nodes().
+# ASSUMPTION: all bin/* scripts have been copied to /tmp/bin on the FIRST_NODE.
 # Uses globals:
 #   FIRST_NODE
-#   VOLNAME
 #   VOLMNT
+#   VOLNAME
 function add_distributed_dirs() {
 
-  local err; local ssh
+  local err; local ssh; local out
+
+  verbose "--- adding hadoop directories to nodes spanned by $VOLNAME..."
+
+  [[ "$FIRST_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $FIRST_NODE"
 
   # add the required distributed hadoop dirs
-  [[ "$FIRST_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $FIRST_NODE"
-  eval "$ssh /tmp/bin/add_dirs.sh -d $VOLMNT/$VOLNAME"
+  out="$(eval "$ssh /tmp/bin/add_dirs.sh -d $VOLMNT/$VOLNAME")"
   err=$?
+  debug "add_dirs -d $VOLMNT/$VOLNAME: $out"
   if (( err != 0 )) ; then
-    echo "ERROR $err: add_dirs -d $VOLMNT/$VOLNAME"
+    err $err "could not add all required hadoop dirs: $out"
     return 1
   fi
 
+  verbose "--- added hadoop directories to nodes spanned by $VOLNAME"
   return 0
 }
 
@@ -273,24 +294,34 @@ function create_vol() {
 
   local bricks=''; local err; local i; local out
 
+  verbose "--- creating the new $VOLNAME volume..."
+
   # create the gluster volume, replica 2 is hard-coded for now
   for (( i=0; i<${#NODES[@]}; i++ )); do
       bricks+="${NODES[$i]}:${BRKMNTS[$i]}/$VOLNAME "
   done
+  debug "bricks: $bricks"
 
   out="$(ssh $FIRST_NODE "gluster volume create $VOLNAME replica 2 $bricks 2>&1"
        )"
   err=$?
+  debug "gluster vol create: $out"
   if (( err != 0 )) ; then
-    echo "ERROR $err: gluster vol create $VOLNAME $bricks: $out"
+    err $err "gluster vol create $VOLNAME $bricks: $out"
     return 1
   fi
-  echo "\"$VOLNAME\" created"
+  verbose "--- \"$VOLNAME\" created"
 
-  # set vol performance settings
-  if ! $PREFIX/bin/set_vol_perf.sh -n $FIRST_NODE $VOLNAME ; then
+  verbose "--- setting performance options on $VOLNAME..."
+  out="$($PREFIX/bin/set_vol_perf.sh -n $FIRST_NODE $VOLNAME)"
+  err=$?
+  debug "gluster vol create: $out"
+  if (( err != 0 )) ; then
+    err $err "gluster vol create $VOLNAME $bricks: $out"
     return 1
   fi
+  verbose "--- performance options set"
+
   return 0
 }
 
@@ -302,20 +333,22 @@ function start_vol() {
 
   local err; local out
 
+  verbose "--- starting the new $VOLNAME volume..."
+
   out="$(ssh $FIRST_NODE "gluster --mode=script volume start $VOLNAME 2>&1"
        )"
   err=$?
+  debug "gluster vol start: $out"
   if (( err != 0 )) ; then # serious error or vol already started
     if grep -qs ' already started' <<<$out ; then
-      echo "WARN: \"$VOLNAME\" volume already started..."
+      warn "\"$VOLNAME\" volume already started..."
     else
-      echo "ERROR $err: gluster vol start $VOLNAME: $out"
+      err $err "gluster vol start $VOLNAME: $out"
       return 1
     fi
-  else
-    echo "\"$VOLNAME\" started"
   fi
 
+  verbose "\"$VOLNAME\" started"
   return 0
 }
 
@@ -325,11 +358,12 @@ function start_vol() {
 ME="$(basename $0 .sh)"
 AUTO_YES=0 # assume false
 BRKMNTS=(); NODES=()
+VERBOSE=$LOG_QUIET # default
 errcnt=0
 
-echo '***'
-echo "*** $ME: version $(cat $PREFIX/VERSION)"
-echo '***'
+quiet '***'
+quiet "*** $ME: version $(cat $PREFIX/VERSION)"
+quiet '***'
 
 parse_cmd $@ || exit -1
 
@@ -337,19 +371,19 @@ parse_nodes
 FIRST_NODE=${NODES[0]} # use this storage node for all gluster cli cmds
 
 # check for passwordless ssh connectivity to nodes
-check_ssh ${NODES[@]} || exit 1
+check_ssh ${NODES[*]} || exit 1
 
 # make sure the volume doesn't already exist
 vol_exists $VOLNAME $FIRST_NODE && {
-  echo "ERROR: volume \"$VOLNAME\" already exists";
+  err "volume \"$VOLNAME\" already exists";
   exit 1; }
 
 parse_brkmnts || exit 1
 
 echo
-echo "*** Volume      : $VOLNAME"
-echo "*** Nodes       : ${NODES[*]}"
-echo "*** Brick mounts: ${BRKMNTS[*]}"
+quiet "*** Volume      : $VOLNAME"
+quiet "*** Nodes       : $(echo ${NODES[*]}   | tr ' ' ', ')"
+quiet "*** Brick mounts: $(echo ${BRKMNTS[*]} | tr ' ' ', ')"
 echo
 
 # verify that each node is prepped for hadoop workloads
@@ -370,4 +404,5 @@ mk_volmnt  || exit 1
 # add the distributed hadoop dirs
 add_distributed_dirs || exit 1
 
+quiet "\"$VOLNAME\" created and started with no errors"
 exit 0

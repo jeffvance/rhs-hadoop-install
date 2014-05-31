@@ -114,7 +114,7 @@ function err() {
   if (( ${#1} == 2 )) && [[ ${1:0:1} == '-' && ${1:1:1} =~ [a-z] ]] ; then
     opt="$1"; shift # assume echo option
   fi
-  [[ ${1:0:1} =~ [0-9] ]] && { num=" $1"; shift; } # assume error number
+  [[ "$1" == *[!0-9]* ]] || { num=" $1"; shift; } # assume 1st arg is error num
 
   force $opt "ERROR$num: $1"
 } 
@@ -222,7 +222,7 @@ function warn() {
   if (( ${#1} == 2 )) && [[ ${1:0:1} == '-' && ${1:1:1} =~ [a-z] ]] ; then
     opt="$1"; shift # assume echo option
   fi
-  [[ ${1:0:1} =~ [0-9] ]] && { num=" $1"; shift; } # assume warning number
+  [[ "$1" == *[!0-9]* ]] || { num=" $1"; shift; } # assume 1st arg is warn num
 
   force $opt "WARN$num: $1"
 } 
