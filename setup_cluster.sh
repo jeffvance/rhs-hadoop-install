@@ -431,7 +431,7 @@ function pool_exists() {
   out="$(eval "$ssh gluster peer status")"
   err=$?
   debug "gluster peer status: $out"
-  (( $? != 0 )) && return 1
+  (( err != 0 )) && return 1
 
   # peer status returns 0 even when no pool exists, so parse output
   grep -qs 'Peers: 0' <<<$out && return 1
