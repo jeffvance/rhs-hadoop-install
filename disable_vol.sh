@@ -23,26 +23,33 @@ SYNTAX:
 
 $ME --version | --help
 
-$ME [-y] [--user <ambari-admin-user>] [--pass <ambari-admin-password>] \\
+$ME [-y] [--quiet | --verbose | --debug] \\
+           [--user <ambari-admin-user>] [--pass <ambari-admin-password>] \\
            [--port <port-num>] [--hadoop-management-node <node>] \\
-           [--rhs-node <node>] --yarn-master <node> <volname>
+           [--rhs-node <node>] --yarn-master <node> \\
+           <volname>
 where:
 
-  <volname> : the RHS volume to be disabled for hadoop workloads.
-  --yarn-master : hostname or ip of the yarn-master server which is expected to
-      be outside of the storage pool.
-  --rhs_node : (optional) hostname of any of the storage nodes. This is needed in
-      order to access the gluster command. Default is localhost which, must have
-      gluster cli access.
-  --hadoop-mgmt-node : (optional) hostname or ip of the hadoop mgmt server which
-      is expected to be outside of the storage pool. Default is localhost.
-  -y : auto answer "yes" to all prompts. Default is to be promoted before the
-      script continues.
-  --user : the ambari admin user name. Default: "admin".
-  --pass : the password for --user. Default: "admin".
-  --port : the port number used by the ambari server. Default: 8080.
-  --version : output only the version string.
-  --help : this text.
+<volname> : the RHS volume to be disabled for hadoop workloads.
+--yarn-master: hostname or ip of the yarn-master server which is expected to
+               be outside of the storage pool.
+--rhs_node   : (optional) hostname of any of the storage nodes. This is needed in
+               order to access the gluster command. Default is localhost which,
+               must have gluster cli access.
+--hadoop-mgmt-node : (optional) hostname or ip of the hadoop mgmt server which
+               is expected to be outside of the storage pool. Default is
+               localhost.
+-y : auto answer "yes" to all prompts. Default is to be promoted before the
+               script continues.
+--quiet      : (optional) output only basic progress/step messages. Default.
+--verbose    : (optional) output --quiet plus more details of each step.
+--debug      : (optional) output --verbose plus greater details useful for
+               debugging.
+--user       : the ambari admin user name. Default: "admin".
+--pass       : the password for --user. Default: "admin".
+--port       : the port number used by the ambari server. Default: 8080.
+--version    : output only the version string.
+--help       : this text.
 
 EOF
 }
@@ -55,12 +62,13 @@ EOF
 #   MGMT_PORT
 #   MGMT_USER
 #   RHS_NODE
+#   VERBOSE
 #   VOLNAME
 #   YARN_NODE
 function parse_cmd() {
 
   local opts='y'
-  local long_opts='version,help,yarn-master:,rhs-node:,hadoop-mgmt-node:,user:,pass:,port:'
+  local long_opts='version,help,yarn-master:,rhs-node:,hadoop-mgmt-node:,user:,pass:,port:,verbose,quiet,debug'
   local errcnt=0
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
@@ -72,6 +80,15 @@ function parse_cmd() {
         ;;
         --version) # version is already output, so nothing to do here
           exit 0
+        ;;
+        --quiet)
+          VERBOSE=$LOG_QUIET; shift; continue
+        ;;
+        --verbose)
+          VERBOSE=$LOG_VERBOSE; shift; continue
+        ;;
+        --debug)
+          VERBOSE=$LOG_DEBUG; shift; continue
         ;;
         -y)
           AUTO_YES=1; shift; continue # true
@@ -118,22 +135,33 @@ function parse_cmd() {
 # edit_core_site: invoke bin/unset_glusterfs_uri to edit the core-site file and
 # restart all ambari services across the cluster. Returns 1 on errors.
 # Uses globals:
+#   LOGFILE
 #   MGMT_*
 #   PREFIX
 #   VOLNAME
 function edit_core_site() {
 
   local mgmt_node; local mgmt_u; local mgmt_p; local mgmt_port
+  local err; local out
 
-  echo "Disable $VOLNAME in all core-site.xml files..."
+  verbose "--- disable $VOLNAME in all core-site.xml files..."
 
   [[ -n "$MGMT_NODE" ]] && mgmt_node="-h $MGMT_NODE"
   [[ -n "$MGMT_USER" ]] && mgmt_u="-u $MGMT_USER"
   [[ -n "$MGMT_PASS" ]] && mgmt_p="-p $MGMT_PASS"
   [[ -n "$MGMT_PORT" ]] && mgmt_port="--port $MGMT_PORT"
 
-  $PREFIX/bin/unset_glusterfs_uri.sh $mgmt_node $mgmt_u $mgmt_p $mgmt_port \
-	$VOLNAME || return 1
+  out="$($PREFIX/bin/unset_glusterfs_uri.sh $mgmt_node $mgmt_u $mgmt_p \
+	$mgmt_port $VOLNAME)" 
+  err=$?
+  debug -e "unset_glusterfs_uri:\n$out"
+  if (( err != 0 )) ; then
+    err $err "unset_glusterfs_uri failed. See $LOGFILE for more info"
+    return 1
+  fi
+
+  verbose "--- disabled $VOLNAME"
+  return 0
 }
 
 
@@ -142,37 +170,44 @@ function edit_core_site() {
 ME="$(basename $0 .sh)"
 errcnt=0
 AUTO_YES=0 # false
+VERBOSE=$LOG_QUIET # default
 
-echo '***'
-echo "*** $ME: version $(cat $PREFIX/VERSION)"
-echo '***'
+quiet '***'
+quiet "*** $ME: version $(cat $PREFIX/VERSION)"
+quiet '***'
 
 parse_cmd $@ || exit -1
 
 if [[ -z "$MGMT_NODE" ]] ; then # omitted
-  echo "No management node specified therefore the localhost ($HOSTNAME) is assumed"
+  warn "no management node specified therefore the localhost ($HOSTNAME) is assumed"
   (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && exit -1
   MGMT_NODE="$HOSTNAME"
 fi
 if [[ -z "$RHS_NODE" ]] ; then # omitted
-  echo "No RHS storage node specified therefore the localhost ($HOSTNAME) is assumed"
+  warn "no RHS storage node specified therefore the localhost ($HOSTNAME) is assumed"
   (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && exit -1
   RHS_NODE="$HOSTNAME"
 fi
 
 vol_exists $VOLNAME $RHS_NODE || {
-  echo "ERROR volume $VOLNAME does not exist";
+  err "volume $VOLNAME does not exist";
   exit 1; }
 
 NODES=($($PREFIX/bin/find_nodes.sh -n $RHS_NODE $VOLNAME)) # spanned by vol
+if (( $? != 0 )) ; then
+  err "${NODE[*]}" # error msg from find_nodes
+  exit 1
+fi
+debug "nodes spanned by $VOLNAME: ${NODES[*]}"
 
 echo
-echo "*** NODES=${NODES[@]}"
+quiet "*** Nodes    : ${NODES[*]// /, }"
 echo
 
-echo "$VOLNAME will be removed from all hadoop config files and thus will not be available for any hadoop workloads"
+force -e "$VOLNAME will be removed from all hadoop config files and thus will not be available\nfor any hadoop workloads"
 if (( AUTO_YES )) || yesno "  Continue? [y|N] " ; then
   edit_core_site || exit 1
 fi
 
+quiet "$VOLNAME disabled for hadoop workloads"
 exit 0
