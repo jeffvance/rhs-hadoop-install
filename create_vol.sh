@@ -179,6 +179,7 @@ function parse_brkmnts() {
 # errors. Assumes all nodes have current bin/ scripts in /tmp.
 # Uses globals:
 #   BRKMNTS
+#   LOGFILE
 #   NODES
 #   VOLNAME
 function chk_nodes() {
@@ -193,9 +194,9 @@ function chk_nodes() {
 
       out="$(eval "$ssh /tmp/bin/check_node.sh ${BRKMNTS[$i]}")"
       err=$?
-      debug "check_node on $node: $out"
+      debug -e "check_node on $node:\n$out"
       if (( err != 0 )) ; then
-	err $err "$node: $out"
+	err $err "check_node on $node. See $LOGFILE for more info"
 	((errcnt++))
       fi
       ((i++))
@@ -211,6 +212,7 @@ function chk_nodes() {
 # mount is persisted in /etc/fstab. Returns 1 on errors.
 # Assumptions: the bin scripts have been copied to each node in /tmp/bin.
 # Uses globals:
+#   LOGFILE
 #   NODES
 #   PREFIX
 #   VOLMNT
@@ -241,10 +243,10 @@ function mk_volmnt() {
 	$ssh_close
       ")"
       err=$?
-      debug "mount on $node: $out"
+      debug "glusterfs mount on $node: $out"
       if (( err != 0 && err != 32 )) ; then # 32==already mounted
 	((errcnt++))
-	err $err "$node: $out"
+	err $err "glusterfs mount on $node failed. See $LOGFILE for more info"
       fi
   done
 
@@ -260,6 +262,7 @@ function mk_volmnt() {
 # ASSUMPTION: all bin/* scripts have been copied to /tmp/bin on the FIRST_NODE.
 # Uses globals:
 #   FIRST_NODE
+#   LOGFILE
 #   VOLMNT
 #   VOLNAME
 function add_distributed_dirs() {
@@ -273,9 +276,9 @@ function add_distributed_dirs() {
   # add the required distributed hadoop dirs
   out="$(eval "$ssh /tmp/bin/add_dirs.sh -d $VOLMNT/$VOLNAME")"
   err=$?
-  debug "add_dirs -d $VOLMNT/$VOLNAME: $out"
+  debug -e "add_dirs -d $VOLMNT/$VOLNAME:\n$out"
   if (( err != 0 )) ; then
-    err $err "could not add all required hadoop dirs: $out"
+    err $err "could not add required hadoop dirs. See $LOGFILE for more info"
     return 1
   fi
 
@@ -287,6 +290,7 @@ function add_distributed_dirs() {
 # its performance settings. Returns 1 on errors.
 # Uses globals:
 #   FIRST_NODE
+#   LOGFILE
 #   NODES
 #   BRKMNTS
 #   VOLNAME
@@ -307,7 +311,7 @@ function create_vol() {
   err=$?
   debug "gluster vol create: $out"
   if (( err != 0 )) ; then
-    err $err "gluster vol create $VOLNAME $bricks: $out"
+    err $err "gluster vol create $VOLNAME $bricks. See $LOGFILE for more info"
     return 1
   fi
   verbose "--- \"$VOLNAME\" created"
@@ -315,19 +319,20 @@ function create_vol() {
   verbose "--- setting performance options on $VOLNAME..."
   out="$($PREFIX/bin/set_vol_perf.sh -n $FIRST_NODE $VOLNAME)"
   err=$?
-  debug "gluster vol create: $out"
+  debug "set_vol_perf: $out"
   if (( err != 0 )) ; then
-    err $err "gluster vol create $VOLNAME $bricks: $out"
+    err $err "set_vol_perf. See $LOGFILE for more info"
     return 1
   fi
-  verbose "--- performance options set"
 
+  verbose "--- performance options set"
   return 0
 }
 
 # start_vol: gluster vol start VOLNAME. Returns 1 on errors.
 # Uses globals:
 #   FIRST_NODE
+#   LOGFILE
 #   VOLNAME
 function start_vol() {
 
@@ -339,11 +344,11 @@ function start_vol() {
        )"
   err=$?
   debug "gluster vol start: $out"
-  if (( err != 0 )) ; then # serious error or vol already started
+  if (( err != 0 )) ; then # either serious error or vol already started
     if grep -qs ' already started' <<<$out ; then
       warn "\"$VOLNAME\" volume already started..."
     else
-      err $err "gluster vol start $VOLNAME: $out"
+      err $err "gluster vol start $VOLNAME. See $LOGFILE for more info"
       return 1
     fi
   fi
