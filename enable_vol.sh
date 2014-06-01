@@ -138,6 +138,7 @@ function parse_cmd() {
 # Uses globals:
 #   BLKDEVS
 #   BRKMNTS
+#   LOGFILE
 #   MGMT_NODE
 #   NODES
 #   VOLNAME
@@ -158,10 +159,10 @@ function setup_nodes() {
       out="$(eval "$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
 		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE")"
       err=$?
-      debug "$node: setup_datanode: $out"
+      debug -e "$node: setup_datanode:\n$out"
 
       if (( err != 0 )) ; then
-        err $err "$node: setup_datanode: $out"
+        err $err "on $node in setup_datanode. See $LOGFILE for more info"
         ((errcnt++))
       fi
       ((i++))
@@ -179,6 +180,7 @@ function setup_nodes() {
 # optionally prompted to fix the problems. Returns 1 for errors.
 # Uses globals:
 #   AUTO_YES
+#   LOGFILE
 #   PREFIX
 #   RHS_NODE
 #   VOLNAME
@@ -189,8 +191,11 @@ function chk_and_fix_nodes() {
   verbose "--- setting up the yarn-master: $YARN_NODE..."
   out="$($PREFIX/bin/setup_yarn.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME)"
   err=$?
-  debug "setup_yarn: $out"
-  (( err != 0 )) && ((errcnt++))
+  debug "setup_yarn in $YARN_NODE: $out"
+  if (( err != 0 )) ; then
+    ((errcnt++))
+    err $err "setup_yarn on $MGMT_NODE. See $LOGFILE for more info"
+  fi
 
   verbose "--- checking that $VOLNAME is setup for hadoop workloads..."
   out="$($PREFIX/bin/check_vol.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME)"
@@ -198,17 +203,19 @@ function chk_and_fix_nodes() {
   debug "check_vol: $out"
 
   if (( err != 0 )) ; then 1 or more issues detected on volume
-    echo
-    warn "nodes spanned by $VOLNAME and/or the YARN-master node have issues"
+    warn -e "\nissues with nodes spanned by $VOLNAME and/or the YARN-master node"
     if (( AUTO_YES )) || yesno "  Correct above issues? [y|N] " ; then
       echo
-      debug "invoking setup_nodes to correct cited issues"
+      debug "invoking setup_nodes to correct above issues"
       setup_nodes || ((errcnt++))
       debug "invoking set_vol_perf"
       out="$($PREFIX/bin/set_vol_perf.sh -n $RHS_NODE $VOLNAME)"
       err=$?
       debug "set_vol_perf: $out"
-      (( err != 0 )) && ((errcnt++))
+      if (( err != 0 )) ; then
+	((errcnt++))
+	err "set_vol_perf failed. See $LOGFILE for more info"
+      fi
     else
       debug "user declines fixing problem node(s)"
       ((errcnt++))
@@ -223,6 +230,7 @@ function chk_and_fix_nodes() {
 # edit_core_site: invoke bin/set_glusterfs_uri to edit the core-site file and
 # restart all ambari services across the cluster. Returns 1 on errors.
 # Uses globals:
+#   LOGFILE
 #   MGMT_*
 #   PREFIX
 #   VOLNAME
@@ -243,7 +251,7 @@ function edit_core_site() {
   debug "set_glusterfs_uri: $out"
 
   if (( err != 0 )) ; then
-    err -e $err "unable to modify core-sites file on 1 or more nodes:\n$out\nSee $LOGFILE more info"
+    err -e $err "unable to modify core-sites file on 1 or more nodes.\nSee $LOGFILE more info"
     return 1
   fi
   verbose "--- core-site files modified for $VOLNAME"
@@ -268,14 +276,15 @@ default_nodes MGMT_NODE 'management' YARN_NODE 'yarn-master' \
 	RHS_NODE 'RHS storage' || exit -1
 
 vol_exists $VOLNAME $RHS_NODE || {
-  err "ERROR volume $VOLNAME does not exist";
+  err "volume $VOLNAME does not exist";
   exit 1; }
 
 NODES=($($PREFIX/bin/find_nodes.sh -n $RHS_NODE $VOLNAME)) # spanned by vol
 if (( $? != 0 )) ; then
-  err "${NODE[*]}" # from find_nodes
+  err "${NODE[*]}" # error from find_nodes
   exit 1
 fi
+debug "nodes spanned by $VOLNAME: ${NODES[*]}"
 
 # check for passwordless ssh connectivity to nodes
 check_ssh ${NODES[*]} $YARN_NODE || exit 1
