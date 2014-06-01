@@ -24,13 +24,13 @@ SYNTAX:
 $ME --version | --help
 
 $ME [-y] [--quiet | --verbose | --debug] \\
-           [--user <ambari-admin-user>] [--pass <ambari-admin-password>] \\
-           [--port <port-num>] [--hadoop-management-node <node>] \\
-           [--rhs-node <node>] --yarn-master <node> \\
-           <volname>
+            [--user <ambari-admin-user>] [--pass <ambari-admin-password>] \\
+            [--port <port-num>] [--hadoop-management-node <node>] \\
+            [--rhs-node <node>] --yarn-master <node> \\
+            <volname>
 where:
 
-<volname> : the RHS volume to be disabled for hadoop workloads.
+<volname>    : the RHS volume to be disabled for hadoop workloads.
 --yarn-master: hostname or ip of the yarn-master server which is expected to
                be outside of the storage pool.
 --rhs_node   : (optional) hostname of any of the storage nodes. This is needed in
