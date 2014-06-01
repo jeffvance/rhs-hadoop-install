@@ -28,26 +28,33 @@ SYNTAX:
 
 $ME --version | --help
 
-$ME [-y] [--user <ambari-admin-user>] [--pass <ambari-admin-password>] \\
+$ME [-y] [--quiet | --verbose | --debug] \\
+           [--user <ambari-admin-user>] [--pass <ambari-admin-password>] \\
            [--port <port-num>] [--hadoop-management-node <node>] \\
-           [--rhs-node <node>] [--yarn-master <node>] <volname>
+           [--rhs-node <node>] [--yarn-master <node>] \\
+           <volname>
 where:
 
-  <volname> : the RHS volume to be enabled for hadoop workloads.
-  --yarn-master : (optional) hostname or ip of the yarn-master server which is
-      expected to be outside of the storage pool. Default is localhost.
-  --rhs_node : (optional) hostname of any of the storage nodes. This is needed in
-      order to access the gluster command. Default is localhost which, must have
-      gluster cli access.
-  --hadoop-mgmt-node : (optional) hostname or ip of the hadoop mgmt server which
-      is expected to be outside of the storage pool. Default is localhost.
-  -y : auto answer "yes" to all prompts. Default is to be promoted before the
-      script continues.
-  --user : the ambari admin user name. Default: "admin".
-  --pass : the password for --user. Default: "admin".
-  --port : the port number used by the ambari server. Default: 8080.
-  --version : output only the version string.
-  --help : this text.
+<volname>    : the RHS volume to be enabled for hadoop workloads.
+--yarn-master: (optional) hostname or ip of the yarn-master server which is
+               expected to be outside of the storage pool. Default is localhost.
+--rhs_node   : (optional) hostname of any of the storage nodes. This is needed in
+               order to access the gluster command. Default is localhost which,
+               must have gluster cli access.
+--hadoop-mgmt-node : (optional) hostname or ip of the hadoop mgmt server which
+               is expected to be outside of the storage pool. Default is
+               localhost.
+-y           : (optional) auto answer "yes" to all prompts. Default is to answer
+               a confirmation prompt.
+--quiet      : (optional) output only basic progress/step messages. Default.
+--verbose    : (optional) output --quiet plus more details of each step.
+--debug      : (optional) output --verbose plus greater details useful for
+               debugging.
+--user       : the ambari admin user name. Default: "admin".
+--pass       : the password for --user. Default: "admin".
+--port       : the port number used by the ambari server. Default: 8080.
+--version    : output only the version string.
+--help       : this text.
 
 EOF
 }
@@ -60,12 +67,13 @@ EOF
 #   MGMT_PORT
 #   MGMT_USER
 #   RHS_NODE
+#   VERBOSE
 #   VOLNAME
 #   YARN_NODE
 function parse_cmd() {
 
   local opts='y'
-  local long_opts='version,help,yarn-master:,rhs-node:,hadoop-mgmt-node:,user:,pass:,port:'
+  local long_opts='version,help,yarn-master:,rhs-node:,hadoop-mgmt-node:,user:,pass:,port:,verbose,quiet,debug'
   local errcnt=0
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
@@ -77,6 +85,15 @@ function parse_cmd() {
         ;;
         --version) # version is already output, so nothing to do here
           exit 0
+        ;;
+        --quiet)
+          VERBOSE=$LOG_QUIET; shift; continue
+        ;;
+        --verbose)
+          VERBOSE=$LOG_VERBOSE; shift; continue
+        ;;
+        --debug)
+          VERBOSE=$LOG_DEBUG; shift; continue
         ;;
         -y)
           AUTO_YES=1; shift; continue # true
@@ -123,11 +140,14 @@ function parse_cmd() {
 #   BRKMNTS
 #   MGMT_NODE
 #   NODES
+#   VOLNAME
 #   YARN_NODE
 function setup_nodes() {
 
-  local i=0; local err; local errcnt=0; local errnodes=''
+  local i=0; local err; local errcnt=0; local out
   local node; local brkmnt; local blkdev; local ssh
+
+  verbose "--- correcting issues on nodes spanned by $VOLNAME..."
 
   for node in ${NODES[@]}; do
       brkmnt=${BRKMNTS[$i]}
@@ -135,20 +155,20 @@ function setup_nodes() {
 
       [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
 
-      eval "$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
-		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE"
+      out="$(eval "$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
+		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE")"
       err=$?
+      debug "$node: setup_datanode: $out"
+
       if (( err != 0 )) ; then
-        echo "ERROR $err: setup_datanode failed on $node"
-        errnodes+="$node "
+        err $err "$node: setup_datanode: $out"
         ((errcnt++))
       fi
       ((i++))
   done
 
-  (( errcnt > 0 )) && {
-    echo "$errcnt setup node errors on nodes: $errnodes";
-    return 1; }
+  (( errcnt > 0 )) && return 1
+  verbose "--- issue(s) corrected"
   return 0
 }
 
@@ -164,26 +184,39 @@ function setup_nodes() {
 #   VOLNAME
 function chk_and_fix_nodes() {
 
-  local errcnt=0
+  local errcnt=0; local out; local err
 
-  # setup the yarn-master node
-  $PREFIX/bin/setup_yarn.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME || ((errcnt++))
+  verbose "--- setting up the yarn-master: $YARN_NODE..."
+  out="$($PREFIX/bin/setup_yarn.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME)"
+  err=$?
+  debug "setup_yarn: $out"
+  (( err != 0 )) && ((errcnt++))
 
-  # verify that the volume is setup for hadoop workload and potentially fix
-  if ! $PREFIX/bin/check_vol.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME ;
-  then # problems
+  verbose "--- checking that $VOLNAME is setup for hadoop workloads..."
+  out="$($PREFIX/bin/check_vol.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME)"
+  err=$?
+  debug "check_vol: $out"
+
+  if (( err != 0 )) ; then 1 or more issues detected on volume
     echo
-    echo "Nodes spanned by $VOLNAME and/or the YARN-master node have issues"
+    warn "nodes spanned by $VOLNAME and/or the YARN-master node have issues"
     if (( AUTO_YES )) || yesno "  Correct above issues? [y|N] " ; then
       echo
+      debug "invoking setup_nodes to correct cited issues"
       setup_nodes || ((errcnt++))
-      $PREFIX/bin/set_vol_perf.sh -n $RHS_NODE $VOLNAME || ((errcnt++))
+      debug "invoking set_vol_perf"
+      out="$($PREFIX/bin/set_vol_perf.sh -n $RHS_NODE $VOLNAME)"
+      err=$?
+      debug "set_vol_perf: $out"
+      (( err != 0 )) && ((errcnt++))
     else
+      debug "user declines fixing problem node(s)"
       ((errcnt++))
     fi
   fi
 
   (( errcnt > 0 )) && return 1
+  verbose "--- nodes spanned by $VOLNAME are ready for hadoop workloads"
   return 0
 }
 
@@ -196,16 +229,24 @@ function chk_and_fix_nodes() {
 function edit_core_site() {
 
   local mgmt_u; local mgmt_p; local mgmt_port
+  local err; local out
 
-  echo "Enable $VOLNAME in all core-site.xml files..."
+  verbose "--- enable $VOLNAME in all core-site.xml files..."
 
   [[ -n "$MGMT_USER" ]] && mgmt_u="-u $MGMT_USER"
   [[ -n "$MGMT_PASS" ]] && mgmt_p="-p $MGMT_PASS"
   [[ -n "$MGMT_PORT" ]] && mgmt_port="--port $MGMT_PORT"
 
-  $PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE $mgmt_u $mgmt_p $mgmt_port \
-	 $VOLNAME || return 1
+  out="$($PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE $mgmt_u $mgmt_p \
+	$mgmt_port $VOLNAME)"
+  err=$?
+  debug "set_glusterfs_uri: $out"
 
+  if (( err != 0 )) ; then
+    err -e $err "unable to modify core-sites file on 1 or more nodes:\n$out\nSee $LOGFILE more info"
+    return 1
+  fi
+  verbose "--- core-site files modified for $VOLNAME"
   return 0
 }
 
@@ -215,10 +256,11 @@ function edit_core_site() {
 ME="$(basename $0 .sh)"
 errcnt=0
 AUTO_YES=0 # false
+VERBOSE=$LOG_QUIET # default
 
-echo '***'
-echo "*** $ME: version $(cat $PREFIX/VERSION)"
-echo '***'
+quiet '***'
+quiet "*** $ME: version $(cat $PREFIX/VERSION)"
+quiet '***'
 
 parse_cmd $@ || exit -1
 
@@ -226,12 +268,12 @@ default_nodes MGMT_NODE 'management' YARN_NODE 'yarn-master' \
 	RHS_NODE 'RHS storage' || exit -1
 
 vol_exists $VOLNAME $RHS_NODE || {
-  echo "ERROR volume $VOLNAME does not exist";
+  err "ERROR volume $VOLNAME does not exist";
   exit 1; }
 
 NODES=($($PREFIX/bin/find_nodes.sh -n $RHS_NODE $VOLNAME)) # spanned by vol
 if (( $? != 0 )) ; then
-  echo "${NODE[*]}" # from find_nodes
+  err "${NODE[*]}" # from find_nodes
   exit 1
 fi
 
@@ -242,12 +284,12 @@ BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh -xn $RHS_NODE $VOLNAME))
 BLKDEVS=($($PREFIX/bin/find_blocks.sh -xn $RHS_NODE $VOLNAME))
 
 echo
-echo "*** Volume            : $VOLNAME"
-echo "*** Nodes             : ${NODES[*]}"
-echo "*** Brick mounts      : ${BRKMNTS[*]}"
-echo "*** Block devices     : ${BLKDEVS[*]}"
-echo "*** Ambari mgmt node  : $MGMT_NODE"
-echo "*** Yarn-master server: $YARN_NODE"
+quiet "*** Volume            : $VOLNAME"
+quiet "*** Nodes             : $(echo ${NODES[*]}     | tr ' ' ', ')"
+quiet "*** Brick mounts      : $(echo ${BRKMNTS[*]}   | tr ' ' ', ')"
+quiet "*** Block devices     : $(echo ${BLKDEVS[*]} } | tr ' ' ', ')"
+quiet "*** Ambari mgmt node  : $MGMT_NODE"
+quiet "*** Yarn-master server: $YARN_NODE"
 echo
 
 # prompt to continue before any changes are made...
@@ -261,4 +303,5 @@ chk_and_fix_nodes || exit 1
 # edit the core-site file to recognize the enabled volume
 edit_core_site || exit 1
 
+quiet "$VOLNAME enabled for hadoop workloads with no errors"
 exit 0
