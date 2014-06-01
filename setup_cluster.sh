@@ -271,6 +271,7 @@ function show_todo() {
 # copy_bin: copies all bin/* files to /tmp/ on the passed-in nodes. Returns 1
 # on errors.
 # Uses globals:
+#   LOGFILE
 #   PREFIX
 function copy_bin() {
 
@@ -285,12 +286,12 @@ function copy_bin() {
 
       [[ "$node" == "$HOSTNAME" ]] && cmd="cp -r $PREFIX/bin /tmp" \
 				   || cmd="scp -qr $PREFIX/bin $node:/tmp"
-      debug "copy bin/ to /tmp on $node"
       out="$(eval "$cmd")"
       err=$?
+      debug "copy bin/ to /tmp on $node: $out"
       if (( err != 0 )) ; then
 	((errcnt++))
-	err $err "could not copy bin/* to /tmp on $node"
+	err -e $err "could not copy bin/* to /tmp on $node.\nSee $LOGFILE for more info"
       fi
   done
 
@@ -301,6 +302,8 @@ function copy_bin() {
 # install_repo: copies the repo file expected to be on the install-from node
 # (localhost) to the passed-in nodes, and yum installs the packages. Returns 1
 # for errors.
+# Uses globals:
+#   LOGFILE
 function install_repo() {
 
   local nodes=($@)
@@ -316,18 +319,18 @@ function install_repo() {
     # copy repo file to node
     out="$(scp $repo_file $node:$repo_file)"
     err=$?
-    debug "copying repo file to $node in $(dirname $repo_file)"
+    debug -e "copying repo file to $node in $(dirname $repo_file):\n$out"
     if (( err != 0 )) ; then
-      err $err "coping $file to $node: $out"
+      err $err "coping $file to $node: $out. See $LOGFILE for more info"
       return 1
     fi
 
     # yum install package
     out="$(ssh $node 'yum install -y --nogpgcheck rhs-hadoop 2>&1')"
     err=$?
-    debug "yum install repo file on $node"
+    debug -e "yum install repo file on $node:\n$out"
     if (( err != 0 )) ; then
-      err $err "yum installing $file on $node: $out"
+      err $err "yum installing $file on $node. See $LOGFILE for more info"
       return 1
     fi
 
@@ -356,6 +359,7 @@ function install_repo() {
 # outside of the storage pool. Note: if the hadoop mgmt-node is outside of the
 # storage pool then it will not have the agent installed. Returns 1 on errors.
 # Uses globals:
+#   LOGFILE
 #   NODES
 #   NODE_BLKDEVS
 #   NODE_BRKMNTS
@@ -390,7 +394,7 @@ function setup_nodes() {
     verbose "+++ completed node $node with status of $err"
 
     if (( err != 0 )) ; then
-      err $err "in setup_datanode"
+      err $err "$node: setup_datanode. See $LOGFILE for more info"
       return 1
     fi
     return 0
@@ -514,6 +518,7 @@ function define_pool() {
 #   returns 1 if the node is unknown.
 # Uses globals:
 #   FIRST_NODE
+#   LOGFILE
 #   POOL
 #   YARN_NODE
 function create_pool() {
@@ -527,9 +532,9 @@ function create_pool() {
       [[ "$node" == "$FIRST_NODE" ]] && continue # skip
       out="$(ssh $FIRST_NODE "gluster peer probe $node 2>&1")"
       err=$?
-      debug "gluster peer probe $node (from $FIRST_NODE): $out"
+      debug -e "gluster peer probe $node (from $FIRST_NODE):\n$out"
       if (( err != 0 )) ; then
-	err $err "peer probe failed on $node"
+	err $err "peer probe failed on $node. See $LOGFILE for more info"
 	((errcnt++))
       fi
   done
@@ -543,6 +548,7 @@ function create_pool() {
 # 1 on errors.
 # ASSUMPTION: 1) bin/* has been copied to /tmp on all nodes
 # Uses globals:
+#   LOGFILE
 #   MGMT_NODE
 function ambari_server() {
 
@@ -556,11 +562,11 @@ function ambari_server() {
   err=$?
   debug "setup_ambari_server: $out"
   if (( err != 0 )) ; then
-    err $err "$out"
+    err $err "setting up ambari-sever on $MGMT_NODE. See $LOGFILE for more info"
     return 1
   fi
 
-  verbose "--- installing ambari-server completed on $MGMT_NODE"
+  verbose "--- install of ambari-server completed on $MGMT_NODE"
   return 0 
 }
 
@@ -578,18 +584,18 @@ function verify_gid_uids() {
 
   out="$($PREFIX/bin/check_gids.sh $nodes)"
   err=$?
-  debug "check_gids out: $out"
+  debug "check_gids: $out"
   if (( err != 0 )) ; then
     ((errcnt++))
-    err "$out"
+    err "inconsistent GIDs: $out"
   fi
 
   out="$($PREFIX/bin/check_uids.sh $nodes)"
   err=$?
-  debug "check_uids out: $out"
+  debug "check_uids: $out"
   if (( err != 0 )) ; then
     ((errcnt++))
-    err "$out"
+    err "inconsistent UIDs: $out"
   fi
 
   (( errcnt > 0 )) && return 1
