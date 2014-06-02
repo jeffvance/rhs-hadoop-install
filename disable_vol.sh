@@ -135,7 +135,6 @@ function parse_cmd() {
 # edit_core_site: invoke bin/unset_glusterfs_uri to edit the core-site file and
 # restart all ambari services across the cluster. Returns 1 on errors.
 # Uses globals:
-#   LOGFILE
 #   MGMT_*
 #   PREFIX
 #   VOLNAME
@@ -154,11 +153,11 @@ function edit_core_site() {
   out="$($PREFIX/bin/unset_glusterfs_uri.sh $mgmt_node $mgmt_u $mgmt_p \
 	$mgmt_port $VOLNAME)" 
   err=$?
-  debug -e "unset_glusterfs_uri:\n$out"
   if (( err != 0 )) ; then
-    err $err "unset_glusterfs_uri failed. See $LOGFILE for more info"
+    err -e $err "unset_glusterfs_uri:\n$out"
     return 1
   fi
+  debug -e "unset_glusterfs_uri:\n$out"
 
   verbose "--- disabled $VOLNAME"
   return 0

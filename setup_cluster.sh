@@ -271,7 +271,6 @@ function show_todo() {
 # copy_bin: copies all bin/* files to /tmp/ on the passed-in nodes. Returns 1
 # on errors.
 # Uses globals:
-#   LOGFILE
 #   PREFIX
 function copy_bin() {
 
@@ -288,11 +287,11 @@ function copy_bin() {
 				   || cmd="scp -qr $PREFIX/bin $node:/tmp"
       out="$(eval "$cmd")"
       err=$?
-      debug "copy bin/ to /tmp on $node: $out"
       if (( err != 0 )) ; then
 	((errcnt++))
-	err -e $err "could not copy bin/* to /tmp on $node.\nSee $LOGFILE for more info"
+	err -e $err "could not copy bin/* to /tmp on $node:\n$out"
       fi
+      debug "copy bin/ to /tmp on $node: $out"
   done
 
   (( errcnt > 0 )) && return 1
@@ -302,8 +301,6 @@ function copy_bin() {
 # install_repo: copies the repo file expected to be on the install-from node
 # (localhost) to the passed-in nodes, and yum installs the packages. Returns 1
 # for errors.
-# Uses globals:
-#   LOGFILE
 function install_repo() {
 
   local nodes=($@)
@@ -319,20 +316,20 @@ function install_repo() {
     # copy repo file to node
     out="$(scp $repo_file $node:$repo_file)"
     err=$?
-    debug -e "copying repo file to $node in $(dirname $repo_file):\n$out"
     if (( err != 0 )) ; then
-      err $err "coping $file to $node: $out. See $LOGFILE for more info"
+      err -e $err "copying $file to $node:\n$out"
       return 1
     fi
+    debug -e "copying repo file to $node in $(dirname $repo_file):\n$out"
 
     # yum install package
     out="$(ssh $node 'yum install -y --nogpgcheck rhs-hadoop 2>&1')"
     err=$?
-    debug -e "yum install repo file on $node:\n$out"
     if (( err != 0 )) ; then
-      err $err "yum installing $file on $node. See $LOGFILE for more info"
+      err -e $err "yum installing $file on $node:\n$out"
       return 1
     fi
+    debug -e "yum install repo file on $node:\n$out"
 
     return 0
   }
@@ -359,7 +356,6 @@ function install_repo() {
 # outside of the storage pool. Note: if the hadoop mgmt-node is outside of the
 # storage pool then it will not have the agent installed. Returns 1 on errors.
 # Uses globals:
-#   LOGFILE
 #   NODES
 #   NODE_BLKDEVS
 #   NODE_BRKMNTS
@@ -389,14 +385,14 @@ function setup_nodes() {
 		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE
  	")"
     err=$?
-    debug "setup_datanode for $node: $out"
     verbose "+++"
     verbose "+++ completed node $node with status of $err"
 
     if (( err != 0 )) ; then
-      err $err "$node: setup_datanode. See $LOGFILE for more info"
+      err -e $err "setup_datanode on $node:\n$out"
       return 1
     fi
+    debug "setup_datanode on $node: $out"
     return 0
   }
 
@@ -442,21 +438,26 @@ function pool_exists() {
   return 0
 }
 
-# uniq_nodes: find the unique nodes in the lis of nodes provided.
+# uniq_nodes: find the unique nodes in the list of nodes provided and set the 
+# passed-in variable name to this list. 
+# Args:
+#   1=variable *name* to hold list of uniq nodes
+#   2+=list of nodes
 # Sets globals:
-#   UNIQ_NODES
+#   <varname in $1>
 function uniq_nodes() {
 
+  local varname=$1; shift
   local nodes=($@)
-  local node
-  UNIQ_NODES=() # global
-
-  for node in ${nodes[@]}; do
-      [[ "${UNIQ_NODES[*]}" =~ $node ]] && continue
-      UNIQ_NODES+=($node)
+  local node; local uniq=()
+  
+  for node in ${nodes[*]}; do
+      [[ "${uniq[*]}" =~ $node ]] && continue
+      uniq+=($node)
   done
 
-  debug "unique nodes (includes yarn and mgmt): ${UNIQ_NODES[*]}"
+  # set passed-in global var to $uniq array
+  eval $varname=($uniq[*])
 }
     
 # define_pool: If the trusted pool already exists then figure out which nodes are
@@ -518,7 +519,6 @@ function define_pool() {
 #   returns 1 if the node is unknown.
 # Uses globals:
 #   FIRST_NODE
-#   LOGFILE
 #   POOL
 #   YARN_NODE
 function create_pool() {
@@ -528,14 +528,15 @@ function create_pool() {
   verbose "--- creating trusted storage pool..."
 
   # create or add-to storage pool
-  for node in ${POOL[@]} $YARN_NODE; do
+  for node in ${POOL[*]} $YARN_NODE; do
       [[ "$node" == "$FIRST_NODE" ]] && continue # skip
       out="$(ssh $FIRST_NODE "gluster peer probe $node 2>&1")"
       err=$?
-      debug -e "gluster peer probe $node (from $FIRST_NODE):\n$out"
       if (( err != 0 )) ; then
-	err $err "peer probe failed on $node. See $LOGFILE for more info"
+	err -e $err "gluster peer probe $node (from $FIRST_NODE):\n$out"
 	((errcnt++))
+      else
+        debug -e "gluster peer probe $node (from $FIRST_NODE):\n$out"
       fi
   done
 
@@ -548,7 +549,6 @@ function create_pool() {
 # 1 on errors.
 # ASSUMPTION: 1) bin/* has been copied to /tmp on all nodes
 # Uses globals:
-#   LOGFILE
 #   MGMT_NODE
 function ambari_server() {
 
@@ -560,11 +560,11 @@ function ambari_server() {
 
   out="$(eval "$ssh /tmp/bin/setup_ambari_server.sh")"
   err=$?
-  debug "setup_ambari_server: $out"
   if (( err != 0 )) ; then
-    err $err "setting up ambari-sever on $MGMT_NODE. See $LOGFILE for more info"
+    err -e $err "setting up ambari-sever on $MGMT_NODE:\n$out"
     return 1
   fi
+  debug "setup_ambari_server: $out"
 
   verbose "--- install of ambari-server completed on $MGMT_NODE"
   return 0 
@@ -632,7 +632,8 @@ FIRST_NODE=${NODES[0]}
 # for cases where storage nodes are repeated and/or the mgmt and/or yarn nodes
 # are inside the pool, there is some improved efficiency in reducing the nodes
 # to just the unique nodes
-uniq_nodes ${NODES[*]} $YARN_NODE $MGMT_NODE # sets UNIQ_NODES global
+uniq_nodes UNIQ_NODES ${NODES[*]} $YARN_NODE $MGMT_NODE # sets UNIQ_NODES var
+#uniq_nodes UNIQ_STORAGE_NODES ${NODES[*]} # just uniq storage nodes
 
 # check for passwordless ssh connectivity to nodes
 check_ssh ${UNIQ_NODES[*]} || exit 1
@@ -640,7 +641,7 @@ check_ssh ${UNIQ_NODES[*]} || exit 1
 show_todo
 
 # figure out which nodes, if any, will be added to the storage pool
-define_pool ${NODES[@]} || exit 1
+define_pool ${NODES[*]} || exit 1
 
 # prompt to continue before any changes are made...
 (( ! AUTO_YES )) && ! yesno "  Continue? [y|N] " && exit 0

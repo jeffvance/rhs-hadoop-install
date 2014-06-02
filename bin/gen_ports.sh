@@ -4,7 +4,8 @@
 # other hadoop services. The format is: "port#:protocol ...", where port# can be
 # a range defined as x-z.
 
-GLUSTER_PORTS='20047-20048:tcp 49152-49170:tcp 111:tcp 111:udp 38465-38467:tcp'
+#GLUSTER_PORTS='20047-20048:tcp 49152-49170:tcp 111:tcp 111:udp 38465-38467:tcp'
+GLUSTER_PORTS='111:tcp 111:udp 24007:tcp 24009-24108:tcp 34865-34867:tcp 50152-50251:tcp'
 AMBARI_PORTS='8080:tcp 8440-8441:tcp'
 
 # default hadoop ports used by Hortonworks Hadoop (HDP) are documented here:
