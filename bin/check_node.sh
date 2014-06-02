@@ -120,7 +120,7 @@ function check_open_ports() {
 	((errcnt++))
       fi
       # file check
-      if ! grep -qs -E "^-A .* -p $proto .* $port .*ACCEPT" $iptables_conf; then
+      if ! grep -qs -E "^-I .* -p $proto .* $port .*ACCEPT" $iptables_conf; then
 	echo "WARN on $NODE: $iptables_conf file: port(s) $port not accepted"
 	((warncnt++))
       fi

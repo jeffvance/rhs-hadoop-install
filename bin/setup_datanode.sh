@@ -152,51 +152,6 @@ function setup_ambari_agent() {
   return 0
 }
 
-# setup_iptables: open ports for the known gluster, ambari and hadoop services.
-function setup_iptables() {
-
-  local err; local errcnt=0; local out
-  local port; local proto
-  local iptables_conf='/etc/sysconfig/iptables'
-
-  for port in $($PREFIX/gen_ports.sh); do
-      proto=${port#*:}
-      port=${port%:*}; port=${port/-/:} # use iptables range syntax
-      # open up this port or port range for the target protocol ONLY if not
-      # already open
-      if ! grep -qs -E "^-A .* -p $proto .* $port .*ACCEPT" $iptables_conf; then
-	out="$(iptables -A INPUT -m state --state NEW -m $proto \
-		-p $proto --dport $port -j ACCEPT)"
-	err=$?
-	if (( err != 0 )) ; then
-	  echo "ERROR $err: iptables port $port: $out"
- 	  ((errcnt++))
-	fi
-      fi
-  done
-  
-  # save iptables
-  out="$(service iptables save)"
-  err=$?
-  echo "iptables save: $out"
-  if (( err != 0 )) ; then
-    echo "ERROR $err: iptables save: $out"
-    ((errcnt++))
-  fi
-
-  # restart iptables
-  out="$(service iptables restart)"
-  err=$?
-  echo "iptables restart: $out"
-  if (( err != 0 )) ; then
-    echo "ERROR $err: iptables restart: $out"
-    ((errcnt++))
-  fi
-
-  (( errcnt > 0 )) && return 1
-  return 0
-}
-
 # setup_ntp: validate the ntp conf file, start ntpd, synch time. Returns 1 on
 # errors.
 function setup_ntp() {
@@ -301,10 +256,10 @@ parse_cmd $@ || exit -1
 setup_xfs          || ((errcnt++))
 mount_blkdev       || ((errcnt++))
 setup_selinux      || ((errcnt++))
-setup_iptables     || ((errcnt++))
 setup_ntp          || ((errcnt++))
 setup_ambari_agent || ((errcnt++))
 
+$PREFIX/setup_firewall.sh          || ((errcnt++))
 $PREFIX/add_groups.sh              || ((errcnt++))
 $PREFIX/add_users.sh               || ((errcnt++))
 if [[ -n "$BRICKMNT" ]] ; then # need brick mount prefix
