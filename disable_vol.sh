@@ -201,7 +201,7 @@ fi
 debug "nodes spanned by $VOLNAME: ${NODES[*]}"
 
 echo
-quiet "*** Nodes    : ${NODES[*]// /, }"
+quiet "*** Nodes    : $(echo ${NODES[*]} | tr ' ' ', ')"
 echo
 
 force -e "$VOLNAME will be removed from all hadoop config files and thus will not be available\nfor any hadoop workloads"
