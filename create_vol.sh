@@ -208,9 +208,11 @@ function chk_nodes() {
 }
 
 # mk_volmnt: create gluster-fuse mount, per node, using the correct mount
-# options. The volume mount is the VOLMNT prefix with VOLNAME appended. The
-# mount is persisted in /etc/fstab. Returns 1 on errors.
-# Assumptions: the bin scripts have been copied to each node in /tmp/bin.
+# options, permissions and owner. The volume mount is the VOLMNT prefix with
+# VOLNAME appended. The mount is persisted in /etc/fstab. Returns 1 on errors.
+# Assumptions:
+#   1) the bin scripts have been copied to each node in /tmp/bin,
+#   2) the hadoop group and users have been created.
 # Uses globals:
 #   NODES
 #   PREFIX
@@ -219,7 +221,10 @@ function chk_nodes() {
 function mk_volmnt() {
 
   local err; local errcnt=0; local out; local node
-  local ssh; local ssh_close; local volmnt="$VOLMNT/$VOLNAME"
+  local ssh; local ssh_close
+  local volmnt="$VOLMNT/$VOLNAME"
+  local owner="yarn:hadoop" # assumes both have been created!
+  local perms=0774 # rwxrwxr--
 
   # assign required and optional gluster-fuse mount options
   local mntopts="$($PREFIX/bin/gen_req_gluster_mnt.sh),"
@@ -238,6 +243,8 @@ function mk_volmnt() {
 	    echo $node:/$VOLNAME $volmnt glusterfs $mntopts 0 0 >>/etc/fstab
 	  fi
 	  mkdir -p $volmnt
+	  chmod $perms $volmnt
+	  chown $owner $volmnt
 	  mount $volmnt 2>&1 # mount via fstab, exit with mount returncode
 	$ssh_close
       ")"

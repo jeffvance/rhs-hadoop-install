@@ -30,10 +30,10 @@ if [[ -f $AMBARI_SERVER_PID ]] ; then
     ((warncnt++)); }
 fi
 
-# install the ambari server -- may want to capture this long output...
+# install the ambari server
 yum -y install ambari-server 2>&1
 err=$?
-if (( err != 0 && err != 1 )) ; then # 1--> nothing-to-do
+if (( err != 0 )) ; then # 1--> nothing-to-do (note sometimes err 1 may be ok?)
   echo "ERROR $err: ambari server install: $out"
   exit 1
 fi

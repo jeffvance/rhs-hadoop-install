@@ -457,7 +457,7 @@ function uniq_nodes() {
   done
 
   # set passed-in global var to $uniq array
-  eval $varname=($uniq[*])
+  eval "$varname=(${uniq[*]})"
 }
     
 # define_pool: If the trusted pool already exists then figure out which nodes are
@@ -502,7 +502,7 @@ function define_pool() {
       force -e "The following nodes are not in the existing storage pool:\n  ${uniq[@]}"
       (( ! AUTO_YES )) && ! yesno  "  Add nodes? [y|N] " && return 1 # will exit
     else # no unique nodes
-      quiet "No new nodes being added so only verifying existing nodes..."
+      quiet "No new nodes being added so checking/setting up existing nodes..."
     fi
 
   else # no pool
@@ -633,7 +633,6 @@ FIRST_NODE=${NODES[0]}
 # are inside the pool, there is some improved efficiency in reducing the nodes
 # to just the unique nodes
 uniq_nodes UNIQ_NODES ${NODES[*]} $YARN_NODE $MGMT_NODE # sets UNIQ_NODES var
-#uniq_nodes UNIQ_STORAGE_NODES ${NODES[*]} # just uniq storage nodes
 
 # check for passwordless ssh connectivity to nodes
 check_ssh ${UNIQ_NODES[*]} || exit 1
