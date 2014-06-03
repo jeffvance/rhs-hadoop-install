@@ -108,24 +108,21 @@ function check_open_ports() {
 
   local out; local port; local proto
   local errcnt=0; local warncnt=0
-  local iptables_conf='/etc/sysconfig/iptables'
+  declare -A PORTS=$($PREFIX/gen_ports.sh)
 
-  for port in $($PREFIX/gen_ports.sh); do # "port:proto", eg "49152-49170:tcp"
-      proto=${port#*:} # == port # if no proto defined
-      port=${port%:*}  # can include port range
-      [[ "$proto" == "$port" ]] && proto='tcp' # default protocol
-      port=${port/-/:} # use iptables range syntax
-
-      # live check
-      if ! iptables -n -L | grep -qs "^ACCEPT *$proto .*:$port"; then
-	echo "ERROR on $NODE: iptables: port(s) $port not open"
-	((errcnt++))
-      fi
-      # file check
-      if ! grep -qs -e "^-p $proto .* $port .*ACCEPT" $iptables_conf; then
-	echo "WARN on $NODE: $iptables_conf file: port(s) $port not accepted"
-	((warncnt++))
-      fi
+  for proto in ${!PORTS[@]}; do
+      for port in ${PORTS[$proto]}; do
+	  # live check
+	  if ! match_port_live $port $proto ; then
+	    echo "ERROR on $NODE: iptables: port(s) $port not open"
+	    ((errcnt++))
+	  fi
+	  # file check
+	  if ! match_port_conf $port $proto ; then
+	    echo "WARN on $NODE: $iptables_conf file: port(s) $port not accepted"
+	    ((warncnt++))
+	  fi
+      done
   done
 
   (( errcnt > 0 )) && return 1

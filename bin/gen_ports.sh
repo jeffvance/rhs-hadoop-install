@@ -20,4 +20,21 @@ NAMENODE_PORTS+=' 50475 8480 8485'
 
 HADOOP_PORTS="$YARN_PORTS $ZOOKEEPER_PORTS $MAPREDUCE_PORTS $NAMENODE_PORTS"
 
-echo "$GLUSTER_PORTS $AMBARI_PORTS $AMBARI_CLIENT_PORT $HADOOP_PORTS"
+#echo "$GLUSTER_PORTS $AMBARI_PORTS $AMBARI_CLIENT_PORT $HADOOP_PORTS"
+ALL_PORTS="$GLUSTER_PORTS $AMBARI_PORTS $AMBARI_CLIENT_PORT $HADOOP_PORTS"
+declare -A PORTS=()
+
+for port in $ALL_PORTS; do
+    proto=${port#*:} # == port num if no proto defined
+    port=${port%:*}  # can include port range
+    [[ "$proto" == "$port" ]] && proto='tcp' # default protocol
+    port=${port/-/:} # use iptables range syntax
+    PORTS[$proto]+="$port "
+done
+
+# output assoc array string
+echo -n '('
+for proto in ${!PORTS[@]}; do
+    echo -n "[$proto]=\"${PORTS[$proto]}\" "
+done
+echo ')' # flush

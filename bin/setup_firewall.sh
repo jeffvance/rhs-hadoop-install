@@ -9,6 +9,10 @@
 
 PREFIX="$(dirname $(readlink -f $0))"
 
+## functions ##
+
+source $PREFIX/functions
+
 # setup_iptables: open ports for the known gluster, ambari and hadoop services
 # by prepending the port to the INPUT rule chain. Note: we don't append since 
 # there could be an existing DENY or DROP in the chain.
@@ -17,28 +21,26 @@ function setup_iptables() {
 
   local err; local errcnt=0; local portcnt=0
   local port; local proto
-  local conf='/etc/sysconfig/iptables'
+  declare -A PORTS=$($PREFIX/gen_ports.sh)
 
-  for port in $($PREFIX/gen_ports.sh); do
-      proto=${port#*:} # == port # if no proto defined
-      port=${port%:*}  # can include port range
-      [[ "$proto" == "$port" ]] && proto='tcp' # default protocol
-      port=${port/-/:} # use iptables range syntax
-      # open up this port or port range for the target protocol ONLY if not
-      # already open
-      if grep -qs -e "-p $proto .* $port .*ACCEPT" $conf; then
-	echo "port $port already opened in $conf"
-      else
-	iptables -I INPUT 1 -m state --state NEW -m $proto -p $proto \
+  for proto in ${!PORTS[@]}; do
+      for port in ${PORTS[$proto]}; do
+	  # open this port or port range for the target protocol ONLY if not
+	  # already open
+	  if match_port_conf $port $proto ; then
+	     echo "port $port already opened in config file"
+	  else
+	    iptables -I INPUT 1 -m state --state NEW -m $proto -p $proto \
 		--dport $port -j ACCEPT 2>&1
-	err=$?
-	if (( err == 0 )) ; then
-	  ((portcnt++))
-	else
-	  echo "ERROR $err: iptables port $port"
- 	  ((errcnt++))
-	fi
-      fi
+	    err=$?
+	    if (( err == 0 )) ; then
+	      ((portcnt++))
+	    else
+	      echo "ERROR $err: iptables port $port"
+	      ((errcnt++))
+	    fi
+	  fi
+      done
   done
   
   if (( portcnt > 0 )); then # added at least 1 port rule
