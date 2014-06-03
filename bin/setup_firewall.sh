@@ -15,7 +15,7 @@ PREFIX="$(dirname $(readlink -f $0))"
 # Returns 1 on errors.
 function setup_iptables() {
 
-  local err; local errcnt=0; portcnt=0
+  local err; local errcnt=0; local portcnt=0
   local port; local proto
   local conf='/etc/sysconfig/iptables'
 

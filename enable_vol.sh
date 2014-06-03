@@ -201,7 +201,7 @@ function chk_and_fix_nodes() {
   debug "check_vol: $out"
 
   if (( err != 0 )) ; then 1 or more issues detected on volume
-    warn -e "\nissues with nodes spanned by $VOLNAME and/or the YARN-master node"
+    warn -e "\nissues with nodes spanned by $VOLNAME and/or YARN-master node"
     if (( AUTO_YES )) || yesno "  Correct above issues? [y|N] " ; then
       echo
       debug "invoking setup_nodes to correct above issues"
@@ -293,9 +293,9 @@ BLKDEVS=($($PREFIX/bin/find_blocks.sh -xn $RHS_NODE $VOLNAME))
 
 echo
 quiet "*** Volume            : $VOLNAME"
-quiet "*** Nodes             : $(echo ${NODES[*]}     | tr ' ' ', ')"
-quiet "*** Brick mounts      : $(echo ${BRKMNTS[*]}   | tr ' ' ', ')"
-quiet "*** Block devices     : $(echo ${BLKDEVS[*]} } | tr ' ' ', ')"
+quiet "*** Nodes             : $(echo ${NODES[*]}   | tr ' ' ', ')"
+quiet "*** Brick mounts      : $(echo ${BRKMNTS[*]} | tr ' ' ', ')"
+quiet "*** Block devices     : $(echo ${BLKDEVS[*]} | tr ' ' ', ')"
 quiet "*** Ambari mgmt node  : $MGMT_NODE"
 quiet "*** Yarn-master server: $YARN_NODE"
 echo

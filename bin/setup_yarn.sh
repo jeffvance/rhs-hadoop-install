@@ -23,15 +23,14 @@ errcnt=0
 #   YARN_NODE
 function set_yarn() {
 
-  local err; local out; local ssh=''; local ssh_close=''
+  local err; local ssh=''; local ssh_close=''
   local fuse_rpm='glusterfs-fuse'
   local volmnt="$VOLMNT" # same name as gluster-fuse mnt
   local mntopts="$($PREFIX/gen_req_gluster_mnt.sh),_netdev" # add _netdev
 
   [[ "$YARN_NODE" != "$HOSTNAME" ]] && { ssh="ssh $YARN_NODE '"; ssh_close="'"; }
 
-  out="$(eval "
-  	$ssh
+  eval "$ssh
 	  # install glusterfs-fuse if not present
 	  if ! rpm -ql $fuse_rpm >& /dev/null ; then
 	    yum -y install $fuse_rpm 2>&1
@@ -44,10 +43,10 @@ function set_yarn() {
 	  mkdir -p $volmnt 2>&1
 	  mount $volmnt 2>&1 # mount via fstab, exit with mount returncode
 	$ssh_close
-      ")"
+       "
   err=$?
   (( err != 0 && err != 32 )) && { # 32==already mounted
-    echo "ERROR $err on $YARN_NODE (yarn-master): $out";
+    echo "ERROR $err on $YARN_NODE (yarn-master)";
     return 1; }
 
   echo "$VOLNAME glusterfs-fuse mounted on $YARN_NODE (yarn-master)"
