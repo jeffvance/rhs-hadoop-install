@@ -211,7 +211,7 @@ function parse_nodes_brkmnts_blkdevs() {
   done
 
   # assign unique storage nodes
-  NODES=(${!NODE_BRKMNTS[@]}) # same as using NODE_BLKDEVS indices...
+  NODES=($(printf '%s\n' "${!NODE_BRKMNTS[@]}" | sort))
 
   # remove last trailing comma from each node's brk/blk value
   for node in ${NODES[@]}; do
