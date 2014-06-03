@@ -252,8 +252,10 @@ mount_blkdev       || ((errcnt++))
 setup_selinux      || ((errcnt++))
 setup_ntp          || ((errcnt++))
 setup_ambari_agent || ((errcnt++))
+echo "**********errcnt=$errcnt (after agent)"
 
 $PREFIX/setup_firewall.sh          || ((errcnt++))
+echo "**********errcnt=$errcnt (after firewall)"
 $PREFIX/add_groups.sh              || ((errcnt++))
 $PREFIX/add_users.sh               || ((errcnt++))
 if [[ -n "$BRICKMNT" ]] ; then # need brick mount prefix

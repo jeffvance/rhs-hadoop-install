@@ -7,7 +7,6 @@
 # NOTE: Java RMI ports (random ports) cannot be handled here as we do not know
 #   their port number.
 
-errcnt=0; q=''
 PREFIX="$(dirname $(readlink -f $0))"
 
 # setup_iptables: open ports for the known gluster, ambari and hadoop services
@@ -16,43 +15,48 @@ PREFIX="$(dirname $(readlink -f $0))"
 # Returns 1 on errors.
 function setup_iptables() {
 
-  local err; local errcnt=0
+  local err; local errcnt=0; portcnt=0
   local port; local proto
   local iptables_conf='/etc/sysconfig/iptables'
 
   for port in $($PREFIX/gen_ports.sh); do
-      proto=${port#*:} # can be blank
-      [[ -z "$proto ]] && proto='tcp' # default protocol
-      port=${port%:*}; port=${port/-/:} # use iptables range syntax
+      proto=${port#*:} # == port # if no proto defined
+      port=${port%:*}  # can include port range
+      [[ "$proto" == "$port" ]] && proto='tcp' # default protocol
+      port=${port/-/:} # use iptables range syntax
       # open up this port or port range for the target protocol ONLY if not
       # already open
+echo "*****if grep -qs -e '-p $proto .* $port .*ACCEPT' $iptables_conf; then"
       if grep -qs -e "-p $proto .* $port .*ACCEPT" $iptables_conf; then
 	echo "port $port already open in iptables"
       else
 	iptables -I INPUT 1 -m state --state NEW -m $proto -p $proto \
-		--dport $port -j ACCEPT
+		--dport $port -j ACCEPT 2>&1
 	err=$?
-	if (( err != 0 )) ; then
+	if (( err == 0 )) ; then
+	  ((portcnt++))
+	else
 	  echo "ERROR $err: iptables port $port"
  	  ((errcnt++))
 	fi
       fi
   done
   
-  # save iptables
-  service iptables save
-  err=$?
-  if (( err != 0 )) ; then
-    echo "ERROR $err: iptables save"
-    return 1
-  fi
+echo "***** portcnt=$portcnt"
+  if (( portcnt > 0 )); then # added at least 1 port rule
+    service iptables save
+    err=$?
+    if (( err != 0 )) ; then
+      echo "ERROR $err: iptables save"
+      ((errcnt++))
+    fi
 
-  # restart iptables
-  service iptables restart
-  err=$?
-  if (( err != 0 )) ; then
-    echo "ERROR $err: iptables restart"
-    return 1
+    service iptables restart
+    err=$?
+    if (( err != 0 )) ; then
+      echo "ERROR $err: iptables restart"
+      ((errcnt++))
+    fi
   fi
 
   (( errcnt > 0 )) && return 1
