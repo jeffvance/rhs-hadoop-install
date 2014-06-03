@@ -392,7 +392,7 @@ function setup_nodes() {
       err -e $err "setup_datanode on $node:\n$out"
       return 1
     fi
-    debug "setup_datanode on $node: $out"
+    debug -e "setup_datanode on $node:\n$out"
     return 0
   }
 

@@ -111,16 +111,17 @@ function check_open_ports() {
   local iptables_conf='/etc/sysconfig/iptables'
 
   for port in $($PREFIX/gen_ports.sh); do # "port:proto", eg "49152-49170:tcp"
-      proto=${port#*:}
+      proto=${port#*:} # can be blank
+      [[ -z "$proto ]] && proto='tcp' # default protocol
       port=${port%:*}  # port can be a range or single number
       port=${port/-/:} # use iptables range syntax
       # live check
-      if ! iptables -n -L | grep -qs -E "^ACCEPT *$proto .*:$port"; then
+      if ! iptables -n -L | grep -qs "^ACCEPT *$proto .*:$port"; then
 	echo "ERROR on $NODE: iptables: port(s) $port not open"
 	((errcnt++))
       fi
       # file check
-      if ! grep -qs -E "^-I .* -p $proto .* $port .*ACCEPT" $iptables_conf; then
+      if ! grep -qs -e "^-p $proto .* $port .*ACCEPT" $iptables_conf; then
 	echo "WARN on $NODE: $iptables_conf file: port(s) $port not accepted"
 	((warncnt++))
       fi

@@ -64,7 +64,7 @@ function parse_cmd() {
 # mount to /etc/fstab, and then mount it. Returns 1 on errors.
 function mount_blkdev() {
 
-  local err; local errcnt=0; local out
+  local err; local errcnt=0
   local blkdev; local brkmnt; local i=0
   local mntopts="noatime,inode64"
 
@@ -79,10 +79,10 @@ function mount_blkdev() {
       fi
 
       if ! grep -qsw $brkmnt /proc/mounts ; then
- 	out="$(mount $brkmnt 2>&1)" # via fstab entry
+ 	mount $brkmnt 2>&1 # via fstab entry
  	err=$?
  	if (( err != 0 )) ; then
-	  echo "ERROR $err: mount $blkdev as $brkmnt: $out"
+	  echo "ERROR $err: mount $blkdev as $brkmnt"
 	  ((errcnt++))
 	fi
       fi
@@ -98,7 +98,7 @@ function mount_blkdev() {
 # automatically after a reboot. Returns 1 on errors.
 function setup_ambari_agent() {
 
-  local out; local err; local errcnt=0
+  local err; local errcnt=0
   local AMBARI_INI='/etc/ambari-agent/conf/ambari-agent.ini'
   local AMBARI_AGENT_PID='/var/run/ambari-agent/ambari-agent.pid'
 
@@ -106,20 +106,18 @@ function setup_ambari_agent() {
 
   # stop agent if running
   if [[ -f $AMBARI_AGENT_PID ]] ; then
-    out="$(ambari-agent stop 2>&1)"
+    ambari-agent stop 2>&1
     err=$?
-    echo "ambari-agent stop: $out"
     if (( err != 0 )) ; then
-      echo "WARN $err: couldn't stop ambari agent: $out"
+      echo "WARN $err: couldn't stop ambari agent"
     fi
   fi
 
   # install agent
-  out="$(yum -y install ambari-agent 2>&1)"
+  yum -y install ambari-agent 2>&1
   err=$?
-  echo "ambari-agent install: $out"
   if (( err != 0 && err != 1 )) ; then # 1--> nothing-to-do
-    echo "ERROR $err: ambari-agent install: $out"
+    echo "ERROR $err: ambari-agent install"
     return 1
   fi
 
@@ -132,20 +130,18 @@ function setup_ambari_agent() {
   sed -i -e "s/hostname=localhost/hostname=${MGMT_NODE}/" $AMBARI_INI
 
   # start the agent now
-  out="$(ambari-agent start 2>&1)"
+  ambari-agent start 2>&1
   err=$?
-  echo "ambari-agent start: $out"
   if (( err != 0 )) ; then
-    echo "ERROR $err: ambari-agent start: $out"
+    echo "ERROR $err: ambari-agent start"
     return 1
   fi
 
   # persist the agent after reboot
-  out="$(chkconfig ambari-agent on 2>&1)"
+  chkconfig ambari-agent on 2>&1
   err=$?
-  echo "ambari-agent chkconfig on: $out"
   if (( err != 0 )) ; then
-    echo "ERROR $err: ambari-agent chkconfig on: $out"
+    echo "ERROR $err: ambari-agent chkconfig on"
     return 1
   fi
 
@@ -156,7 +152,7 @@ function setup_ambari_agent() {
 # errors.
 function setup_ntp() {
 
-  local errcnt=0; local warncnt=0; local out; local cnt=0; local err
+  local errcnt=0; local warncnt=0; local cnt=0; local err
 
   # validate ntp config file
   if ! validate_ntp_conf ; then  # we're hosed: can't sync time nor start ntpd
@@ -176,17 +172,17 @@ function setup_ntp() {
 
   # set time to ntp clock time now (ntpdate is being deprecated)
   # note: ntpd can't be running...
-  out="$(ntpd -qg 2>&1)"
+  ntpd -qg 2>&1
   err=$?
   (( err != 0 )) && {
-    echo "WARN $err: ntpd -qg (aka ntpdate) error: $out"; 
+    echo "WARN $err: ntpd -qg (aka ntpdate)";
     ((warncnt++)); }
 
   # start ntpd
-  out="$(service ntpd start 2>&1)"
+  service ntpd start 2>&1
   err=$?
   (( err != 0 )) && {
-    echo "ERROR $err: ntpd start error: $out";
+    echo "ERROR $err: ntpd start"
     ((errcnt++)); }
 
   (( errcnt > 0 )) && return 1
@@ -195,17 +191,16 @@ function setup_ntp() {
 }
 
 # setup_selinux: if selinux is enabled then set it to permissive. This seems
-# to be a requirement for HDP.
+# to be a requirement for HDP. Returns 1 on errors.
 function setup_selinux() {
 
-  local out; local err
+  local err
   local conf='/etc/sysconfig/selinux' # symlink to /etc/selinux/config
   local selinux_key='SELINUX='
   local permissive='permissive'
 
   # set selinux to permissive (audit errors reported but not enforced)
-  out="$(setenforce $permissive 2>&1)"
-  echo "$out"
+  setenforce $permissive 2>&1
 
   # keep selinux permissive on reboots
   if [[ ! -f $conf ]] ; then
@@ -214,10 +209,10 @@ function setup_selinux() {
   fi
 
   # config SELINUX=permissive which takes effect the next reboot
-  out="$(sed -i -e "/^$selinux_key/c\\$selinux_key$permissive" $conf)"
+  sed -i -e "/^$selinux_key/c\\$selinux_key$permissive" $conf
   err=$?
   if (( err != 0 )) ; then
-    echo "ERROR $err: setting selinux permissive in $CONF"
+    echo "ERROR $err: trying to set selinux to permissive in $conf"
     return 1
   fi
 }
@@ -225,18 +220,17 @@ function setup_selinux() {
 # setup_xfs: mkfs.xfs on the block device. Returns 1 on error.
 function setup_xfs() {
 
-  local blkdev; local err; local errcnt=0; local out
+  local blkdev; local err; local errcnt=0
   local isize=512
 
   [[ -z "$BLKDEV" ]] && return 0 # nothing to do...
 
   for blkdev in ${BLKDEV[@]}; do
       if ! xfs_info $blkdev >& /dev/null ; then
-	out="$(mkfs -t xfs -i size=$isize -f $blkdev 2>&1)"
+	mkfs -t xfs -i size=$isize -f $blkdev 2>&1
 	err=$?
-	echo "mkfs.xfs on $blkdev: $out"
 	if (( err != 0 )) ; then
-	  echo "ERROR $err: mkfs.xfs on $blkdev: $out"
+	  echo "ERROR $err: mkfs.xfs on $blkdev"
 	  ((errcnt++))
 	fi
       fi

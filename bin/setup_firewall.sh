@@ -21,11 +21,14 @@ function setup_iptables() {
   local iptables_conf='/etc/sysconfig/iptables'
 
   for port in $($PREFIX/gen_ports.sh); do
-      proto=${port#*:}
+      proto=${port#*:} # can be blank
+      [[ -z "$proto ]] && proto='tcp' # default protocol
       port=${port%:*}; port=${port/-/:} # use iptables range syntax
       # open up this port or port range for the target protocol ONLY if not
       # already open
-      if ! grep -qs -E "^-I .* -p $proto .* $port .*ACCEPT" $iptables_conf; then
+      if grep -qs -e "-p $proto .* $port .*ACCEPT" $iptables_conf; then
+	echo "port $port already open in iptables"
+      else
 	iptables -I INPUT 1 -m state --state NEW -m $proto -p $proto \
 		--dport $port -j ACCEPT
 	err=$?
