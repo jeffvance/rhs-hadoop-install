@@ -17,7 +17,7 @@ function setup_iptables() {
 
   local err; local errcnt=0; portcnt=0
   local port; local proto
-  local iptables_conf='/etc/sysconfig/iptables'
+  local conf='/etc/sysconfig/iptables'
 
   for port in $($PREFIX/gen_ports.sh); do
       proto=${port#*:} # == port # if no proto defined
@@ -26,9 +26,8 @@ function setup_iptables() {
       port=${port/-/:} # use iptables range syntax
       # open up this port or port range for the target protocol ONLY if not
       # already open
-echo "*****if grep -qs -e '-p $proto .* $port .*ACCEPT' $iptables_conf; then"
-      if grep -qs -e "-p $proto .* $port .*ACCEPT" $iptables_conf; then
-	echo "port $port already open in iptables"
+      if grep -qs -e "-p $proto .* $port .*ACCEPT" $conf; then
+	echo "port $port already opened in $conf"
       else
 	iptables -I INPUT 1 -m state --state NEW -m $proto -p $proto \
 		--dport $port -j ACCEPT 2>&1
@@ -42,7 +41,6 @@ echo "*****if grep -qs -e '-p $proto .* $port .*ACCEPT' $iptables_conf; then"
       fi
   done
   
-echo "***** portcnt=$portcnt"
   if (( portcnt > 0 )); then # added at least 1 port rule
     service iptables save
     err=$?
