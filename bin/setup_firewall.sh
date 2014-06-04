@@ -30,7 +30,9 @@ function setup_iptables() {
 	  if match_port_conf $port $proto ; then
 	     echo "port $port already opened in config file"
 	  else
-	    iptables -I INPUT 1 -m state --state NEW -m $proto -p $proto \
+	    #iptables -I INPUT 1 -m state --state NEW -m $proto -p $proto \
+		#--dport $port -j ACCEPT 2>&1
+	    iptables -I INPUT 1 -p $proto \
 		--dport $port -j ACCEPT 2>&1
 	    err=$?
 	    if (( err == 0 )) ; then

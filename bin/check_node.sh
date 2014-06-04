@@ -46,17 +46,16 @@ function check_brick_mount() {
   # errors have already been reported by check_xfs() for missing brick mtn dirs
   [[ ! -d $BRICKMNT ]] && return
 
-  out="$(xfs_info $BRICKMNT 2>&1)"
+  xfs_info $BRICKMNT 2>&1
   err=$?
-  echo "xfs_info on $BRICKMNT: $out"
   if (( err != 0 )) ; then
-    echo "ERROR $err: $out"
+    echo "ERROR $err: xfs_info on $BRICKMNT"
     ((errcnt++))
   else
     out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
     if (( out != isize )) ; then
       echo "WARN: xfs size on $BRICKMNT expected to be $isize; found $out"
-	((warncnt++))
+      ((warncnt++))
     fi
   fi
 
@@ -193,18 +192,16 @@ function check_users() {
 # check_xfs:
 function check_xfs() {
 
-  local err; local errcnt=0; local warncnt=0
-  local out; local isize=512
+  local err; local errcnt=0; local warncnt=0; local out; local isize=512
 
   if [[ ! -d $BRICKMNT ]] ; then
     echo "ERROR: directory $BRICKMNT missing on $NODE"
     ((errcnt++))
   else
-    out="$(xfs_info $BRICKMNT 2>&1)"
+    xfs_info $BRICKMNT 2>&1
     err=$?
-    echo "xfs_info on $BRICKMNT: $out"
     if (( err != 0 )) ; then
-      echo "ERROR $err: $out"
+      echo "ERROR $err:xfs_info on $BRICKMNT"
       ((errcnt++))
     else
       out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
