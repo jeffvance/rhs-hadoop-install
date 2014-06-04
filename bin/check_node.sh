@@ -105,8 +105,21 @@ function check_dirs() {
 # open, both "live" (iptables) and persisted (iptables conf file).
 function check_open_ports() {
 
+  # return 0 if iptables is not even running
+  if ! service iptables status >& /dev/null ; then
+    echo "iptables not running on $HOSTNAME"
+    return 0
+  fi
+
+  # return 0 if iptables is running but all ports are open
+  if ! iptables -S | grep -v ACCEPT ; then
+    echo "no iptables rules, all ports are open on $HOSTNAME"
+    return 0
+  fi
+
+  # there are some iptables rules, verify the required ports are open
   local out; local port; local proto
-  local errcnt=0; local warncnt=0
+  local out; local errcnt=0; local warncnt=0
   declare -A PORTS=$($PREFIX/gen_ports.sh)
 
   for proto in ${!PORTS[@]}; do

@@ -15,8 +15,8 @@ source $PREFIX/functions
 
 # setup_iptables: open ports for the known gluster, ambari and hadoop services
 # by prepending the port to the INPUT rule chain. Note: we don't append since 
-# there could be an existing DENY or DROP in the chain.
-# Returns 1 on errors.
+# there could be an existing DENY or DROP in the chain. Note: if iptables is
+# not running then we don't restart the service. Returns 1 on errors.
 function setup_iptables() {
 
   local err; local errcnt=0; local portcnt=0
@@ -32,8 +32,7 @@ function setup_iptables() {
 	  else
 	    #iptables -I INPUT 1 -m state --state NEW -m $proto -p $proto \
 		#--dport $port -j ACCEPT 2>&1
-	    iptables -I INPUT 1 -p $proto \
-		--dport $port -j ACCEPT 2>&1
+	    iptables -I INPUT 1 -p $proto --dport $port -j ACCEPT 2>&1
 	    err=$?
 	    if (( err == 0 )) ; then
 	      ((portcnt++))
@@ -53,11 +52,14 @@ function setup_iptables() {
       ((errcnt++))
     fi
 
-    service iptables restart
-    err=$?
-    if (( err != 0 )) ; then
-      echo "ERROR $err: iptables restart"
-      ((errcnt++))
+    # if iptables is running then restart it, else leave it off
+    if service iptables status >& /dev/null ; then
+      service iptables restart
+      err=$?
+      if (( err != 0 )) ; then
+	echo "ERROR $err: iptables restart"
+	((errcnt++))
+      fi
     fi
   fi
 
