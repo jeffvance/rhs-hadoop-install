@@ -514,13 +514,11 @@ function define_pool() {
 }
 
 # create_pool: create the trusted pool or add new nodes to the existing pool.
-# Note: the yarn-master server is include in the pool but will have no storage.
 # Note: gluster peer probe returns 0 if the node is already in the pool. It
 #   returns 1 if the node is unknown.
 # Uses globals:
 #   FIRST_NODE
 #   POOL
-#   YARN_NODE
 function create_pool() {
 
   local node; local err; local errcnt=0; local out
@@ -528,7 +526,7 @@ function create_pool() {
   verbose "--- creating trusted storage pool..."
 
   # create or add-to storage pool
-  for node in ${POOL[*]} $YARN_NODE; do
+  for node in ${POOL[*]} ; do
       [[ "$node" == "$FIRST_NODE" ]] && continue # skip
       out="$(ssh $FIRST_NODE "gluster peer probe $node 2>&1")"
       err=$?
@@ -645,11 +643,11 @@ define_pool ${NODES[*]} || exit 1
 # prompt to continue before any changes are made...
 (( ! AUTO_YES )) && ! yesno "  Continue? [y|N] " && exit 0
 
-# distribute and install the rhs-hadoop repo file to all nodes
-install_repo ${UNIQ_NODES[*]} || exit 1
-
 # copy bin/* files to /tmp/ on all nodes including mgmt- and yarn-nodes
 copy_bin ${UNIQ_NODES[*]} || exit 1
+
+# distribute and install the rhs-hadoop repo file to all nodes
+install_repo ${UNIQ_NODES[*]} || exit 1
 
 # setup each node for hadoop workloads
 setup_nodes || exit 1

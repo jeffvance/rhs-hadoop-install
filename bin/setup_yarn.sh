@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# setup_yarn.sh setup the supplied yarn-master node for the passed-in volume. So
-# far, this includes creating the glusterfs-fuse mount.
+# setup_yarn.sh setup the supplied yarn-master node for the passed-in volume.
+# So far, this includes creating the glusterfs-fuse mount.
 # Syntax:
 #   $1=volume name (required).
 #   -y=yarn-master node (required).
@@ -25,23 +25,20 @@ function set_yarn() {
 
   local err; local ssh=''; local ssh_close=''
   local fuse_rpm='glusterfs-fuse'
-  local volmnt="$VOLMNT" # same name as gluster-fuse mnt
-  local mntopts="$($PREFIX/gen_req_gluster_mnt.sh),_netdev" # add _netdev
+  local mntopts="$($PREFIX/gen_req_gluster_mnt.sh)"
 
-  [[ "$YARN_NODE" != "$HOSTNAME" ]] && { ssh="ssh $YARN_NODE '"; ssh_close="'"; }
+  [[ "$YARN_NODE" != "$HOSTNAME" ]] && \
+	{ ssh="ssh $YARN_NODE '"; ssh_close="'"; }
 
   eval "$ssh
 	  # install glusterfs-fuse if not present
 	  if ! rpm -ql $fuse_rpm >& /dev/null ; then
-	    yum -y install $fuse_rpm 2>&1
+	    yum -y install $fuse_rpm
 	  fi
-	  # append to fstab if not present
-	  if ! grep -qs $volmnt /etc/fstab ; then
-	    echo $RHS_NODE:/$VOLNAME $volmnt glusterfs $mntopts 0 0 >>/etc/fstab
-	  fi
-	  # always attempt to create the dir and mount the vol
-	  mkdir -p $volmnt 2>&1
-	  mount $volmnt 2>&1 # mount via fstab, exit with mount returncode
+	  source /tmp/bin/functions # for function call below
+	  gluster_mnt_vol $RHS_NODE $VOLNAME $VOLMNT $mntopts
+	  chmod $perms $mnt
+	  chown $owner $mnt
 	$ssh_close
        "
   err=$?

@@ -172,27 +172,31 @@ function setup_nodes() {
 }
 
 # chk_and_fix_nodes: this is the first opportunity to setup the yarn-master 
-# server because we need both the yarn-master node and a volume. Next, check_vol
-# is called to verify that VOLNAME has been setup for hadoop workloads, including
-# each node spanned by the volume. If setup issues are detected then the user is
-# optionally prompted to fix the problems. Returns 1 for errors.
+# server because we need both the yarn-master node and a volume. Next,
+# check_vol is called to verify that VOLNAME has been setup for hadoop
+# workloads, including each node spanned by the volume. If setup issues are
+# detected then the user is optionally prompted to fix the problems. Returns 1
+# for errors.
 # Uses globals:
 #   AUTO_YES
 #   PREFIX
 #   RHS_NODE
 #   VOLNAME
+#   YARN_INSIDE
 function chk_and_fix_nodes() {
 
   local errcnt=0; local out; local err
 
-  verbose "--- setting up the yarn-master: $YARN_NODE..."
-  out="$($PREFIX/bin/setup_yarn.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME)"
-  err=$?
-  if (( err != 0 )) ; then
-    ((errcnt++))
-    err -e $err "setup_yarn on $YARN_NODE:\n$out"
-  else
-    debug -e "setup_yarn on $YARN_NODE:\n$out"
+  if (( ! YARN_INSIDE )) ; then # need to setup gluster-fuse mnt
+    verbose "--- setting up the yarn-master: $YARN_NODE..."
+    out="$($PREFIX/bin/setup_yarn.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME)"
+    err=$?
+    if (( err != 0 )) ; then
+      ((errcnt++))
+      err -e $err "setup_yarn on $YARN_NODE:\n$out"
+    else
+      debug -e "setup_yarn on $YARN_NODE:\n$out"
+    fi
   fi
 
   verbose "--- checking that $VOLNAME is setup for hadoop workloads..."

@@ -194,10 +194,11 @@ function chk_nodes() {
 
       out="$(eval "$ssh /tmp/bin/check_node.sh ${BRKMNTS[$i]}")"
       err=$?
-      debug -e "check_node on $node:\n$out"
       if (( err != 0 )) ; then
-	err $err "check_node on $node. See $LOGFILE for more info"
+	err -e $err "check_node on $node:\n$out"
 	((errcnt++))
+      else
+	debug -e "check_node on $node:\n$out"
       fi
       ((i++))
   done
@@ -215,7 +216,6 @@ function chk_nodes() {
 #   2) the hadoop group and users have been created.
 # Uses globals:
 #   NODES
-#   PREFIX
 #   VOLMNT
 #   VOLNAME
 function mk_volmnt() {
@@ -223,29 +223,16 @@ function mk_volmnt() {
   local err; local errcnt=0; local out; local node
   local ssh; local ssh_close
   local volmnt="$VOLMNT/$VOLNAME"
-  local owner="yarn:hadoop" # assumes both have been created!
-  local perms=0774 # rwxrwxr--
-
-  # assign required and optional gluster-fuse mount options
-  local mntopts="$($PREFIX/bin/gen_req_gluster_mnt.sh),"
-  mntopts+="$($PREFIX/bin/gen_opt_gluster_mnt.sh),_netdev" # add _netdev here
 
   verbose "--- creating glusterfs-fuse mount for $VOLNAME..."
-  debug "mount opts: $mntopts"
 
   for node in ${NODES[*]}; do
       [[ "$node" == "$HOSTNAME" ]] && { ssh=''; ssh_close=''; } \
 			           || { ssh="ssh $node '"; ssh_close="'"; }
       out="$(eval "
 	$ssh
-	  # append mount to fstab, if not present
-	  if ! grep -qs $volmnt /etc/fstab ; then
-	    echo $node:/$VOLNAME $volmnt glusterfs $mntopts 0 0 >>/etc/fstab
-	  fi
-	  mkdir -p $volmnt
-	  chmod $perms $volmnt
-	  chown $owner $volmnt
-	  mount $volmnt 2>&1 # mount via fstab, exit with mount returncode
+	  source /tmp/bin/functions # for function call below
+          gluster_mnt_vol $node $VOLNAME $volmnt
 	$ssh_close
       ")"
       err=$?

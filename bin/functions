@@ -17,15 +17,14 @@ LOGFILE='/var/log/rhs-hadoop-install.log'
 function check_ssh() {
 
   local nodes="$@"
-  local localhost="$(hostname)"
   local node; local err; local errcnt=0
 
   for node in $nodes; do
-      [[ "$node" == "$localhost" ]] && continue # skip
+      [[ "$node" == "$HOSTNAME" ]] && continue # skip
       ssh -q $node exit
       err=$?
       if (( err != 0 )) ; then
-        echo "ERROR: cannot connect to node $node"
+        echo "ERROR: cannot passwordless ssh to node $node from $HOSTNAME"
         ((errcnt++))
       fi
   done
@@ -138,6 +137,39 @@ function get_ambari_repo(){
 
   (( errcnt > 0 )) && return 1
   return 0
+}
+
+# gluster_mnt_vol: persist the passed volume, node and mount as a native
+# glusterfs-fuse mount with the correct owner and permissions. Note: _netdev is
+# appended to the mount opts.
+# Note: returns the returncode from the mount command.
+# Args:
+#   1=storage node
+#   2=volume name
+#   3=gluster vol mount dir (includes volname)
+#   4=(optional) mount opts
+function gluster_mnt_vol() {
+
+  local node=$1; local vol=$2; local mnt=$3; local mntopts=$4
+  local owner="yarn:hadoop" # assumes both have been created!
+  local perms=0774 # rwxrwxr--
+
+  # append to fstab if not present
+  if ! grep -qs $mnt /etc/fstab ; then # mnt not present in fstab
+    if [[ -z "$mntopts" ]] ; then # set default mount opts if needed
+      mntopts="$(/tmp/bin/gen_req_gluster_mnt.sh),"  # required mnt opts +
+      mnmtopts+="$(/tmp/bin/gen_opt_gluster_mnt.sh)" # optional mnt opts
+    fi
+    mntopts+=',_netdev' # always append _netdev
+    # persist mnt in fstab
+    echo $node:/$vol $mnt glusterfs $mntopts 0 0 >>/etc/fstab
+  fi
+
+  # always attempt to create the dir, mount the vol, set owner/perms
+  mkdir -p $mnt
+  chmod $perms $mnt
+  chown $owner $mnt
+  mount $mnt # mount via fstab, return with mount's returncode
 }
 
 # match_port_conf: return 0 (shell true) if the passed-in port and protocol
