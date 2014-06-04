@@ -37,8 +37,6 @@ function set_yarn() {
 	  fi
 	  source /tmp/bin/functions # for function call below
 	  gluster_mnt_vol $RHS_NODE $VOLNAME $VOLMNT $mntopts
-	  chmod $perms $mnt
-	  chown $owner $mnt
 	$ssh_close
        "
   err=$?
