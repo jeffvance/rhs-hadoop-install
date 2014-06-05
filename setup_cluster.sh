@@ -385,14 +385,13 @@ function setup_nodes() {
 		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE
  	")"
     err=$?
-    verbose "+++"
-    verbose "+++ completed node $node with status of $err"
-
     if (( err != 0 )) ; then
       err -e $err "setup_datanode on $node:\n$out"
       return 1
     fi
     debug -e "setup_datanode on $node:\n$out"
+    verbose "+++"
+    verbose "+++ completed node $node with status of $err"
     return 0
   }
 
