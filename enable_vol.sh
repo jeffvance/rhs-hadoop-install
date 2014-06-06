@@ -38,12 +38,11 @@ where:
 <volname>    : the RHS volume to be enabled for hadoop workloads.
 --yarn-master: (optional) hostname or ip of the yarn-master server which is
                expected to be outside of the storage pool. Default is localhost.
---rhs_node   : (optional) hostname of any of the storage nodes. This is needed in
-               order to access the gluster command. Default is localhost which,
-               must have gluster cli access.
---hadoop-mgmt-node : (optional) hostname or ip of the hadoop mgmt server which
-               is expected to be outside of the storage pool. Default is
-               localhost.
+--rhs_node   : (optional) hostname of any of the storage nodes. This is needed
+               in order to access the gluster command. Default is localhost
+               which, must have gluster cli access.
+--hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server which is
+               expected to be outside of the storage pool. Default is localhost.
 -y           : (optional) auto answer "yes" to all prompts. Default is to answer
                a confirmation prompt.
 --quiet      : (optional) output only basic progress/step messages. Default.
@@ -204,8 +203,8 @@ function chk_and_fix_nodes() {
   err=$?
   debug "check_vol: $out"
 
-  if (( err != 0 )) ; then 1 or more issues detected on volume
-    warn -e "\nissues with nodes spanned by $VOLNAME and/or YARN-master node"
+  if (( err != 0 )) ; then # 1 or more issues detected on volume
+    warn "issues with nodes spanned by $VOLNAME and/or YARN-master node"
     if (( AUTO_YES )) || yesno "  Correct above issues? [y|N] " ; then
       echo
       debug "invoking setup_nodes to correct above issues"

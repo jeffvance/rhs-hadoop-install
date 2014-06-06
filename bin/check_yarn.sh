@@ -4,7 +4,7 @@
 # this includes checking the nfs mount.
 # Syntax:
 #   $1=volume name (required).
-#   -y=yarn-master node (required).
+#   -y=(optional) yarn-master node, default=localhost.
 
 errcnt=0
 
@@ -17,13 +17,16 @@ function chk_yarn() {
   local errcnt=0; local warncnt=0; local cnt
 
   # live check
-  if ! eval "$SSH ps -ef | grep -q :/$VOLNAME\\s $SSH_CLOSE" ; then
+  if ! eval "$SSH ps -ef | \
+	grep \"glusterfs --.*$VOLNAME\" | \
+	grep -vq grep $SSH_CLOSE" ; then
     echo "ERROR: $VOLNAME not mounted on $YARN_NODE (yarn-master)"
     ((errcnt++))
   fi
 
   # fstab check
-  cnt=$(eval "$SSH grep -c :/$VOLNAME\\s /etc/fstab $SSH_CLOSE")
+  cnt=$(eval "$SSH
+	grep -c \"$VOLNAME\s.*\sglusterfs\s\" /etc/fstab $SSH_CLOSE")
   if (( cnt == 0 )) ; then
     echo "WARN: $VOLNAME mount missing from /etc/fstab on $YARN_NODE (yarn-master)"
     ((warncnt++))
@@ -55,9 +58,7 @@ VOLNAME="$1"
   echo "Syntax error: volume name is required";
   exit -1; }
 
-[[ -z "$YARN_NODE" ]] && {
-  echo "Syntax error: yarn-master node is required";
-  exit -1; }
+[[ -z "$YARN_NODE" ]] && YARN_NODE="$HOSTNAME"
 
 [[ "$YARN_NODE" == "$HOSTNAME" ]] && { SSH=''; SSH_CLOSE=''; } \
 				  || { SSH="ssh $YARN_NODE '"; SSH_CLOSE="'"; }
@@ -65,5 +66,4 @@ VOLNAME="$1"
 chk_yarn || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
-echo "$VOLNAME is setup correctly on yarn-master $YARN_NODE"
 exit 0

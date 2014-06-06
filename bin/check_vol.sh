@@ -7,7 +7,7 @@
 #
 # Syntax:
 #   $1=volume name (required).
-#   -y=yarn-master node (required).
+#   -y=(optional) yarn-master node, default=localhost.
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
 
@@ -34,9 +34,7 @@ VOLNAME="$1"
   echo "Syntax error: volume name is required";
   exit -1; }
 
-[[ -z "$yarn_node" ]] && {
-  echo "Syntax error: yarn-master node is required";
-  exit -1; }
+[[ -z "$yarn_node" ]] && yarn_node="$HOSTNAME" # default
 
 [[ -n "$rhs_node" ]] && rhs_node="-n $rhs_node" || rhs_node=''
 

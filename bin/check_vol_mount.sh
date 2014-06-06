@@ -54,15 +54,15 @@ function check_vol_mnt_attrs() {
   (( rc == 1 )) && ((errcnt++)) || (( rc == 2 )) && ((warncnt++))
 
   # fstab check
-  cnt=$(ssh $node "grep -c '$node:/$VOLNAME.* glusterfs ' /etc/fstab")
+  cnt=$(ssh $node "grep -c '$VOLNAME\s.*\sglusterfs\s' /etc/fstab")
   if (( cnt == 0 )) ; then
-    echo "ERROR: $VOLNAME mount missing in /etc/fstab"
+    echo "ERROR on $node: $VOLNAME mount missing in /etc/fstab"
     ((errcnt++))
   elif (( cnt > 1 )) ; then
-    echo "ERROR: $VOLNAME appears more than once in /etc/fstab"
+    echo "ERROR on $node: $VOLNAME appears more than once in /etc/fstab"
     ((errcnt++))
   else # cnt == 1
-    mntopts="$(ssh $node "grep '$node:/$VOLNAME.* glusterfs ' /etc/fstab")"
+    mntopts="$(ssh $node "grep '$VOLNAME\s.*\sglusterfs\s' /etc/fstab")"
     mntopts=${mntopts#* glusterfs }
     chk_mnt $node "$mntopts"
     rc=$?
