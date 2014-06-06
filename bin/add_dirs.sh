@@ -52,9 +52,10 @@ for dir in $MNT; do
 	echo "ERROR: $dir is not a directory";
 	exit -1; }
 done
+dirs_to_add="$($PREFIX/gen_dirs.sh $opt)"
 
 for dir in $MNT; do # to handle a list of local mounts
-    for tuple in $($PREFIX/gen_dirs.sh $opt); do
+    for tuple in $dirs_to_add; do
 	path="$dir/${tuple%%:*}"; let fill=(42-${#path})
 	path+="$(printf ' %.0s' $(seq $fill))" # left-justified for nicer output
 	perm=${tuple%:*}; perm=${perm#*:}

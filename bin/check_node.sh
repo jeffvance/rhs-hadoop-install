@@ -37,8 +37,8 @@ function check_ambari_agent() {
   return 0
 }
 
-# check_brick_mount: use xfs_info to verify the brick mnt is xfs (if not error)
-# and the isize = 512 (if not warning).
+# check_brick_mount: use xfs_info to verify the brick mnt is xfs and the isize
+# is 512.
 function check_brick_mount() {
 
   local out; local isize=512; local errcnt=0; local warncnt=0
@@ -46,10 +46,10 @@ function check_brick_mount() {
   # errors have already been reported by check_xfs() for missing brick mtn dirs
   [[ ! -d $BRICKMNT ]] && return
 
-  xfs_info $BRICKMNT 2>&1
+  out="$(xfs_info $BRICKMNT 2>&1)"
   err=$?
   if (( err != 0 )) ; then
-    echo "ERROR $err: xfs_info on $BRICKMNT"
+    echo "ERROR $err: xfs_info on $BRICKMNT: $out"
     ((errcnt++))
   else
     out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value

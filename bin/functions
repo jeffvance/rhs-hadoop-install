@@ -156,9 +156,9 @@ function gluster_mnt_vol() {
 
   # append to fstab if not present
   if ! grep -qs $mnt /etc/fstab ; then # mnt not present in fstab
-    if [[ -z "$mntopts" ]] ; then # set default mount opts if needed
-      mntopts="$(/tmp/bin/gen_req_gluster_mnt.sh),"  # required mnt opts +
-      mnmtopts+="$(/tmp/bin/gen_opt_gluster_mnt.sh)" # optional mnt opts
+    if [[ -z "$mntopts" ]] ; then # set default mount opts
+      mntopts="$(/tmp/bin/gen_req_gluster_mnt.sh)," # required mnt opts +
+      mntopts+="$(/tmp/bin/gen_opt_gluster_mnt.sh)" # optional mnt opts
     fi
     mntopts+=',_netdev' # always append _netdev
     # persist mnt in fstab

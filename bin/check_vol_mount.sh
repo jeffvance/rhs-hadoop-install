@@ -11,8 +11,8 @@
 #      storage node.
 
 
-# given the passed-in vol mount opts, verify the correct settings. Returns 1 
-# for errors, 2 for warnings, and 0 for neither.
+# chk_mnt: given the passed-in vol mount opts, verify the correct settings.
+# Returns 1 for errors, 2 for warnings, and 0 for neither.
 # Note: cannot return -1, just in case you were wondering...
 function chk_mnt() {
 
