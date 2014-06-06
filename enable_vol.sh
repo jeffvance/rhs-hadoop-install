@@ -1,13 +1,8 @@
 #!/bin/bash
 #
-# TODO:
-# 1) add hadoop-users to yarn-master
-# 2) verify uid consistency
-# 3) detect which RMI port #s are being used and open them.
-#
 # enable_vol.sh accepts a volume name, discovers and checks the volume mount on
-# each node spanned by the volume to be sure they are setup for hadoop workloads,
-# and then updates the core-site file to contain the volume. 
+# each node spanned by the volume to be sure they are setup for hadoop work-
+# loads, and then updates the core-site file to contain the volume. 
 #
 # See usage() for syntax.
 
@@ -134,6 +129,7 @@ function parse_cmd() {
 # setup_nodes: setup each node for hadoop workloads by invoking
 # setup_datanodes.sh. Returns 1 on errors. Assumes all nodes have current
 # bin/ scripts in /tmp.
+# NOTE: NOT CURRENTY INVOKED BUT MAY BE LATER...
 # Uses globals:
 #   BLKDEVS
 #   BRKMNTS
@@ -170,19 +166,22 @@ function setup_nodes() {
   return 0
 }
 
-# chk_and_fix_nodes: this is the first opportunity to setup the yarn-master 
+# chk_nodes: this is the first opportunity to setup the yarn-master 
 # server because we need both the yarn-master node and a volume. Next,
 # check_vol is called to verify that VOLNAME has been setup for hadoop
 # workloads, including each node spanned by the volume. If setup issues are
-# detected then the user is optionally prompted to fix the problems. Returns 1
-# for errors.
+# detected then, for now, an error is reported and the user needs to re-run
+# the setup_cluster script. Later, we may let the user correct issues here.
+# Returns 1 for errors.
 # Uses globals:
-#   AUTO_YES
+#   LOGFILE
 #   PREFIX
+#   NODES
 #   RHS_NODE
 #   VOLNAME
 #   YARN_INSIDE
-function chk_and_fix_nodes() {
+#   YARN_NODE
+function chk_nodes() {
 
   local errcnt=0; local out; local err
 
@@ -199,29 +198,16 @@ function chk_and_fix_nodes() {
   fi
 
   verbose "--- checking that $VOLNAME is setup for hadoop workloads..."
-  out="$($PREFIX/bin/check_vol.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME)"
+  out="$($PREFIX/bin/check_vol.sh -n $RHS_NODE $VOLNAME)"
   err=$?
   debug "check_vol: $out"
-
   if (( err != 0 )) ; then # 1 or more issues detected on volume
-    warn "issues with nodes spanned by $VOLNAME and/or YARN-master node"
-    if (( AUTO_YES )) || yesno "  Correct above issues? [y|N] " ; then
-      echo
-      debug "invoking setup_nodes to correct above issues"
-      setup_nodes || ((errcnt++))
-      debug "invoking set_vol_perf"
-      out="$($PREFIX/bin/set_vol_perf.sh -n $RHS_NODE $VOLNAME)"
-      err=$?
-      if (( err != 0 )) ; then
-	((errcnt++))
-	err -e "set_vol_perf:\n$out"
-      else
-	debug -e "set_vol_perf:\n$out"
-      fi
-    else
-      debug "user declines fixing problem node(s)"
-      ((errcnt++))
-    fi
+    ((errcnt++))
+    err "issues with 1 or more nodes spanned by $VOLNAME"
+    debug -e "Nodes spanned by $VOLNAME:\n${NODES[*]}"
+    force "A suggestion is to re-run the setup_cluster.sh script to ensure that"
+    force "all nodes in the cluster are set up correctly for Hadoop workloads."
+    force "See the $LOGFILE log file for additional info."
   fi
 
   (( errcnt > 0 )) && return 1
@@ -309,7 +295,7 @@ echo
 
 # verify nodes spanned by the volume are ready for hadoop workloads, and if
 # not prompt user to fix problems.
-chk_and_fix_nodes || exit 1
+chk_nodes || exit 1
 
 # edit the core-site file to recognize the enabled volume
 edit_core_site || exit 1

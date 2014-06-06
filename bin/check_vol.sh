@@ -7,7 +7,6 @@
 #
 # Syntax:
 #   $1=volume name (required).
-#   -y=(optional) yarn-master node, default=localhost.
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
 
@@ -15,13 +14,10 @@ errcnt=0; q=''
 PREFIX="$(dirname $(readlink -f $0))"
 
 # parse cmd opts
-while getopts ':y:n:' opt; do
+while getopts ':n:' opt; do
     case "$opt" in
       n)
         rhs_node="$OPTARG"
-        ;;
-      y)
-        yarn_node="$OPTARG"
         ;;
       \?) # invalid option
         ;;
@@ -33,8 +29,6 @@ VOLNAME="$1"
 [[ -z "$VOLNAME" ]] && {
   echo "Syntax error: volume name is required";
   exit -1; }
-
-[[ -z "$yarn_node" ]] && yarn_node="$HOSTNAME" # default
 
 [[ -n "$rhs_node" ]] && rhs_node="-n $rhs_node" || rhs_node=''
 
@@ -48,7 +42,6 @@ done
 
 $PREFIX/check_vol_mount.sh $rhs_node $VOLNAME $NODES || ((errcnt++))
 $PREFIX/check_vol_perf.sh $rhs_node $VOLNAME || ((errcnt++))
-$PREFIX/check_yarn.sh -y $yarn_node $VOLNAME || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
 echo "$VOLNAME is ready for hadoop workloads"
