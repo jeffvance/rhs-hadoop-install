@@ -102,7 +102,10 @@ function check_dirs() {
 }
 
 # check_open_ports: verify that the ports needed by gluster and ambari are all
-# open, both "live" (iptables) and persisted (iptables conf file).
+# open, both "live" (iptables) and persisted (iptables conf file). NOTE: due to
+# RMI ports and Java's allowing of port number 0 to be randomly assigned, we 
+# cannot open all of the needed hadoop ports. Therefore, unfortunately, we need
+# to check that iptables is stopped.
 function check_open_ports() {
 
   # return 0 if iptables is not even running
@@ -117,29 +120,33 @@ function check_open_ports() {
     return 0
   fi
 
+  return 1 # potentially hadoop needed ports have rules
+
+  # Code below remains for documentation purposes...
+
   # there are some iptables rules, verify the required ports are open
-  local out; local port; local proto
-  local out; local errcnt=0; local warncnt=0
-  declare -A PORTS=$($PREFIX/gen_ports.sh)
+  #local out; local port; local proto
+  #local out; local errcnt=0; local warncnt=0
+  #declare -A PORTS=$($PREFIX/gen_ports.sh)
 
-  for proto in ${!PORTS[@]}; do
-      for port in ${PORTS[$proto]}; do
+  #for proto in ${!PORTS[@]}; do
+      #for port in ${PORTS[$proto]}; do
 	  # live check
-	  if ! match_port_live $port $proto ; then
-	    echo "ERROR on $NODE: iptables: port(s) $port not open"
-	    ((errcnt++))
-	  fi
+	  #if ! match_port_live $port $proto ; then
+	    #echo "ERROR on $NODE: iptables: port(s) $port not open"
+	    #((errcnt++))
+	  #fi
 	  # file check
-	  if ! match_port_conf $port $proto ; then
-	    echo "WARN on $NODE: $iptables_conf file: port(s) $port not accepted"
-	    ((warncnt++))
-	  fi
-      done
-  done
+	  #if ! match_port_conf $port $proto ; then
+	    #echo "WARN on $NODE: $iptables_conf file: port(s) $port not accepted"
+	    #((warncnt++))
+	  #fi
+      #done
+  #done
 
-  (( errcnt > 0 )) && return 1
-  echo "all required ports are open on $NODE with $warncnt warnings"
-  return 0
+  #(( errcnt > 0 )) && return 1
+  #echo "all required ports are open on $NODE with $warncnt warnings"
+  #return 0
 }
 
 # check_ntp: verify that ntp is running and the config file has 1 or more
