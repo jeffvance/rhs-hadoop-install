@@ -6,7 +6,7 @@
 # open, ambari agent running, selinux not enabled, hadoop users and local hadoop
 # directories exist.
 # Syntax:
-#  $1= xfs brick mount directory path including the volume name
+#  $1= xfs brick mount directory path including the volume name (required).
 
 PREFIX="$(dirname $(readlink -f $0))"
 
@@ -38,13 +38,14 @@ function check_ambari_agent() {
 }
 
 # check_brick_mount: use xfs_info to verify the brick mnt is xfs and the isize
-# is 512.
+# is 512. Returns 1 for errors.
 function check_brick_mount() {
 
   local out; local isize=512; local errcnt=0; local warncnt=0
 
-  # errors have already been reported by check_xfs() for missing brick mtn dirs
-  [[ ! -d $BRICKMNT ]] && return
+  [[ ! -d $BRICKMNT ]] && {
+    echo "ERROR: directory $BRICKMNT missing on $NODE";
+    return 1; }
 
   out="$(xfs_info $BRICKMNT 2>&1)"
   err=$?
@@ -209,34 +210,6 @@ function check_users() {
   return 0
 }
 
-# check_xfs:
-function check_xfs() {
-
-  local err; local errcnt=0; local warncnt=0; local out; local isize=512
-
-  if [[ ! -d $BRICKMNT ]] ; then
-    echo "ERROR: directory $BRICKMNT missing on $NODE"
-    ((errcnt++))
-  else
-    xfs_info $BRICKMNT 2>&1
-    err=$?
-    if (( err != 0 )) ; then
-      echo "ERROR $err:xfs_info on $BRICKMNT"
-      ((errcnt++))
-    else
-      out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
-      if (( out != $isize )) ; then
-        echo "WARN: xfs for $BRICKMNT on $NODE expected to be $isize in size; instead sized at $out"
-	((warncnt++))
-      fi
-    fi
-  fi
-
-  (( errcnt > 0 )) && return 1
-  echo "xfs setup correctly on $NODE with $warncnt warnings"
-  return 0
-}
-
 
 ## main ##
 
@@ -247,7 +220,6 @@ BRICKMNT="$1" # includes the vol name in path
   echo "Syntax error: xfs brick mount path is required";
   exit -1; }
 
-check_xfs          || ((errcnt++))
 check_brick_mount  || ((errcnt++))
 check_selinux      || ((errcnt++))
 check_open_ports   || ((errcnt++))
