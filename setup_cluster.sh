@@ -303,17 +303,16 @@ function copy_bin() {
 # for errors.
 function install_repo() {
 
-  local nodes=($@)
-  local node; local errcnt=0
+  local nodes="$@"
+  local node; local errcnt=0; local err
   local repo_file='/etc/yum.repos.d/rhs-hadoop.repo'
 
-  # nested function copies to and installs package on the passed-in node.
+  # nested function copies the repo file to the passed-in node.
   # Returns 1 on errors.
-  function cp_install() {
+  function cp_repo() {
 
     local node="$1"; local err
 
-    # copy repo file to node
     out="$(scp $repo_file $node:$repo_file)"
     err=$?
     if (( err != 0 )) ; then
@@ -321,8 +320,15 @@ function install_repo() {
       return 1
     fi
     debug -e "copying repo file to $node in $(dirname $repo_file):\n$out"
+    return 0
+  }
 
-    # yum install package
+  # nested function installs the package on the passed-in node.
+  # Returns 1 on errors.
+  function install_repo() {
+
+    local node="$1"; local err
+
     out="$(ssh $node 'yum install -y --nogpgcheck rhs-hadoop 2>&1')"
     err=$?
     if (( err != 0 )) ; then
@@ -330,7 +336,6 @@ function install_repo() {
       return 1
     fi
     debug -e "yum install repo file on $node:\n$out"
-
     return 0
   }
 
@@ -342,9 +347,16 @@ function install_repo() {
     err "$repo_file is missing. Cannot install rhs-hadoop package on cluster";
     return 1; }
 
-  for node in ${nodes[@]}; do
-      [[ "$node" == "$HOSTNAME" ]] && continue # skip self (localhost)
-      cp_install $node || ((errcnt++))
+  for node in $nodes; do
+      err=0
+      if [[ "$node" != "$HOSTNAME" ]] ; then
+	cp_repo $node
+        err=$?
+        (( err != 0 )) && ((errcnt++))
+      fi
+      if (( err == 0 )) ; then
+	install_repo $node || ((errcnt++))
+      fi
   done
 
   (( errcnt > 0 )) && return 1
