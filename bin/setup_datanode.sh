@@ -240,6 +240,22 @@ function setup_xfs() {
   return 0
 }
 
+# add_local_dirs: add the local directories for each brick mount if the brick
+# mount is defined.
+function add_local_dirs() {
+
+  local brkmnt; local errcnt=0
+
+  [[ -z "$BRICKMNT" ]] && return 0 # nothing to do
+
+  for brkmnt in ${BRICKMNT[*]}; do
+      $PREFIX/add_dirs.sh -l $brkmnt || ((errcnt++))
+  done
+
+  (( errcnt > 0 )) && return 1
+  return 0
+}
+
 
 ## main ##
 
@@ -253,12 +269,10 @@ setup_selinux      || ((errcnt++))
 setup_ntp          || ((errcnt++))
 setup_ambari_agent || ((errcnt++))
 
-$PREFIX/setup_firewall.sh          || ((errcnt++))
-$PREFIX/add_groups.sh              || ((errcnt++))
-$PREFIX/add_users.sh               || ((errcnt++))
-if [[ -n "$BRICKMNT" ]] ; then # need brick mount prefix
-  $PREFIX/add_dirs.sh -l $BRICKMNT || ((errcnt++)) # just local dirs
-fi
+$PREFIX/setup_firewall.sh || ((errcnt++))
+$PREFIX/add_groups.sh     || ((errcnt++))
+$PREFIX/add_users.sh      || ((errcnt++))
+add_local_dirs            || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
 echo "Node $(hostname) successfully setup"
