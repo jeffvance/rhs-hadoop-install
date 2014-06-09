@@ -25,7 +25,6 @@ function set_yarn() {
 
   local err; local ssh=''; local ssh_close=''
   local fuse_rpm='glusterfs-fuse'
-  local mntopts="$($PREFIX/gen_req_gluster_mnt.sh)"
 
   [[ "$YARN_NODE" != "$HOSTNAME" ]] && \
 	{ ssh="ssh $YARN_NODE '"; ssh_close="'"; }
@@ -36,7 +35,7 @@ function set_yarn() {
 	    yum -y install $fuse_rpm
 	  fi
 	  source /tmp/bin/functions # for function call below
-	  gluster_mnt_vol $RHS_NODE $VOLNAME $VOLMNT $mntopts
+	  gluster_mnt_vol $RHS_NODE $VOLNAME $VOLMNT
 	$ssh_close
        "
   err=$?

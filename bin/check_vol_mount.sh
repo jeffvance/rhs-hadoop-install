@@ -12,46 +12,36 @@
 
 
 # chk_mnt: given the passed-in vol mount opts, verify the correct settings.
-# Returns 1 for errors, 2 for warnings, and 0 for neither.
-# Note: cannot return -1, just in case you were wondering...
+# Returns 1 for errors.
 function chk_mnt() {
 
   local node="$1"; local opts="$2"
   local errcnt=0; local warncnt=0; local mnt
 
-  for mnt in $REQ_MNT_OPTS; do
+  for mnt in $MNT_OPTS; do
       if ! grep -q "$mnt" <<<$opts; then
 	echo "ERROR on $node: required gluster mount option $mnt must be set"
 	((errcnt++))
       fi
   done
 
-  for mnt in $OPT_MNT_OPTS; do
-      if ! grep -q "$mnt" <<<$opts; then
-	echo "WARN on $node: recommended gluster mount option $mnt can be set"
-	((warncnt++))
-      fi
-  done
-
-  (( errcnt > 0  )) && return 1 # 1 or more errors
-  (( warncnt > 0 )) && return 2 # 1 or more warnings
+  (( errcnt > 0  )) && return 1
   return 0
 }
 
 # check_vol_mnt_attrs: verify that the correct mount settings for VOLNAME have
-# been set on the passed-in node. This include verifying both the "live" settings,
-# determined by ps, and the "persistent" settings, defined in /etc/fstab.
+# been set on the passed-in node. This include verifying both the "live" 
+# settings, determined by ps, and the "persistent" settings, defined in
+# /etc/fstab.
 function check_vol_mnt_attrs() {
 
   local node="$1"
-  local rc; local errcnt=0; local warncnt=0; local cnt; local mntopts
+  local errcnt=0; local cnt; local mntopts
 
   # live check
   mntopts="$(ssh $node "ps -ef | grep 'glusterfs --.*$VOLNAME' | grep -v grep")"
   mntopts=${mntopts#*glusterfs} # just the opts
-  chk_mnt $node "$mntopts"
-  rc=$?
-  (( rc == 1 )) && ((errcnt++)) || (( rc == 2 )) && ((warncnt++))
+  chk_mnt $node "$mntopts" || ((errcnt++))
 
   # fstab check
   cnt=$(ssh $node "grep -c '$VOLNAME\s.*\sglusterfs\s' /etc/fstab")
@@ -64,9 +54,7 @@ function check_vol_mnt_attrs() {
   else # cnt == 1
     mntopts="$(ssh $node "grep '$VOLNAME\s.*\sglusterfs\s' /etc/fstab")"
     mntopts=${mntopts#* glusterfs }
-    chk_mnt $node "$mntopts"
-    rc=$?
-    (( rc == 1 )) && ((errcnt++)) || (( rc == 2 )) && ((warncnt++))
+    chk_mnt $node "$mntopts" || ((errcnt++))
   fi
 
   (( errcnt > 0 )) && return 1
@@ -79,10 +67,8 @@ function check_vol_mnt_attrs() {
 
 errcnt=0; cnt=0
 PREFIX="$(dirname $(readlink -f $0))"
-REQ_MNT_OPTS="$($PREFIX/gen_req_gluster_mnt.sh)" # required mnt opts
-OPT_MNT_OPTS="$($PREFIX/gen_opt_gluster_mnt.sh)" # optional mnt opts
-REQ_MNT_OPTS="${REQ_MNT_OPTS//,/ }" # subst spaces for commas
-OPT_MNT_OPTS="${OPT_MNT_OPTS//,/ }" # subst spaces for commas
+MNT_OPTS="$($PREFIX/gen_vol_mnt_options.sh)" # required mnt opts
+MNT_OPTS="${MNT_OPTS//,/ }" # replace commas with spaces
 
 # parse cmd opts
 while getopts ':n:' opt; do
