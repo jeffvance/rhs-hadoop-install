@@ -10,7 +10,10 @@
 PREFIX="$(dirname $(readlink -f $0))"
 YARN_NODE="$1"; shift 
 [[ "$HOSTNAME" == "$YARN_NODE" ]] && ssh='' || ssh="ssh $YARN_NODE"
-USERS="sally" # required hadoop users
+
+### This seemed to fail, just hard coded it for now to 
+### sally. 
+USERS=(sally,s,s) # required hadoop users, comma sep uname/fname/lname
 ### USERS+=" $@" # add any additional passed-in users
 
 YARN_DOMAIN="$(eval "$ssh hostname -d")"
@@ -29,12 +32,17 @@ eval "$ssh
 		--domain=$YARN_DOMAIN --ds-password=$PASSWD \
 		--admin-password=$PASSWD && \
 	echo $PASSWD | kinit $ADMIN && \
-        ipa group-add hadoop  --desc="hadoop user"  && \
+        echo \"hadoop group description\" | ipa group-add hadoop && \
 	for user in $USERS; do
-    	    ipa user-add $user
-	done					&& \
-	ipa group-add-member hadoop --users=${USERS// /,}
-"
+            IN=\"$user\"
+            set -- \"$IN\"
+            IFS=\",\"; declare -a Array=($*)
+            u=\"${Array[0]}\"
+            f=\"${Array[1]}\"
+            l=\"${Array[2]}\"
+	    ipa user-add $u --first $f --last $l 
+            ipa group-add-member hadoop --users=$u
+        done		&& \ "
 err=$?
 if (( err != 0 )) ; then
   echo "ERROR $err: ipa-server: adding group-users"
@@ -43,5 +51,4 @@ fi
 
 # on the clients:
 ssh mrg42 "yum -y install ipa-client"
-ssh mrg42 "ipa-client-install --enable-dns-updates --domain $YARN_DOMAIN \
-	--server $YARN_NODE --realm HADOOP"
+ssh mrg42 "ipa-client-install --enable-dns-updates --domain $YARN_DOMAIN	--server $YARN_NODE --realm HADOOP"
