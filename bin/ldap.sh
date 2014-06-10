@@ -4,20 +4,20 @@
 # User will never need to know or use the hard-coded password.
 # Exits 1 on error; otherwise exits 0.
 # Args:
-#   1=yarn-master node, will be used as the ldap server (required)
+#   1=hadoop mgmt-node, will be used as the ldap server (required)
 #   2+=list of additional users to add, eg. "tom sally ed", (optional)
 
 PREFIX="$(dirname $(readlink -f $0))"
-ssh=''; ssh_close=''
-YARN_NODE="$1"; shift
-[[ -z "$YARN_NODE" ]] && {
+ssh='('; ssh_close=')' # assume using a sub-shell vs doing ssh
+MGMT_NODE="$1"; shift
+[[ -z "$MGMT_NODE" ]] && {
   echo "Syntax error: the yarn-master node is the first arg and is required";
   exit -1; }
 
-[[ "$HOSTNAME" != "$YARN_NODE" ]] && {
-  ssh="ssh $YARN_NODE '"; ssh_close="'"; }
-YARN_DOMAIN="$(eval "$ssh hostname -d")"
-[[ -z "$YARN_DOMAIN" ]] && YARN_DOMAIN="$YARN_NODE"
+[[ "$HOSTNAME" != "$MGMT_NODE" ]] && {
+  ssh="ssh $MGMT_NODE '"; ssh_close="'"; }
+MGMT_DOMAIN="$(eval "$ssh hostname -d")"
+[[ -z "$MGMT_DOMAIN" ]] && MGMT_DOMAIN="$MGMT_NODE"
 
 USERS="$($PREFIX/gen_users.sh)" # required hadoop users
 USERS+=" $@" # add any additional passed-in users
@@ -26,24 +26,46 @@ PASSWD='admin123' # min of 8 chars
 
 # on the server:
 eval "$ssh 
-	yum -y install ipa-server		 && \
-	ipa-server-install -U --hostname=$YARN_NODE --realm=HADOOP \
-		--domain=$YARN_DOMAIN --ds-password=$PASSWD \
-		--admin-password=$PASSWD	 && \
-	echo $PASSWD | kinit $ADMIN && \
-        ipa group-add hadoop --desc hadoop-group && \
+	yum -y install ipa-server
+        err=\$?
+	(( err != 0 )) && {
+	   echo \"ERROR \$err: yum install ipa-server\"; exit 1; }
+
+	ipa-server-install -U --hostname=$MGMT_NODE --realm=HADOOP \
+		--domain=$MGMT_DOMAIN --ds-password=$PASSWD \
+		--admin-password=$PASSWD
+        err=\$?
+	(( err != 0 )) && {
+	   echo \"ERROR \$err: ipa-server-install\"; exit 1; }
+ 
+	echo $PASSWD | kinit $ADMIN
+        err=\$?
+	(( err != 0 )) && {
+	   echo \"ERROR \$err: kinit $ADMIN\"; exit 1; }
+
+        ipa group-add hadoop --desc hadoop-group
+        err=\$?
+	(( err != 0 )) && {
+	   echo \"ERROR \$err: ipa group-add hadoop\"; exit 1; }
+
 	for user in $USERS; do
 	    ipa user-add $user --first $user --last $user 
-        done					 && \
+	    err=\$?
+	    (( err != 0 )) && {
+		echo \"ERROR \$err: ipa user-add $user\"; exit 1; }
+        done
+
         ipa group-add-member hadoop --users=${USERS// /,}
+        err=\$?
+	(( err != 0 )) && {
+	   echo \"ERROR \$err: ipa group-add-member hadoop --users $USERS\";
+	   exit 1; }
+
       $ssh_close"
-err=$?
-if (( err != 0 )) ; then
-  echo "ERROR $err: ipa-server: adding users: $USERS"
-  exit 1
-fi
+
+(( $? != 0 )) && exit 1 # error msg echo'd above
 
 # on the clients:
 ssh mrg42 "yum -y install ipa-client"
-ssh mrg42 "ipa-client-install --enable-dns-updates --domain $YARN_DOMAIN \
-	--server $YARN_NODE --realm HADOOP"
+ssh mrg42 "ipa-client-install --enable-dns-updates --domain $MGMT_DOMAIN \
+	--server $MGMT_NODE --realm HADOOP"

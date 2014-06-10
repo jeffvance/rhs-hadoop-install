@@ -36,7 +36,7 @@ function chk_mnt() {
 function check_vol_mnt_attrs() {
 
   local node="$1"
-  local errcnt=0; local cnt; local mntopts
+  local warncnt=0; local errcnt=0; local cnt; local mntopts
 
   # live check
   mntopts="$(ssh $node "ps -ef | grep 'glusterfs --.*$VOLNAME' | grep -v grep")"

@@ -153,6 +153,7 @@ function gluster_mnt_vol() {
   local node=$1; local vol=$2; local mnt=$3; local mntopts=$4
   local owner="yarn:hadoop" # assumes both have been created!
   local perms=0774 # rwxrwxr--
+  local err=0
 
   # append to fstab if not present
   if ! grep -qs $mnt /etc/fstab ; then # mnt not present in fstab
@@ -164,11 +165,18 @@ function gluster_mnt_vol() {
     echo $node:/$vol $mnt glusterfs $mntopts 0 0 >>/etc/fstab
   fi
 
-  # always attempt to create the dir, mount the vol, set owner/perms
+  # always attempt to create the dir, set owner/perms
   mkdir -p $mnt
   chmod $perms $mnt
   chown $owner $mnt
-  mount $mnt # mount via fstab, return with mount's returncode
+
+  # mount the vol if not already mounted
+  if ! grep -qs $mnt /proc/mounts ; then
+    mount $mnt
+    err=$? # return with mount's exit-value
+  fi
+
+  return $err
 }
 
 # match_port_conf: return 0 (shell true) if the passed-in port and protocol
