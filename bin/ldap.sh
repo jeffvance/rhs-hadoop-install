@@ -8,26 +8,23 @@
 #   2+=list of additional users to add, eg. "tom sally ed", (optional)
 
 PREFIX="$(dirname $(readlink -f $0))"
-YARN_NODE="$1"; shift 
+YARN_NODE="$1"; shift
+[[ -z "$YARN_NODE" ]] && {
+  echo "Syntax error: the yarn-master node is the first arg and is required";
+  exit -1; }
+
 [[ "$HOSTNAME" == "$YARN_NODE" ]] && ssh='' || ssh="ssh $YARN_NODE"
-
-### This seemed to fail, just hard coded it for now to 
-### sally. 
-USERS=(sally,s,s) # required hadoop users, comma sep uname/fname/lname
-### USERS+=" $@" # add any additional passed-in users
-
 YARN_DOMAIN="$(eval "$ssh hostname -d")"
+[[ -z "$YARN_DOMAIN" ]] && YARN_DOMAIN="$YARN_NODE"
 
-
+USERS="$($PREFIX/gen_users.sh)" # required hadoop users
+USERS+=" $@" # add any additional passed-in users
 ADMIN='admin'
 PASSWD='admin123' # min of 8 chars
 
-
-echo "YARN server = $YARN_DOMAIN "
-
 # on the server:
 eval "$ssh
-	yum -y install ipa-server		&& \
+	yum -y install ipa-server		  && \
 	ipa-server-install -U --hostname=$YARN_NODE --realm=HADOOP \
 		--domain=$YARN_DOMAIN --ds-password=$PASSWD \
 		--admin-password=$PASSWD && \
