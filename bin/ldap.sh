@@ -19,24 +19,25 @@ YARN_DOMAIN="$(eval "$ssh hostname -d")"
 
 USERS="$($PREFIX/gen_users.sh)" # required hadoop users
 USERS+=" $@" # add any additional passed-in users
+USERS=($USERS)
 ADMIN='admin'
 PASSWD='admin123' # min of 8 chars
 
+echo "users === $USERS"
 # on the server:
 eval "$ssh
 	yum -y install ipa-server		  && \
-	ipa-server-install -U --hostname=$YARN_NODE --realm=HADOOP \
-		--domain=$YARN_DOMAIN --ds-password=$PASSWD \
-		--admin-password=$PASSWD && \
+	ipa-server-install -U --hostname=$YARN_NODE --realm=HADOOP --domain=$YARN_DOMAIN --ds-password=$PASSWD --admin-password=$PASSWD && \
 	echo $PASSWD | kinit $ADMIN && \
         echo \"hadoop group description\" | ipa group-add hadoop && \
 	for user in $USERS; do
             IN=\"$user\"
             set -- \"$IN\"
-            IFS=\",\"; declare -a Array=($*)
+            IFS=\"-\"; declare -a Array=($*)
             u=\"${Array[0]}\"
             f=\"${Array[1]}\"
             l=\"${Array[2]}\"
+            echo \"adding user = $user\"
 	    ipa user-add $u --first $f --last $l 
             ipa group-add-member hadoop --users=$u
         done		&& \ "
