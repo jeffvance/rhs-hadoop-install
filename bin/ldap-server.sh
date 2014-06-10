@@ -14,8 +14,8 @@ LDAP_NODE="$1"; shift # ldap server
   echo "Syntax error: the ldap server node is the first arg and is required";
   exit -1; }
 
-if [[ "$HOSTNAME" == "$LDAP_NODE" ]] ; then # use sub-sell rather than ssh
-  ssh='('; ssh_close=')'
+if [[ "$HOSTNAME" == "$LDAP_NODE" ]] ; then # use sub-shell rather than ssh
+  ssh='('; ssh_close=')'                    # so that a common exit can be used
 else # use ssh to ldap server
   ssh="ssh $LDAP_NODE '"; ssh_close="'"
 fi
@@ -53,14 +53,6 @@ eval "$ssh
 	(( err != 0 )) && {
 	   echo \"ERROR \$err: kinit $ADMIN\"; exit 1; }
 
-	# add group(s)
-	for group in $GROUPS; do
-	    ipa group-add \$group --desc \${group}-group
-	    err=\$?
-	    (( err != 0 )) && {
-	      echo \"ERROR \$err: ipa group-add \$group\"; exit 1; }
-	done
-
 	# add hadoop users + any extra users
 	for user in $USERS; do
 	    ipa user-add \$user --first \$user --last \$user 
@@ -69,8 +61,13 @@ eval "$ssh
 		echo \"ERROR \$err: ipa user-add \$user\"; exit 1; }
         done
 
-	# associate users with group(s)
+	# add group(s) and associate to users
 	for group in $GROUPS; do
+	    ipa group-add \$group --desc \${group}-group
+	    err=\$?
+	    (( err != 0 )) && {
+	      echo \"ERROR \$err: ipa group-add \$group\"; exit 1; }
+
 	    ipa group-add-member \$group --users=${USERS// /,}
 	    err=\$?
 	    (( err != 0 )) && {
