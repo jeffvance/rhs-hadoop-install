@@ -1,8 +1,8 @@
 ##!/bin/bash
 #
-# ldap.sh: install and setup the ipa server on the passed-in server node.
-# User will never need to know or use the hard-coded password.
-# Exits 1 on error; otherwise exits 0.
+# ldap-server.sh: install and setup the ipa server on the passed-in server
+# node. Currently the ldap-server admin user and password are hard-coded but
+# that can be changed in the future. Exits 1 on errors; otherwise exits 0.
 # Args:
 #   1=(required) ldap server node, usually the hadoop mgmt node,
 #   2+=(optional) list of additional users to add, eg. "tom sally ed".
