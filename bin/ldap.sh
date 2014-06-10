@@ -8,15 +8,18 @@
 #   2+=list of additional users to add, eg. "tom sally ed", (optional)
 
 PREFIX="$(dirname $(readlink -f $0))"
-ssh='('; ssh_close=')' # assume using a sub-shell vs doing ssh
 MGMT_NODE="$1"; shift
 [[ -z "$MGMT_NODE" ]] && {
   echo "Syntax error: the yarn-master node is the first arg and is required";
   exit -1; }
 
-[[ "$HOSTNAME" != "$MGMT_NODE" ]] && {
-  ssh="ssh $MGMT_NODE '"; ssh_close="'"; }
-MGMT_DOMAIN="$(eval "$ssh hostname -d")"
+if [[ "$HOSTNAME" == "$MGMT_NODE" ]] ; then # use sub-sell rather than ssh
+  ssh='('; ssh_close=')'
+else # use ssh to mgmt node
+  ssh="ssh $MGMT_NODE '"; ssh_close="'"
+fi
+
+MGMT_DOMAIN="$(eval "$ssh hostname -d $ssh_close")"
 [[ -z "$MGMT_DOMAIN" ]] && MGMT_DOMAIN="$MGMT_NODE"
 
 USERS="$($PREFIX/gen_users.sh)" # required hadoop users
