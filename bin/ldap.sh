@@ -1,33 +1,38 @@
 ##!/bin/bash
 #
-# ldap.sh... ...
+# ldap.sh: install and setup the ipa server on the passed-in server node.
 # User will never need to know or use the hard-coded password.
 # Exits 1 on error; otherwise exits 0.
 # Args:
-#   1=hadoop mgmt-node, will be used as the ldap server (required)
-#   2+=list of additional users to add, eg. "tom sally ed", (optional)
+#   1=(required) ldap server node, usually the hadoop mgmt node,
+#   2+=(optional) list of additional users to add, eg. "tom sally ed".
 
 PREFIX="$(dirname $(readlink -f $0))"
-MGMT_NODE="$1"; shift
-[[ -z "$MGMT_NODE" ]] && {
-  echo "Syntax error: the yarn-master node is the first arg and is required";
+
+LDAP_NODE="$1"; shift # ldap server
+[[ -z "$LDAP_NODE" ]] && {
+  echo "Syntax error: the ldap server node is the first arg and is required";
   exit -1; }
 
-if [[ "$HOSTNAME" == "$MGMT_NODE" ]] ; then # use sub-sell rather than ssh
+if [[ "$HOSTNAME" == "$LDAP_NODE" ]] ; then # use sub-sell rather than ssh
   ssh='('; ssh_close=')'
-else # use ssh to mgmt node
-  ssh="ssh $MGMT_NODE '"; ssh_close="'"
+else # use ssh to ldap server
+  ssh="ssh $LDAP_NODE '"; ssh_close="'"
 fi
 
-MGMT_DOMAIN="$(eval "$ssh hostname -d $ssh_close")"
-[[ -z "$MGMT_DOMAIN" ]] && MGMT_DOMAIN="$MGMT_NODE"
+LDAP_DOMAIN="$(eval "$ssh hostname -d $ssh_close")"
+[[ -z "$LDAP_DOMAIN" ]] && LDAP_DOMAIN="$LDAP_NODE"
 
 USERS="$($PREFIX/gen_users.sh)" # required hadoop users
 USERS+=" $@" # add any additional passed-in users
+
+GROUPS="$($PREFIX/gen_groups.sh)"
+
+# hard-coded admin user and password
 ADMIN='admin'
 PASSWD='admin123' # min of 8 chars
 
-# on the server:
+# set up ldap on the LDAP_NODE
 eval "$ssh 
 	yum -y install ipa-server
         err=\$?
@@ -36,8 +41,8 @@ eval "$ssh
 
 	# uninstall ipa-server-install for idempotency
 	ipa-server-install --uninstall -U
-	ipa-server-install -U --hostname=$MGMT_NODE --realm=HADOOP \
-		--domain=$MGMT_DOMAIN --ds-password=$PASSWD \
+	ipa-server-install -U --hostname=$LDAP_NODE --realm=HADOOP \
+		--domain=$LDAP_DOMAIN --ds-password=$PASSWD \
 		--admin-password=$PASSWD
         err=\$?
 	(( err != 0 )) && {
@@ -48,29 +53,31 @@ eval "$ssh
 	(( err != 0 )) && {
 	   echo \"ERROR \$err: kinit $ADMIN\"; exit 1; }
 
-        ipa group-add hadoop --desc hadoop-group
-        err=\$?
-	(( err != 0 )) && {
-	   echo \"ERROR \$err: ipa group-add hadoop\"; exit 1; }
+	# add group(s)
+	for group in $GROUPS; do
+	    ipa group-add \$group --desc \${group}-group
+	    err=\$?
+	    (( err != 0 )) && {
+	      echo \"ERROR \$err: ipa group-add \$group\"; exit 1; }
+	done
 
+	# add hadoop users + any extra users
 	for user in $USERS; do
 	    ipa user-add \$user --first \$user --last \$user 
 	    err=\$?
 	    (( err != 0 )) && {
-		echo \"ERROR \$err: ipa user-add $user\"; exit 1; }
+		echo \"ERROR \$err: ipa user-add \$user\"; exit 1; }
         done
 
-        ipa group-add-member hadoop --users=${USERS// /,}
-        err=\$?
-	(( err != 0 )) && {
-	   echo \"ERROR \$err: ipa group-add-member hadoop --users $USERS\";
-	   exit 1; }
-
+	# associate users with group(s)
+	for group in $GROUPS; do
+	    ipa group-add-member \$group --users=${USERS// /,}
+	    err=\$?
+	    (( err != 0 )) && {
+	      echo \"ERROR \$err: ipa group-add-member \$group --users $USERS\";
+	     exit 1; }
+	done
       $ssh_close"
 
 (( $? != 0 )) && exit 1 # error msg echo'd above
-
-# on the clients:
-ssh mrg42 "yum -y install ipa-client"
-ssh mrg42 "ipa-client-install --enable-dns-updates --domain $MGMT_DOMAIN \
-	--server $MGMT_NODE --realm HADOOP"
+exit 0
