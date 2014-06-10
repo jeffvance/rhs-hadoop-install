@@ -34,6 +34,8 @@ eval "$ssh
 	(( err != 0 )) && {
 	   echo \"ERROR \$err: yum install ipa-server\"; exit 1; }
 
+	# uninstall ipa-server-install for idempotency
+	ipa-server-install --uninstall -U
 	ipa-server-install -U --hostname=$MGMT_NODE --realm=HADOOP \
 		--domain=$MGMT_DOMAIN --ds-password=$PASSWD \
 		--admin-password=$PASSWD
@@ -52,7 +54,7 @@ eval "$ssh
 	   echo \"ERROR \$err: ipa group-add hadoop\"; exit 1; }
 
 	for user in $USERS; do
-	    ipa user-add $user --first $user --last $user 
+	    ipa user-add \$user --first \$user --last \$user 
 	    err=\$?
 	    (( err != 0 )) && {
 		echo \"ERROR \$err: ipa user-add $user\"; exit 1; }
