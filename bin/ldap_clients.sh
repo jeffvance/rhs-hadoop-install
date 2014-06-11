@@ -46,11 +46,12 @@ done
 err=0
 for node in $CLIENT_NODES; do
     ssh $node "
-	yum -y install ipa-client
+	yum -y install ipa-client 2>&1
         # uninstall ipa-client-install for idempotency
-        ipa-client-install --uninstall -U
+        ipa-client-install --uninstall -U 2>&1
         ipa-client-install -U --enable-dns-updates --domain $IPA_DOMAIN \
-		--server $IPA_SERVER --realm $IPA_REALM -p $ADMIN -w $PASSWD
+		--server $IPA_SERVER --realm $IPA_REALM -p $ADMIN \
+		-w $PASSWD 2>&1
         err=\$?
         (( err != 0 )) && {
 	  echo "ERROR \$err: ipa-client-install on \$node"; exit \$err; }

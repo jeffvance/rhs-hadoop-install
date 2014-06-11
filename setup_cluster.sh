@@ -635,6 +635,7 @@ function setup_ldap() {
     return 1; }
   debug "ldap_clients: $out"
 
+  verbose "--- setting up ldap/ipa server and clients complete"
   return 0
 }
 
@@ -730,9 +731,7 @@ fi
 ambari_server || exit 1
 
 # setup a simple ldap/ipa server on the mgmt node, if requested
-echo "***** SETUP_LDAP=$SETUP_LDAP"
 setup_ldap $MGMT_NODE $NODES[*] $YARN_NODE || exit 1
-echo "***** after setup_ldap()"
 
 # verify user UID and group GID consistency across the cluster
 verify_gid_uids ${NODES[*]} $YARN_NODE || exit 1 

@@ -46,15 +46,15 @@ eval "$ssh
 	   echo \"ERROR \$err: yum install ipa-server\"; exit \$err; }
 
 	# uninstall ipa-server-install for idempotency
-	ipa-server-install --uninstall -U
+	ipa-server-install --uninstall -U 2>&1
 	ipa-server-install -U --hostname=$LDAP_NODE --realm=$IPA_REALM \
 		--domain=$LDAP_DOMAIN --ds-password=$PASSWD \
-		--admin-password=$PASSWD
+		--admin-password=$PASSWD 2>&1
         err=\$?
 	(( err != 0 )) && {
 	   echo \"ERROR \$err: ipa-server-install\"; exit \$err; }
  
-	echo $PASSWD | kinit $ADMIN
+	echo $PASSWD | kinit $ADMIN 2>&1
         err=\$?
 	(( err != 0 )) && {
 	   echo \"ERROR \$err: kinit $ADMIN\"; exit \$err; }
@@ -62,7 +62,7 @@ eval "$ssh
 	# add hadoop users + any extra users
 	for u in $USERS; do
 	    if ! getent passwd \$u >& /dev/null ; then # user does not exist
-	      ipa user-add \$u --first \$u --last \$u 
+	      ipa user-add \$u --first \$u --last \$u  2>&1
 	      err=\$?
 	      (( err != 0 )) && {
 		echo \"ERROR \$err: ipa user-add \$u\"; exit \$err; }
@@ -72,12 +72,12 @@ eval "$ssh
 	# add group(s) and associate to users
 	for g in $GROUPS; do
 	    if ! getent group \$g >& /dev/null ; then
-	      ipa group-add \$g --desc \${g}-group
+	      ipa group-add \$g --desc \${g}-group 2>&1
 	      err=\$?
 	      (( err != 0 )) && {
 		echo \"ERROR \$err: ipa group-add \$g\"; exit \$err; }
 
-	      ipa group-add-member \$g --users=${USERS// /,}
+	      ipa group-add-member \$g --users=${USERS// /,} 2>&1
 	      err=\$?
 	      (( err != 0 )) && {
 		echo \"ERROR \$err: ipa group-add-member \$g: users: $USERS\";
