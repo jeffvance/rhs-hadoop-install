@@ -613,7 +613,7 @@ function setup_ldap() {
   verbose "--- setting up ldap/ipa server on $ldap_server..."
   out="$(/tmp/bin/ldap_server.sh $ldap_server ${EXTRA_USERS//,/ })"
   err=$?
-  (( err != 0 )) {
+  (( err != 0 )) && {
     err $err "ldap_server: $out";
     return 1; }
   debug "ldap_server: $out"
@@ -621,7 +621,7 @@ function setup_ldap() {
   verbose "--- setting up ldap/ipa clients on $client_nodes..."
   out="$(/tmp/bin/ldap_clients.sh $ldap_server $client_nodes)"
   err=$?
-  (( err != 0 )) {
+  (( err != 0 )) && {
     err $err "ldap_clients: $out";
     return 1; }
   debug "ldap_clients: $out"
