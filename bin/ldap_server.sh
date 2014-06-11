@@ -6,7 +6,7 @@
 # added. Currently the ldap-server admin user and password are hard-coded but
 # that can be changed in the future. Exits 1 on errors; otherwise exits 0.
 # Args:
-#   1=(required) ldap server node, usually the hadoop mgmt node,
+#   1=(required) ldap/ipa server node, usually the hadoop mgmt node,
 #   2+=(optional) list of additional users to add, eg. "tom sally ed".
 
 PREFIX="$(dirname $(readlink -f $0))"
@@ -34,6 +34,9 @@ GROUPS="$($PREFIX/gen_groups.sh)"
 ADMIN='admin'
 PASSWD='admin123' # min of 8 chars
 
+# hard-coded realm
+IPA_REALM='HADOOP'
+
 # set up ldap on the LDAP_NODE and add users/groups
 eval "$ssh 
 	yum -y install ipa-server
@@ -43,7 +46,7 @@ eval "$ssh
 
 	# uninstall ipa-server-install for idempotency
 	ipa-server-install --uninstall -U
-	ipa-server-install -U --hostname=$LDAP_NODE --realm=HADOOP \
+	ipa-server-install -U --hostname=$LDAP_NODE --realm=$IPA_REALM \
 		--domain=$LDAP_DOMAIN --ds-password=$PASSWD \
 		--admin-password=$PASSWD
         err=\$?
