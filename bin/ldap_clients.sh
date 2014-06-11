@@ -1,6 +1,6 @@
 ##!/bin/bash
 #
-# ldap-client.sh... ...
+# ldap-clients.sh... ...
 # Args:
 #   1= IPA SERVER (i.e. mrg41.lab.bos.redhat.com)
 #   2= IPA Domain (i.e. lab.bos.redhat.com)
@@ -23,9 +23,9 @@ eval "$ssh
       yum -y install ipa-client &&
       for i in {3..$#}
       do
-         echo -n \"$i\"
+         echo \"$i\"
          ssh \$i \"ipa-client-install --enable-dns-updates --domain $IPA_DOMAIN \
-         --server $IPA_SERVER --realm \" &&                
+         --server $IPA_SERVER --realm $IPA_REALM\" &&                
       done &&
       $ssh_close"
 
