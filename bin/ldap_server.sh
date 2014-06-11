@@ -1,4 +1,4 @@
-##!/bin/bash
+#!/bin/bash
 #
 # ldap-server.sh: install and setup the ipa server on the passed-in server
 # node, and add the required hadoop group(s), and the required hadoop and

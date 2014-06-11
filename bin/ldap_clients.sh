@@ -1,14 +1,15 @@
-##!/bin/bash
+#!/bin/bash
 #
-# ldap-clients.sh... ...
+# ldap_clients.sh... ...
 # Args:
 #   1= IPA SERVER (i.e. mrg41.lab.bos.redhat.com)
 #   2= IPA Domain (i.e. lab.bos.redhat.com)
 #   3= IPA REALM (i.e. HADOOP)
 
-IPA_SERVER=$1 
-IPA_DOMAIN=$2 
-IPA_REALM=$3
+IPA_SERVER="$1"; shift
+IPA_DOMAIN="$1"; shift
+IPA_REALM="$1";  shift
+CLIENT_NODES="$@"
 
 # Remaining args: IPA Clients 
 
@@ -19,15 +20,18 @@ echo "domain : $IPA_DOMAIN"
 echo "realm : $IPA_REALM" 
 echo "***************************************"
 
-eval "$ssh 
-      yum -y install ipa-client &&
-      for i in {3..$#}
-      do
-         echo \"$i\"
-         ssh \$i \"ipa-client-install --enable-dns-updates --domain $IPA_DOMAIN \
-         --server $IPA_SERVER --realm $IPA_REALM\" &&                
-      done &&
-      $ssh_close"
+for node in $CLIENT_NODES; do
+    ssh $node "
+	yum -y install ipa-client
+        # uninstall ipa-client-install for idempotency
+        ipa-client-install --uninstall -U
+        ipa-client-install --enable-dns-updates --domain $IPA_DOMAIN \
+		--server $IPA_SERVER --realm $IPA_REALM
+        err=\$?
+        (( err != 0 )) && {
+	  echo "ERROR \$err: ipa-client-install on \$node"; exit 1; }
+	"
+done
 
 (( $? != 0 )) && exit 1
-
+exit 0
