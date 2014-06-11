@@ -54,6 +54,7 @@ SYNTAX:
 $ME --version | --help
 
 $ME [-y] [--hadoop-management-node <node>] [--yarn-master <node>] \\
+              [--ldap [user1,user2,...]] \\
               [--quiet | --verbose | --debug] \\
               <nodes-spec-list>
 where:
@@ -77,6 +78,11 @@ where:
 --hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server which
                   is expected to be outside of the storage pool. Default is
                   localhost.
+--ldap [users]  : (optional) create a simple ldap/ipa server on the hadoop
+                  management node, where the required hadoop users will be
+                  managed, and any supplied extra users (eg. "tom,sue,...") are
+                  included. The default is that the required hadoop users must
+                  be created/managed outside of this script.
 -y              : (optional) auto answer "yes" to all prompts. Default is to 
                   answer a confirmation prompt.
 --quiet         : (optional) output only basic progress/step messages. Default.
@@ -131,7 +137,7 @@ function parse_cmd() {
 	  MGMT_NODE="$2"; shift 2; continue
 	;;
 	--ldap) # extra users list is optional
-	  EXTRA_USERS="$2" # empty if user list omitted
+	  EXTRA_USERS="$2" # empty if users omitted, else comma separated list
 	  SETUP_LDAP=1 # true
 	  shift 2; continue
 	;;
@@ -588,22 +594,39 @@ function ambari_server() {
 
 # setup_ldap: if the user requested a simple ldap/ipa setup then create the
 # ipa server on the passed-in node, and setup the ipa clients on all storage
-# nodes and on the yarn-master.
+# nodes and on the yarn-master. Returns 1 on errors.
+# Args:
+#   1=(required) ldap/ipa server node,
+#   2=(required) list of client nodes.
 # Uses globals:
 #   EXTRA_USERS, can be empty
 #   NODES()
 #   YARN_NODE
 function setup_ldap() {
 
-  local ldap_server="$1"
+  local ldap_server="$1"; shift
+  local client_nodes="$@"
+  local err; local out
 
   (( SETUP_LDAP )) || return # default, nothing to do...
 
-  # setup ldap/ipa-server
-  /tmp/bin/ldap_server.sh $ldap_server ${EXTRA_USERS//,/ }
+  verbose "--- setting up ldap/ipa server on $ldap_server..."
+  out="$(/tmp/bin/ldap_server.sh $ldap_server ${EXTRA_USERS//,/ })"
+  err=$?
+  (( err != 0 )) {
+    err $err "ldap_server: $out";
+    return 1; }
+  debug "ldap_server: $out"
 
-  # setup ldap/ipa-clients
-  /tmp/bin/ldap_clients.sh $ldap_server ${NODES[*]} $YARN_NODE
+  verbose "--- setting up ldap/ipa clients on $client_nodes..."
+  out="$(/tmp/bin/ldap_clients.sh $ldap_server $client_nodes)"
+  err=$?
+  (( err != 0 )) {
+    err $err "ldap_clients: $out";
+    return 1; }
+  debug "ldap_clients: $out"
+
+  return 0
 }
 
 # verify_gid_uids: checks that the UIDs and GIDs for the hadoop users and hadoop
@@ -698,7 +721,7 @@ fi
 ambari_server || exit 1
 
 # setup a simple ldap/ipa server on the mgmt node, if requested
-setup_ldap $MGMT_NODE
+setup_ldap $MGMT_NODE $NODES[*] $YARN_NODE || exit 1
 
 # verify user UID and group GID consistency across the cluster
 verify_gid_uids ${NODES[*]} $YARN_NODE || exit 1 
