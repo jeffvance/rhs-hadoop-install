@@ -5,10 +5,14 @@
 # It is assumed that localhost has already been validated (eg. check_node.sh
 # has been run) prior to setting up the node.
 # Syntax:
-#  --blkdev: block dev path(s) (optional), skip xfs and blk-mnts if missing.
-#  --brkmnt: brick mnt path(s) (optional), skip xfs and blk-mnts if missing.
-#  --hadoop-mgmt-node: hostname or ip of the hadoop mgmt server (expected to
-#       be outside of the storage pool) (optional, default=localhost).
+#  --blkdev: (optional) block dev path(s), skip xfs and blk-mnts if missing.
+#  --brkmnt: (optional) brick mnt path(s), skip xfs and blk-mnts if missing.
+#  --hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server 
+#       (expected to be outside of the storage pool). Default=localhost.
+#  --users [extra-users]: (optional) comma separated list of users to add, in
+#       addition to the standard list of hadoop users. Default: if omitted 
+#       completely then no users at all are added. If --users is specified but
+#       no extra users are passed then only the standard hadoop users are added.
 #
 # Note: the blkdev and brkmnt values can be a list of 1 or more paths separated
 #   by a comma (no spaces).

@@ -23,8 +23,8 @@
 # On each node the blk-device is setup as an xfs file system and mounted to the
 # brick mount dir, ntp config is verified, required gluster & ambari ports are
 # checked to be open, selinux is set to permissive, hadoop required users are
-# created, and the required hadoop local directories are created (note: the
-# required distributed dirs are not created here).
+# optionally created, and the required hadoop local directories are created
+# (note: the required distributed dirs are not created here).
 #
 # Also, on all nodes (assumed to be storage- data-nodes) and on the yarn-master
 # server node, the ambari agent is installed (updated if present) and started.

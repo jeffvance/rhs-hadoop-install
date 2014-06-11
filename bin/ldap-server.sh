@@ -1,7 +1,9 @@
 ##!/bin/bash
 #
 # ldap-server.sh: install and setup the ipa server on the passed-in server
-# node. Currently the ldap-server admin user and password are hard-coded but
+# node, and add the required hadoop group(s), and the required hadoop and
+# optional user-supplied users. If the user or group already exists it is not
+# added. Currently the ldap-server admin user and password are hard-coded but
 # that can be changed in the future. Exits 1 on errors; otherwise exits 0.
 # Args:
 #   1=(required) ldap server node, usually the hadoop mgmt node,
@@ -32,7 +34,7 @@ GROUPS="$($PREFIX/gen_groups.sh)"
 ADMIN='admin'
 PASSWD='admin123' # min of 8 chars
 
-# set up ldap on the LDAP_NODE
+# set up ldap on the LDAP_NODE and add users/groups
 eval "$ssh 
 	yum -y install ipa-server
         err=\$?
@@ -54,25 +56,29 @@ eval "$ssh
 	   echo \"ERROR \$err: kinit $ADMIN\"; exit 1; }
 
 	# add hadoop users + any extra users
-	for user in $USERS; do
-	    ipa user-add \$user --first \$user --last \$user 
-	    err=\$?
-	    (( err != 0 )) && {
-		echo \"ERROR \$err: ipa user-add \$user\"; exit 1; }
+	for u in $USERS; do
+	    if ! getent passwd \$u >& /dev/null ; then # user does not exist
+	      ipa user-add \$u --first \$u --last \$u 
+	      err=\$?
+	      (( err != 0 )) && {
+		echo \"ERROR \$err: ipa user-add \$u\"; exit 1; }
+	    fi
         done
 
 	# add group(s) and associate to users
-	for group in $GROUPS; do
-	    ipa group-add \$group --desc \${group}-group
-	    err=\$?
-	    (( err != 0 )) && {
-	      echo \"ERROR \$err: ipa group-add \$group\"; exit 1; }
+	for g in $GROUPS; do
+	    if ! getent group \$g >& /dev/null ; then
+	      ipa group-add \$g --desc \${g}-group
+	      err=\$?
+	      (( err != 0 )) && {
+		echo \"ERROR \$err: ipa group-add \$g\"; exit 1; }
 
-	    ipa group-add-member \$group --users=${USERS// /,}
-	    err=\$?
-	    (( err != 0 )) && {
-	      echo \"ERROR \$err: ipa group-add-member \$group --users $USERS\";
-	     exit 1; }
+	      ipa group-add-member \$g --users=${USERS// /,}
+	      err=\$?
+	      (( err != 0 )) && {
+		echo \"ERROR \$err: ipa group-add-member \$g: users: $USERS\";
+		exit 1; }
+	    fi
 	done
       $ssh_close"
 
