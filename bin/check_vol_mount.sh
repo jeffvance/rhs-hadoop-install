@@ -16,6 +16,7 @@
 function chk_mnt() {
 
   local node="$1"; local opts="$2"
+  local historic_mnt_opts='entry-timeout=0 attribute-timeout=0'
   local errcnt=0; local warncnt=0; local mnt
 
   for mnt in $MNT_OPTS; do
@@ -25,7 +26,15 @@ function chk_mnt() {
       fi
   done
 
+  for mnt in $historic_mnt_opts; do
+      if grep -q "$mnt" <<<$opts; then
+	echo "WARN on $node: \"$mnt\" option should not be set"
+	((warncnt++))
+      fi
+  done
+
   (( errcnt > 0  )) && return 1
+  echo "$VOLNAME mount options are set correctly with $warncnt warnings"
   return 0
 }
 

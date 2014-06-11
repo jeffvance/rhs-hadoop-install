@@ -4,9 +4,7 @@
 # 1) CDN register each node, including yarn and mgmt nodes
 # 2) verify brick xfs mount options, eg noatime
 # 3) wait for nodes to join trusted pool
-# 4) remove useradd/groupadd code and use ipa scripts
-# 5) --ldap[=extra-users], --no-users (default)
-# 6) don't set entry-timeout and attribute-timeout in the vol mount
+# 4) don't set entry-timeout and attribute-timeout in the vol mount
 #
 # setup_cluster.sh accepts a list of nodes:brick-mnts:block-devs, along with
 # the name of the yarn-master and hadoop-mgmt servers, and creates a new trusted

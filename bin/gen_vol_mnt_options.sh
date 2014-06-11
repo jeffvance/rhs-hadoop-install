@@ -1,6 +1,7 @@
 #!/bin/bash
 #
 # gen_vol_mnt_options.sh outputs the gluster-fuse mount options that are
-# required for hadoop workloads.
+# required for hadoop workloads. Earlier versions included entry-timeout=0 and
+# attribuite-timeout=0, but now we default these options.
 
-echo 'entry-timeout=0,attribute-timeout=0,use-readdirp=no'
+echo 'use-readdirp=no'
