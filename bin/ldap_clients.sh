@@ -25,26 +25,37 @@ IPA_REALM='HADOOP' # hard-coded
 ADMIN="admin"
 PASSWD="admin123"
 
-echo "***************************************"
-echo "RHS LDAP CLIENT SETUP"
-echo "server/cli : $IPA_SERVER / $IPA_CLIENTS"
-echo "domain : $IPA_DOMAIN"
-echo "realm : $IPA_REALM" 
-echo "***************************************"
+CERT_FILE='/etc/ipa/ca.crt'
+errcnt=0
 
+# before adding clients, first check that no previous cert exists
+for node in $CLIENT_NODES; do
+    ssh $node "
+	if [[ -f $CERT_FILE ]] ; then
+	  echo \"ERROR: cert file $CERT_FILE exists on \$node\"
+	  echo \"This file needs to be deleted before the ipa client on \$node can be configured.\"
+          exit 1
+	fi
+        exit 0
+    "
+    (( $? != 0 )) && ((errcnt++))
+done
+(( errcnt > 0 )) && exit 1 # don't install the ipa client
+
+# now do the client install
 for node in $CLIENT_NODES; do
     ssh $node "
 	yum -y install ipa-client
         # uninstall ipa-client-install for idempotency
         ipa-client-install --uninstall -U
-        echo "Uninstalled ipa: If there are old cert errors, also run rm -rf /etc/ipa/ca.crt"
         ipa-client-install -U --enable-dns-updates --domain $IPA_DOMAIN \
 		--server $IPA_SERVER --realm $IPA_REALM -p $ADMIN -w $PASSWD
         err=\$?
         (( err != 0 )) && {
 	  echo "ERROR \$err: ipa-client-install on \$node"; exit 1; }
-	"
+    "
+    (( $? != 0 )) && ((errcnt++))
 done
 
-(( $? != 0 )) && exit 1
+(( errcnt > 0 )) && exit 1
 exit 0

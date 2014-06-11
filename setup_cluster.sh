@@ -258,8 +258,10 @@ function parse_nodes_brkmnts_blkdevs() {
 # Uses globals:
 #   BLKDEVS
 #   BRKMNTS
+#   EXTRA_USERS
 #   MGMT_NODE
 #   NODES
+#   SETUP_LDAP
 #   YARN_NODE
 function show_todo() {
 
@@ -279,6 +281,13 @@ function show_todo() {
 
   quiet "*** Ambari mgmt node  : $MGMT_NODE"
   quiet "*** Yarn-master server: $YARN_NODE"
+  if (( SETUP_LDAP )) ; then
+    if [[ -n "$EXTRA_USERS" ]] ; then
+      quiet "*** Setting up ldap/ipa with these extra users: ${EXTRA_USERS//,/, }"
+    else
+      quiet "*** Setting up ldap/ipa with standard hadoop users"
+    fi
+  fi
   echo
 }
 
@@ -608,7 +617,7 @@ function setup_ldap() {
   local client_nodes="$@"
   local err; local out
 
-  (( SETUP_LDAP )) || return # default, nothing to do...
+  (( SETUP_LDAP )) || return 0 # default, nothing to do...
 
   verbose "--- setting up ldap/ipa server on $ldap_server..."
   out="$(/tmp/bin/ldap_server.sh $ldap_server ${EXTRA_USERS//,/ })"
@@ -721,7 +730,9 @@ fi
 ambari_server || exit 1
 
 # setup a simple ldap/ipa server on the mgmt node, if requested
+echo "***** SETUP_LDAP=$SETUP_LDAP"
 setup_ldap $MGMT_NODE $NODES[*] $YARN_NODE || exit 1
+echo "***** after setup_ldap()"
 
 # verify user UID and group GID consistency across the cluster
 verify_gid_uids ${NODES[*]} $YARN_NODE || exit 1 
