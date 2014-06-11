@@ -1,17 +1,25 @@
 #!/bin/bash
 #
-# ldap_clients.sh... ...
+# ldap_clients.sh: install and setup the ipa client on the passed-in nodes
+# for the passed-in ldap/ipa server. Exits 1 on errors; otherwise exits 0.
 # Args:
-#   1= IPA SERVER (i.e. mrg41.lab.bos.redhat.com)
-#   2= IPA Domain (i.e. lab.bos.redhat.com)
-#   3= IPA REALM (i.e. HADOOP)
+#   1=(required) ldap/ipa-server,
+#   2+=(required) list of client nodes.
 
 IPA_SERVER="$1"; shift
-IPA_DOMAIN="$1"; shift
-IPA_REALM="$1";  shift
 CLIENT_NODES="$@"
+[[ -z "$IPA_SERVER" ]] && {
+  echo "Syntax error: ldap-ipa server is the 1st arg and is required";
+  exit -1; }
+[[ -z "$CLIENT_NODES" ]] && {
+  echo "Syntax error: client nodes are the 2nd arg and are required";
+  exit -1; }
 
-# Remaining args: IPA Clients 
+IPA_DOMAIN="$(ssh $IPA_SERVER "hostname -d")"
+[[ -z "$IPA_DOMAIN ]] && IPA_DOMAIN="$IPA_SERVER"
+
+IPA_REALM='HADOOP' # hard-coded
+
 
 echo "***************************************"
 echo "RHS LDAP CLIENT SETUP"

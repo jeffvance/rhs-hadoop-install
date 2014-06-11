@@ -99,7 +99,7 @@ EOF
 function parse_cmd() {
 
   local opts='y'
-  local long_opts='help,version,yarn-master:,hadoop-mgmt-node:,verbose,quiet,debug'
+  local long_opts='help,version,yarn-master:,hadoop-mgmt-node:,ldap::,verbose,quiet,debug'
   local errcnt=0
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
@@ -129,6 +129,11 @@ function parse_cmd() {
 	;;
 	--hadoop-mgmt-node)
 	  MGMT_NODE="$2"; shift 2; continue
+	;;
+	--ldap) # extra users list is optional
+	  EXTRA_USERS="$2" # empty if user list omitted
+	  SETUP_LDAP=1 # true
+	  shift 2; continue
 	;;
 	--)
 	  shift; break
@@ -374,7 +379,6 @@ function install_repo() {
 #   NODES
 #   NODE_BLKDEVS
 #   NODE_BRKMNTS
-#   PREFIX
 #   YARN_INSIDE
 #   YARN_NODE
 function setup_nodes() {
@@ -474,10 +478,10 @@ function uniq_nodes() {
   eval "$varname=(${uniq[*]})"
 }
     
-# define_pool: If the trusted pool already exists then figure out which nodes are
-# new (can be none) and assign them to the global POOL array, which is used for
-# the gluster peer probe. Returns 1 if it's not ok to add node(s) to the pool.
-# In all other cases 0 is returned.
+# define_pool: If the trusted pool already exists then figure out which nodes
+# are new (can be none) and assign them to the global POOL array, which is used
+# for the gluster peer probe. Returns 1 if it's not ok to add node(s) to the
+# pool. In all other cases 0 is returned.
 # Args:
 #   $@=list of nodes
 # Uses globals:
@@ -501,7 +505,7 @@ function define_pool() {
     FIRST_NODE=${POOL[0]} # peer probe from this node
     debug "existing pool nodes: ${POOL[@]}"
 
-    # find nodes in pool that are not supplied nodes (ie. unique)
+    # find nodes in pool that are not supplied $nodes (ie. unique)
     for node in ${nodes[@]}; do
 	[[ "${POOL[*]}" =~ $node ]] && continue
 	uniq+=($node)
@@ -582,11 +586,28 @@ function ambari_server() {
   return 0 
 }
 
+# setup_ldap: if the user requested a simple ldap/ipa setup then create the
+# ipa server on the passed-in node, and setup the ipa clients.
+# Uses globals:
+#   EXTRA_USERS, can be empty
+#   NODES()
+#   YARN_NODE
+function setup_ldap() {
+
+  local ldap_server="$1"
+
+  (( SETUP_LDAP )) || return # default, nothing to do...
+
+  # setup ldap/ipa-server
+  /tmp/bin/ldap_server.sh $ldap_server ${EXTRA_USERS//,/ }
+
+  # setup ldap/ipa-clients
+  /tmp/bin/ldap_clients.sh $ldap_server xx yy ${NODES[*]} $YARN_NODE
+}
+
 # verify_gid_uids: checks that the UIDs and GIDs for the hadoop users and hadoop
 # group are the same numeric value across all of the passed-in nodes. Returns 1
 # on inconsistency errors.
-# Uses globals:
-#   PREFIX
 function verify_gid_uids() {
 
   local nodes="$@"
@@ -594,7 +615,7 @@ function verify_gid_uids() {
 
   verbose "--- verifying consistent hadoop UIDs and GIDs across nodes..."
 
-  out="$($PREFIX/bin/check_gids.sh $nodes)"
+  out="$(/tmp/bin/check_gids.sh $nodes)"
   err=$?
   debug "check_gids: $out"
   if (( err != 0 )) ; then
@@ -602,7 +623,7 @@ function verify_gid_uids() {
     err "inconsistent GIDs: $out"
   fi
 
-  out="$($PREFIX/bin/check_uids.sh $nodes)"
+  out="$(/tmp/bin/check_uids.sh $nodes)"
   err=$?
   debug "check_uids: $out"
   if (( err != 0 )) ; then
@@ -624,6 +645,7 @@ declare -A NODE_BRKMNTS; declare -A NODE_BLKDEVS
 MGMT_INSIDE=0 # assume false
 YARN_INSIDE=0 # assume false
 AUTO_YES=0    # assume false
+SETUP_LDAP=0  # assume false
 VERBOSE=$LOG_QUIET # default
 errnodes=''; errcnt=0
 
@@ -673,6 +695,9 @@ fi
 
 # install and start the ambari server on the MGMT_NODE
 ambari_server || exit 1
+
+# setup a simple ldap/ipa server on the mgmt node, if requested
+setup_ldap $MGMT_NODE
 
 # verify user UID and group GID consistency across the cluster
 verify_gid_uids ${NODES[*]} $YARN_NODE || exit 1 

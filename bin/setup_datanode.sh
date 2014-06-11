@@ -9,10 +9,6 @@
 #  --brkmnt: (optional) brick mnt path(s), skip xfs and blk-mnts if missing.
 #  --hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server 
 #       (expected to be outside of the storage pool). Default=localhost.
-#  --users [extra-users]: (optional) comma separated list of users to add, in
-#       addition to the standard list of hadoop users. Default: if omitted 
-#       completely then no users at all are added. If --users is specified but
-#       no extra users are passed then only the standard hadoop users are added.
 #
 # Note: the blkdev and brkmnt values can be a list of 1 or more paths separated
 #   by a comma (no spaces).
@@ -274,8 +270,8 @@ setup_ntp          || ((errcnt++))
 setup_ambari_agent || ((errcnt++))
 
 $PREFIX/setup_firewall.sh || ((errcnt++))
-$PREFIX/add_groups.sh     || ((errcnt++))
-$PREFIX/add_users.sh      || ((errcnt++))
+##$PREFIX/add_groups.sh     || ((errcnt++))
+##$PREFIX/add_users.sh      || ((errcnt++))
 add_local_dirs            || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
