@@ -43,6 +43,7 @@ done
 (( errcnt > 0 )) && exit 1 # don't install the ipa client
 
 # now do the client install
+err=0
 for node in $CLIENT_NODES; do
     ssh $node "
 	yum -y install ipa-client
@@ -52,10 +53,10 @@ for node in $CLIENT_NODES; do
 		--server $IPA_SERVER --realm $IPA_REALM -p $ADMIN -w $PASSWD
         err=\$?
         (( err != 0 )) && {
-	  echo "ERROR \$err: ipa-client-install on \$node"; exit 1; }
+	  echo "ERROR \$err: ipa-client-install on \$node"; exit \$err; }
     "
-    (( $? != 0 )) && ((errcnt++))
+    err=$?
+    (( err != 0 )) && break
 done
 
-(( errcnt > 0 )) && exit 1
-exit 0
+exit $err

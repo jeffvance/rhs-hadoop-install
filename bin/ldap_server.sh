@@ -38,11 +38,12 @@ PASSWD='admin123' # min of 8 chars
 IPA_REALM='HADOOP'
 
 # set up ldap on the LDAP_NODE and add users/groups
+err=0
 eval "$ssh 
 	yum -y install ipa-server
         err=\$?
 	(( err != 0 )) && {
-	   echo \"ERROR \$err: yum install ipa-server\"; exit 1; }
+	   echo \"ERROR \$err: yum install ipa-server\"; exit \$err; }
 
 	# uninstall ipa-server-install for idempotency
 	ipa-server-install --uninstall -U
@@ -51,12 +52,12 @@ eval "$ssh
 		--admin-password=$PASSWD
         err=\$?
 	(( err != 0 )) && {
-	   echo \"ERROR \$err: ipa-server-install\"; exit 1; }
+	   echo \"ERROR \$err: ipa-server-install\"; exit \$err; }
  
 	echo $PASSWD | kinit $ADMIN
         err=\$?
 	(( err != 0 )) && {
-	   echo \"ERROR \$err: kinit $ADMIN\"; exit 1; }
+	   echo \"ERROR \$err: kinit $ADMIN\"; exit \$err; }
 
 	# add hadoop users + any extra users
 	for u in $USERS; do
@@ -64,7 +65,7 @@ eval "$ssh
 	      ipa user-add \$u --first \$u --last \$u 
 	      err=\$?
 	      (( err != 0 )) && {
-		echo \"ERROR \$err: ipa user-add \$u\"; exit 1; }
+		echo \"ERROR \$err: ipa user-add \$u\"; exit \$err; }
 	    fi
         done
 
@@ -74,16 +75,16 @@ eval "$ssh
 	      ipa group-add \$g --desc \${g}-group
 	      err=\$?
 	      (( err != 0 )) && {
-		echo \"ERROR \$err: ipa group-add \$g\"; exit 1; }
+		echo \"ERROR \$err: ipa group-add \$g\"; exit \$err; }
 
 	      ipa group-add-member \$g --users=${USERS// /,}
 	      err=\$?
 	      (( err != 0 )) && {
 		echo \"ERROR \$err: ipa group-add-member \$g: users: $USERS\";
-		exit 1; }
+		exit \$err; }
 	    fi
 	done
       $ssh_close"
+err=$?
 
-(( $? != 0 )) && exit 1 # error msg echo'd above
-exit 0
+exit $err
