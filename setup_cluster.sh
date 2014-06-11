@@ -675,7 +675,7 @@ fi
 ambari_server || exit 1
 
 # verify user UID and group GID consistency across the cluster
-verify_gid_uids ${UNIQ_NODES[*]} || exit 1
+verify_gid_uids ${NODES[*]} $YARN_NODE || exit 1 
 
 quiet "All nodes verified/setup for hadoop workloads with no errors"
 exit 0
