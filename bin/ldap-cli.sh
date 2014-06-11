@@ -1,17 +1,16 @@
 ##!/bin/bash
 #
-# ldap.sh... ...
-# User will never need to know or use the hard-coded password.
-# Exits 1 on error; otherwise exits 0.
+# ldap-client.sh... ...
 # Args:
-#   1=hadoop mgmt-node, will be used as the ldap server (required)
-#   2+=list of additional users to add, eg. "tom sally ed", (optional)
+#   1= IPA SERVER (i.e. mrg41.lab.bos.redhat.com)
+#   2= IPA Domain (i.e. lab.bos.redhat.com)
+#   3= IPA REALM (i.e. HADOOP)
 
-PREFIX="$(dirname $(readlink -f $0))"
-
-IPA_SERVER=$1 #mrg10.lab.bos.redhat.com
-IPA_DOMAIN=$2 # lab.bos.redhat.com
+IPA_SERVER=$1 
+IPA_DOMAIN=$2 
 IPA_REALM=$3
+
+# Remaining args: IPA Clients 
 
 echo "***************************************"
 echo "RHS LDAP CLIENT SETUP"
