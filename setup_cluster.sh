@@ -587,7 +587,8 @@ function ambari_server() {
 }
 
 # setup_ldap: if the user requested a simple ldap/ipa setup then create the
-# ipa server on the passed-in node, and setup the ipa clients.
+# ipa server on the passed-in node, and setup the ipa clients on all storage
+# nodes and on the yarn-master.
 # Uses globals:
 #   EXTRA_USERS, can be empty
 #   NODES()
@@ -602,7 +603,7 @@ function setup_ldap() {
   /tmp/bin/ldap_server.sh $ldap_server ${EXTRA_USERS//,/ }
 
   # setup ldap/ipa-clients
-  /tmp/bin/ldap_clients.sh $ldap_server xx yy ${NODES[*]} $YARN_NODE
+  /tmp/bin/ldap_clients.sh $ldap_server ${NODES[*]} $YARN_NODE
 }
 
 # verify_gid_uids: checks that the UIDs and GIDs for the hadoop users and hadoop
