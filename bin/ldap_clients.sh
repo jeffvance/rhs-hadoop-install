@@ -8,6 +8,7 @@
 
 IPA_SERVER="$1"; shift
 CLIENT_NODES="$@"
+
 [[ -z "$IPA_SERVER" ]] && {
   echo "Syntax error: ldap-ipa server is the 1st arg and is required";
   exit -1; }
@@ -20,6 +21,9 @@ IPA_DOMAIN="$(ssh $IPA_SERVER "hostname -d")"
 
 IPA_REALM='HADOOP' # hard-coded
 
+# hard-code ldap/ipa admin user and password
+ADMIN="admin"
+PASSWD="admin123"
 
 echo "***************************************"
 echo "RHS LDAP CLIENT SETUP"
@@ -33,8 +37,9 @@ for node in $CLIENT_NODES; do
 	yum -y install ipa-client
         # uninstall ipa-client-install for idempotency
         ipa-client-install --uninstall -U
+        echo "Uninstalled ipa: If there are old cert errors, also run rm -rf /etc/ipa/ca.crt"
         ipa-client-install --enable-dns-updates --domain $IPA_DOMAIN \
-		--server $IPA_SERVER --realm $IPA_REALM
+		--server $IPA_SERVER --realm $IPA_REALM -p $ADMIN -w $PASSWD -U
         err=\$?
         (( err != 0 )) && {
 	  echo "ERROR \$err: ipa-client-install on \$node"; exit 1; }
