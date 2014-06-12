@@ -268,11 +268,8 @@ mount_blkdev       || ((errcnt++))
 setup_selinux      || ((errcnt++))
 setup_ntp          || ((errcnt++))
 setup_ambari_agent || ((errcnt++))
-
+add_local_dirs     || ((errcnt++))
 $PREFIX/setup_firewall.sh || ((errcnt++))
-##$PREFIX/add_groups.sh     || ((errcnt++))
-##$PREFIX/add_users.sh      || ((errcnt++))
-add_local_dirs            || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
 echo "Node $(hostname) successfully setup"

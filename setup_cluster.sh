@@ -717,6 +717,9 @@ copy_bin ${UNIQ_NODES[*]} || exit 1
 # distribute and install the rhs-hadoop repo file to all nodes
 install_repo ${UNIQ_NODES[*]} || exit 1
 
+# setup a simple ldap/ipa server on the mgmt node, if requested
+setup_ldap $MGMT_NODE $NODES[*] $YARN_NODE || exit 1
+
 # setup each node for hadoop workloads
 setup_nodes || exit 1
 
@@ -727,9 +730,6 @@ fi
 
 # install and start the ambari server on the MGMT_NODE
 ambari_server || exit 1
-
-# setup a simple ldap/ipa server on the mgmt node, if requested
-setup_ldap $MGMT_NODE $NODES[*] $YARN_NODE || exit 1
 
 # verify user UID and group GID consistency across the cluster
 verify_gid_uids ${NODES[*]} $YARN_NODE || exit 1 
