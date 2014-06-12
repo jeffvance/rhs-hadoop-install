@@ -12,37 +12,33 @@
 
 
 # chk_mnt: given the passed-in existing vol mount opts and the passed-in
-# expected mount options, verify the correct settings. Returns 1 for errors.
+# expected mount options, verify the correct settings. Returns 1 for errors
+# and returns 2 for warnings.
 # Args:
-#  1=node
-#  2=current mount option values
-#  3=expected mount option values
+#  1=current mount options
+#  2=expected required mount options (live or fstab)
+#  3=expected mount options to warn against (live or fstab)
 function chk_mnt() {
 
-  local node="$1"; local curr_opts="$2"; local expt_opts="$3"
-echo "**** curr_opts=$curr_opts, expt_opts=$expt_opts"
-  # note "_" in option names below
-  local historic_mnt_opts='entry_timeout=0.000000 attribute_timeout=0.000000'
+  local curr_opts="$1"; local expt_opts="$2"; local warn_opts="$3"
   local errcnt=0; local warncnt=0; local mnt
 
   for mnt in $expt_opts; do
-echo "*****error mnt=$mnt"
       if ! grep -q "$mnt" <<<$curr_opts; then
-	echo "ERROR on $node: required gluster mount option $mnt must be set"
+	echo "ERROR: required gluster mount option $mnt must be set"
 	((errcnt++))
       fi
   done
 
-  for mnt in $historic_mnt_opts; do
-echo "*****warn mnt=$mnt"
+  for mnt in $warn_opts; do
       if grep -q "$mnt" <<<$curr_opts; then
-	echo "WARN on $node: \"${mnt//_/-}\" option should not be set"
+	echo "WARN: \"$mnt\" option should not be set"
 	((warncnt++))
       fi
   done
 
   (( errcnt > 0  )) && return 1
-  echo "$VOLNAME mount options are set correctly with $warncnt warnings"
+  (( warncnt > 0 )) && return 2
   return 0
 }
 
@@ -57,8 +53,10 @@ function check_vol_mnt_attrs() {
   local state_file_dir='/var/run/gluster'
   local state_file='glusterdump.' # prefix
   local section='\[xlator.mount.fuse.priv\]'
+  local err
 
   # live check:
+  echo "--- $node: live $VOLNAME mount options check..."
   # find correct glusterfs pid
   pid=($(ssh $node "ps -ef | grep 'glusterfs --.*$VOLNAME' | grep -v grep"))
   pid=${pid[1]} # extract glusterfs pid, 2nd field
@@ -72,10 +70,17 @@ function check_vol_mnt_attrs() {
   state_file="${state_file[0]}" # newest
   # extract mount opts section from state file
   mntopts="$(sed -n "/^$section/,/^$/p" $state_file | tr '\n' ' ')"
-echo "*****LIVE chk_mnt $node '$mntopts' '${CHK_MNTOPTS//-/_}'"
-  chk_mnt $node "$mntopts" "${CHK_MNTOPTS//-/_}" || ((errcnt++))
+  # verify the current mnt options
+  chk_mnt "$mntopts" "$CHK_MNTOPTS_LIVE" "$CHK_MNTOPTS_LIVE_WARN"
+  err=$?
+  if (( err == 1 )) ; then
+    ((errcnt++))
+  elif (( err = 2 )) ; then
+    ((warncnt++))
+  fi
 
   # fstab check:
+  echo "--- $node: /etc/fstab $VOLNAME mount options check..."
   cnt=$(ssh $node "grep -c '$VOLNAME\s.*\sglusterfs\s' /etc/fstab")
   if (( cnt == 0 )) ; then
     echo "ERROR on $node: $VOLNAME mount missing in /etc/fstab"
@@ -86,12 +91,20 @@ echo "*****LIVE chk_mnt $node '$mntopts' '${CHK_MNTOPTS//-/_}'"
   else # cnt == 1
     mntopts="$(ssh $node "grep '$VOLNAME\s.*\sglusterfs\s' /etc/fstab")"
     mntopts=${mntopts#* glusterfs }
-echo "***** fstab: chk_mnt $node '$mntopts' '$CHK_MNTOPTS'"
-    chk_mnt $node "$mntopts" "$CHK_MNTOPTS" || ((errcnt++))
+    chk_mnt "$mntopts" "$CHK_MNTOPTS" "$CHK_MNTOPTS_WARN"
+    err=$?
+    if (( err == 1 )) ; then
+      ((errcnt++))
+    elif (( err = 2 )) ; then
+      ((warncnt++))
+    fi
   fi
 
   (( errcnt > 0 )) && return 1
-  echo "$VOLNAME mount setup correctly on $node with $warncnt warnings"
+
+  echo -n "$VOLNAME mount setup correctly on $node"
+  (( warncnt > 0 )) && echo -n " with warnings"
+  echo # flush
   return 0
 }
 
@@ -100,8 +113,16 @@ echo "***** fstab: chk_mnt $node '$mntopts' '$CHK_MNTOPTS'"
 
 errcnt=0; cnt=0
 PREFIX="$(dirname $(readlink -f $0))"
-CHK_MNTOPTS="$($PREFIX/gen_vol_mnt_options.sh)" # required mnt opts
+
+# assign all combos of mount options (live, fstab, warn, required)
+CHK_MNTOPTS="$($PREFIX/gen_vol_mnt_options.sh)" # required fstab mnt opts
 CHK_MNTOPTS="${CHK_MNTOPTS//,/ }" # replace commas with spaces
+CHK_MNTOPTS_LIVE="$($PREFIX/gen_vol_mnt_options.sh -l)" # live required mnt opts
+CHK_MNTOPTS_LIVE="${CHK_MNTOPTS_LIVE//,/ }"
+CHK_MNTOPTS_WARN="$($PREFIX/gen_vol_mnt_options.sh -w)" # fstab opts to warn on
+CHK_MNTOPTS_WARN="${CHK_MNTOPTS_WARN//,/ }"
+CHK_MNTOPTS_LIVE_WARN="$($PREFIX/gen_vol_mnt_options.sh -wl)" # live-warn opts
+CHK_MNTOPTS_LIVE_WARN="${CHK_MNTOPTS_LIVE_WARN//,/ }"
 
 # parse cmd opts
 while getopts ':n:' opt; do
