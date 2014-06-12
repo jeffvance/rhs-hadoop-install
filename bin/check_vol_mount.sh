@@ -11,26 +11,32 @@
 #      storage node.
 
 
-# chk_mnt: given the passed-in vol mount opts, verify the correct settings.
-# Returns 1 for errors.
+# chk_mnt: given the passed-in existing vol mount opts and the passed-in
+# expected mount options, verify the correct settings. Returns 1 for errors.
+# Args:
+#  1=node
+#  2=current mount option values
+#  3=expected mount option values
 function chk_mnt() {
 
-  local node="$1"; local opts="$2"
-  local historic_mnt_opts='entry_timeout=0.000000 \
-attribute_timeout=0.000000' # note "_" in option name
+  local node="$1"; local curr_opts="$2"; local expt_opts="$3"
+echo "**** curr_opts=$curr_opts, expt_opts=$expt_opts"
+  # note "_" in option names below
+  local historic_mnt_opts='entry_timeout=0.0000 attribute_timeout=0.0000'
   local errcnt=0; local warncnt=0; local mnt
 
-  for mnt in $MNT_OPTS; do
-      if ! grep -q "$mnt" <<<$opts; then
+  for mnt in $expt_opts; do
+echo "*****error mnt=$mnt"
+      if ! grep -q "$mnt" <<<$curr_opts; then
 	echo "ERROR on $node: required gluster mount option $mnt must be set"
 	((errcnt++))
       fi
   done
 
   for mnt in $historic_mnt_opts; do
-      if grep -q "$mnt" <<<$opts; then
-        mnt=${mnts//_/-} # make mnt opt look more familiar
-	echo "WARN on $node: \"$mnt\" option should not be set"
+echo "*****warn mnt=$mnt"
+      if grep -q "$mnt" <<<$curr_opts; then
+	echo "WARN on $node: \"${mnt//_/-}\" option should not be set"
 	((warncnt++))
       fi
   done
@@ -47,8 +53,7 @@ attribute_timeout=0.000000' # note "_" in option name
 function check_vol_mnt_attrs() {
 
   local node="$1"
-  local warncnt=0; local errcnt=0; local cnt; local mntopts; local out
-  local pid
+  local warncnt=0; local errcnt=0; local cnt; local mntopts; local pid;
   local state_file_dir='/var/run/gluster'
   local state_file='glusterdump.' # prefix
   local section='\[xlator.mount.fuse.priv\]'
@@ -60,14 +65,15 @@ function check_vol_mnt_attrs() {
   # generate gluster state file
   ssh $node "kill -SIGUSR1 $pid"
   # copy state file back to local, expected to be 1 file but could match more
-  state_file="${state_file}${pid.dump}.[0-9]*" # glob -- don't know full name
+  state_file="$state_file${pid}.dump.[0-9]*" # glob -- don't know full name
   scp -q $node:/$state_file_dir/$state_file /tmp
   # assign exact state file name
   state_file=($(ls -r /tmp/$state_file)) # array in reverse order (new -> old)
-  state_file="/tmp/${state_file[0]}" # newest
+  state_file="${state_file[0]}" # newest
   # extract mount opts section from state file
   mntopts="$(sed -n "/^$section/,/^$/p" $state_file)"
-  chk_mnt $node "$mntopts" || ((errcnt++))
+echo "*****LIVE chk_mnt $node '$mntopts' '${CHK_MNTOPTS//-/_}'"
+  chk_mnt $node "$mntopts" "${CHK_MNTOPTS//-/_}" || ((errcnt++))
 
   # fstab check:
   cnt=$(ssh $node "grep -c '$VOLNAME\s.*\sglusterfs\s' /etc/fstab")
@@ -80,7 +86,8 @@ function check_vol_mnt_attrs() {
   else # cnt == 1
     mntopts="$(ssh $node "grep '$VOLNAME\s.*\sglusterfs\s' /etc/fstab")"
     mntopts=${mntopts#* glusterfs }
-    chk_mnt $node "$mntopts" || ((errcnt++))
+echo "***** fstab: chk_mnt $node '$mntopts' '$CHK_MNTOPTS'"
+    chk_mnt $node "$mntopts" "$CHK_MNTOPTS" || ((errcnt++))
   fi
 
   (( errcnt > 0 )) && return 1
@@ -93,10 +100,8 @@ function check_vol_mnt_attrs() {
 
 errcnt=0; cnt=0
 PREFIX="$(dirname $(readlink -f $0))"
-MNT_OPTS="$($PREFIX/gen_vol_mnt_options.sh)" # required mnt opts
-# edit mnt opts for use with the gluster state file rather then a mount cmd
-MNT_OPTS="${MNT_OPTS//,/ }" # replace commas with spaces
-MNT_OPTS="${MNT_OPTS//-/_}" # replace dashed with underbars
+CHK_MNTOPTS="$($PREFIX/gen_vol_mnt_options.sh)" # required mnt opts
+CHK_MNTOPTS="${CHK_MNTOPTS//,/ }" # replace commas with spaces
 
 # parse cmd opts
 while getopts ':n:' opt; do
