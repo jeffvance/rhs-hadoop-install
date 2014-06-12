@@ -49,31 +49,68 @@ function chk_mnt() {
 function check_vol_mnt_attrs() {
 
   local node="$1"
-  local warncnt=0; local errcnt=0; local cnt; local mntopts; local pid;
-  local state_file_dir='/var/run/gluster'
-  local state_file='glusterdump.' # prefix
-  local section='\[xlator.mount.fuse.priv\]'
-  local err
+  local warncnt=0; local errcnt=0; local err
+
+  # live_check: secondary function to check the mount options seen in the
+  # gluster "state" file. This file is produced when sending the glusterf
+  # client pid the SIGUSR1 signal. Returns the chk_mnt() rtncode.
+  function live_check() {
+
+    local node="$1"
+    local mntopts; local pid
+    local state_file_dir='/var/run/gluster'
+    local state_file='glusterdump.' # prefix
+    local section='\[xlator.mount.fuse.priv\]'
+
+    # find correct glusterfs pid
+    pid=($(ssh $node "ps -ef | grep 'glusterfs --.*$VOLNAME' | grep -v grep"))
+    pid=${pid[1]} # extract glusterfs pid, 2nd field
+
+    # generate gluster state file
+    ssh $node "kill -SIGUSR1 $pid"
+
+    # copy state file back to local, expected to be 1 file but could match more
+    state_file="$state_file${pid}.dump.[0-9]*" # glob -- don't know full name
+    scp -q $node:/$state_file_dir/$state_file /tmp
+
+    # assign exact state file name
+    state_file=($(ls -r /tmp/$state_file)) # array in reverse order (new -> old)
+    state_file="${state_file[0]}" # newest
+
+    # extract mount opts section from state file
+    mntopts="$(sed -n "/^$section/,/^$/p" $state_file | tr '\n' ' ')"
+
+    # verify the current mnt options and return chk_mnts rtncode
+    chk_mnt "$mntopts" "$CHK_MNTOPTS_LIVE" "$CHK_MNTOPTS_LIVE_WARN"
+  }
+
+  # fstab: secondary function to check the mount options in /etc/fstab.
+  # Returns 1 on errors and 2 for warnings -- see also chk_mnt().
+  function fstab_check() {
+
+    local node="$1"
+    local mntopts; local cnt
+
+    cnt=$(ssh $node "grep -c '$VOLNAME\s.*\sglusterfs\s' /etc/fstab")
+    (( cnt == 0 )) && {
+      echo "ERROR on $node: $VOLNAME mount missing in /etc/fstab";
+      return 1; }
+
+    (( cnt > 1 )) && {
+      echo "ERROR on $node: $VOLNAME appears more than once in /etc/fstab";
+      return 1; }
+    
+    mntopts="$(ssh $node "grep '$VOLNAME\s.*\sglusterfs\s' /etc/fstab")"
+    mntopts=${mntopts#* glusterfs }
+    # call chk_mnt() and return it's rtncode
+    chk_mnt "$mntopts" "$CHK_MNTOPTS" "$CHK_MNTOPTS_WARN"
+  }
+
+  ## main 
 
   # live check:
   echo "--- $node: live $VOLNAME mount options check..."
-  live_check "$CHK_MNTOPTS_LIVE" "$CHK_MNTOPTS_LIVE_WARN"
-...
-  # find correct glusterfs pid
-  pid=($(ssh $node "ps -ef | grep 'glusterfs --.*$VOLNAME' | grep -v grep"))
-  pid=${pid[1]} # extract glusterfs pid, 2nd field
-  # generate gluster state file
-  ssh $node "kill -SIGUSR1 $pid"
-  # copy state file back to local, expected to be 1 file but could match more
-  state_file="$state_file${pid}.dump.[0-9]*" # glob -- don't know full name
-  scp -q $node:/$state_file_dir/$state_file /tmp
-  # assign exact state file name
-  state_file=($(ls -r /tmp/$state_file)) # array in reverse order (new -> old)
-  state_file="${state_file[0]}" # newest
-  # extract mount opts section from state file
-  mntopts="$(sed -n "/^$section/,/^$/p" $state_file | tr '\n' ' ')"
-  # verify the current mnt options
-  chk_mnt "$mntopts" "$CHK_MNTOPTS_LIVE" "$CHK_MNTOPTS_LIVE_WARN"
+  live_check $node
   err=$?
   if (( err == 1 )) ; then
     ((errcnt++))
@@ -83,23 +120,12 @@ function check_vol_mnt_attrs() {
 
   # fstab check:
   echo "--- $node: /etc/fstab $VOLNAME mount options check..."
-  cnt=$(ssh $node "grep -c '$VOLNAME\s.*\sglusterfs\s' /etc/fstab")
-  if (( cnt == 0 )) ; then
-    echo "ERROR on $node: $VOLNAME mount missing in /etc/fstab"
+  fstab_check $node
+  err=$?
+  if (( err == 1 )) ; then
     ((errcnt++))
-  elif (( cnt > 1 )) ; then
-    echo "ERROR on $node: $VOLNAME appears more than once in /etc/fstab"
-    ((errcnt++))
-  else # cnt == 1
-    mntopts="$(ssh $node "grep '$VOLNAME\s.*\sglusterfs\s' /etc/fstab")"
-    mntopts=${mntopts#* glusterfs }
-    chk_mnt "$mntopts" "$CHK_MNTOPTS" "$CHK_MNTOPTS_WARN"
-    err=$?
-    if (( err == 1 )) ; then
-      ((errcnt++))
-    elif (( err = 2 )) ; then
-      ((warncnt++))
-    fi
+  elif (( err = 2 )) ; then
+    ((warncnt++))
   fi
 
   (( errcnt > 0 )) && return 1
