@@ -16,7 +16,8 @@
 function chk_mnt() {
 
   local node="$1"; local opts="$2"
-  local historic_mnt_opts='entry-timeout=0 attribute-timeout=0'
+  local historic_mnt_opts='entry_timeout=0.000000 \
+attribute_timeout=0.000000' # note "_" in option name
   local errcnt=0; local warncnt=0; local mnt
 
   for mnt in $MNT_OPTS; do
@@ -28,6 +29,7 @@ function chk_mnt() {
 
   for mnt in $historic_mnt_opts; do
       if grep -q "$mnt" <<<$opts; then
+        mnt=${mnts//_/-} # make mnt opt look more familiar
 	echo "WARN on $node: \"$mnt\" option should not be set"
 	((warncnt++))
       fi
@@ -40,19 +42,34 @@ function chk_mnt() {
 
 # check_vol_mnt_attrs: verify that the correct mount settings for VOLNAME have
 # been set on the passed-in node. This include verifying both the "live" 
-# settings, determined by ps, and the "persistent" settings, defined in
-# /etc/fstab.
+# settings, determined by gluster state, and the "persistent" settings,
+# defined in /etc/fstab.
 function check_vol_mnt_attrs() {
 
   local node="$1"
-  local warncnt=0; local errcnt=0; local cnt; local mntopts
+  local warncnt=0; local errcnt=0; local cnt; local mntopts; local out
+  local pid
+  local state_file_dir='/var/run/gluster'
+  local state_file='glusterdump.' # prefix
+  local section='\[xlator.mount.fuse.priv\]'
 
-  # live check
-  mntopts="$(ssh $node "ps -ef | grep 'glusterfs --.*$VOLNAME' | grep -v grep")"
-  mntopts=${mntopts#*glusterfs} # just the opts
+  # live check:
+  # find correct glusterfs pid
+  pid=($(ssh $node "ps -ef | grep 'glusterfs --.*$VOLNAME' | grep -v grep"))
+  pid=${pid[1]} # extract glusterfs pid, 2nd field
+  # generate gluster state file
+  ssh $node "kill -SIGUSR1 $pid"
+  # copy state file back to local, expected to be 1 file but could match more
+  state_file="${state_file}${pid.dump}.[0-9]*" # glob -- don't know full name
+  scp -q $node:/$state_file_dir/$state_file /tmp
+  # assign exact state file name
+  state_file=($(ls -r /tmp/$state_file)) # array in reverse order (new -> old)
+  state_file="/tmp/${state_file[0]}" # newest
+  # extract mount opts section from state file
+  mntopts="$(sed -n "/^$section/,/^$/p" $state_file)"
   chk_mnt $node "$mntopts" || ((errcnt++))
 
-  # fstab check
+  # fstab check:
   cnt=$(ssh $node "grep -c '$VOLNAME\s.*\sglusterfs\s' /etc/fstab")
   if (( cnt == 0 )) ; then
     echo "ERROR on $node: $VOLNAME mount missing in /etc/fstab"
@@ -77,7 +94,9 @@ function check_vol_mnt_attrs() {
 errcnt=0; cnt=0
 PREFIX="$(dirname $(readlink -f $0))"
 MNT_OPTS="$($PREFIX/gen_vol_mnt_options.sh)" # required mnt opts
+# edit mnt opts for use with the gluster state file rather then a mount cmd
 MNT_OPTS="${MNT_OPTS//,/ }" # replace commas with spaces
+MNT_OPTS="${MNT_OPTS//-/_}" # replace dashed with underbars
 
 # parse cmd opts
 while getopts ':n:' opt; do
