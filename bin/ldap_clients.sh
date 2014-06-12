@@ -19,7 +19,7 @@ echo "----> $CLIENT_NODES"
 IPA_DOMAIN="$(ssh $IPA_SERVER "hostname -d")"
 [[ -z "$IPA_DOMAIN" ]] && IPA_DOMAIN="$IPA_SERVER"
 
-IPA_REALM='HADOOP' # hard-coded
+IPA_REALM=`echo $IPA_DOMAIN | tr '[:lower:]' '[:upper:]'` # hard-coded
 
 # hard-code ldap/ipa admin user and password
 ADMIN="admin"
@@ -30,7 +30,6 @@ errcnt=0
 
 # before adding clients, first check that no previous cert exists
 for node in $CLIENT_NODES; do
-<<<<<<< HEAD
     echo "before ssh node  = $node"
     ssh -q $node "
         echo in ssh $node

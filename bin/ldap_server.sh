@@ -34,8 +34,8 @@ GROUPS="$($PREFIX/gen_groups.sh)"
 ADMIN='admin'
 PASSWD='admin123' # min of 8 chars
 
-# hard-coded realm
-IPA_REALM='HADOOP'
+# hard-coded realm, i.e. LAB.XYZ.COMPANY.COM
+IPA_REALM=`echo $LDAP_DOMAIN | tr '[:lower:]' '[:upper:]'`
 
 # set up ldap on the LDAP_NODE and add users/groups
 err=0
