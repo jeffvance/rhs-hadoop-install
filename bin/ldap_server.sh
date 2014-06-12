@@ -40,7 +40,7 @@ IPA_REALM="$(echo $LDAP_DOMAIN | tr '[:lower:]' '[:upper:]')"
 # set up ldap on the LDAP_NODE and add users/groups
 err=0
 eval "$ssh 
-	yum -y install ipa-server
+	yum -y install ipa-server 2>&1
         err=\$?
 	(( err != 0 )) && {
 	   echo \"ERROR \$err: yum install ipa-server\"; exit \$err; }
