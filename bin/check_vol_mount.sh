@@ -22,7 +22,7 @@ function chk_mnt() {
   local node="$1"; local curr_opts="$2"; local expt_opts="$3"
 echo "**** curr_opts=$curr_opts, expt_opts=$expt_opts"
   # note "_" in option names below
-  local historic_mnt_opts='entry_timeout=0.0000 attribute_timeout=0.0000'
+  local historic_mnt_opts='entry_timeout=0.000000 attribute_timeout=0.000000'
   local errcnt=0; local warncnt=0; local mnt
 
   for mnt in $expt_opts; do
@@ -71,7 +71,7 @@ function check_vol_mnt_attrs() {
   state_file=($(ls -r /tmp/$state_file)) # array in reverse order (new -> old)
   state_file="${state_file[0]}" # newest
   # extract mount opts section from state file
-  mntopts="$(sed -n "/^$section/,/^$/p" $state_file)"
+  mntopts="$(sed -n "/^$section/,/^$/p" $state_file | tr '\n' ' ')"
 echo "*****LIVE chk_mnt $node '$mntopts' '${CHK_MNTOPTS//-/_}'"
   chk_mnt $node "$mntopts" "${CHK_MNTOPTS//-/_}" || ((errcnt++))
 
