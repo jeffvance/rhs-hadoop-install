@@ -8,7 +8,6 @@
 
 IPA_SERVER="$1"; shift
 CLIENT_NODES="$@"
-echo "----> $CLIENT_NODES"
 [[ -z "$IPA_SERVER" ]] && {
   echo "Syntax error: ldap-ipa server is the 1st arg and is required";
   exit -1; }
@@ -19,7 +18,7 @@ echo "----> $CLIENT_NODES"
 IPA_DOMAIN="$(ssh $IPA_SERVER "hostname -d")"
 [[ -z "$IPA_DOMAIN" ]] && IPA_DOMAIN="$IPA_SERVER"
 
-IPA_REALM=`echo $IPA_DOMAIN | tr '[:lower:]' '[:upper:]'` # hard-coded
+IPA_REALM="$(echo $IPA_DOMAIN | tr '[:lower:]' '[:upper:]')"
 
 # hard-code ldap/ipa admin user and password
 ADMIN="admin"
@@ -35,7 +34,7 @@ for node in $CLIENT_NODES; do
         echo in ssh $node
 	if [[ -f $CERT_FILE ]] ; then 
 	  echo \"ERROR: cert file $CERT_FILE exists on $node\"
-	  echo \"This file needs to be deleted before the ipa client on $node can be configured.\"
+	  echo \"This file needs to be deleted before the ipa client can be configured\"
           exit 1
 	fi
         exit 0

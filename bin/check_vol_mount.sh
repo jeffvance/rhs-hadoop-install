@@ -57,6 +57,8 @@ function check_vol_mnt_attrs() {
 
   # live check:
   echo "--- $node: live $VOLNAME mount options check..."
+  live_check "$CHK_MNTOPTS_LIVE" "$CHK_MNTOPTS_LIVE_WARN"
+...
   # find correct glusterfs pid
   pid=($(ssh $node "ps -ef | grep 'glusterfs --.*$VOLNAME' | grep -v grep"))
   pid=${pid[1]} # extract glusterfs pid, 2nd field
