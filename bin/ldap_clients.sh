@@ -17,7 +17,7 @@ CLIENT_NODES="$@"
   exit -1; }
 
 IPA_DOMAIN="$(ssh $IPA_SERVER "hostname -d")"
-[[ -z "$IPA_DOMAIN ]] && IPA_DOMAIN="$IPA_SERVER"
+[[ -z "$IPA_DOMAIN" ]] && IPA_DOMAIN="$IPA_SERVER"
 
 IPA_REALM='HADOOP' # hard-coded
 
@@ -32,8 +32,8 @@ errcnt=0
 for node in $CLIENT_NODES; do
     ssh $node "
 	if [[ -f $CERT_FILE ]] ; then
-	  echo \"ERROR: cert file $CERT_FILE exists on \$node\"
-	  echo \"This file needs to be deleted before the ipa client on \$node can be configured.\"
+	  echo \"ERROR: cert file $CERT_FILE exists on $node\"
+	  echo \"This file needs to be deleted before the ipa client can be configured.\"
           exit 1
 	fi
         exit 0
@@ -54,7 +54,7 @@ for node in $CLIENT_NODES; do
 		-w $PASSWD 2>&1
         err=\$?
         (( err != 0 )) && {
-	  echo "ERROR \$err: ipa-client-install on \$node"; exit \$err; }
+	  echo "ERROR \$err: ipa-client-install on $node"; exit \$err; }
     "
     err=$?
     (( err != 0 )) && break
