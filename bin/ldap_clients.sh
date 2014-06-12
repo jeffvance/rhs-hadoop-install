@@ -8,7 +8,7 @@
 
 IPA_SERVER="$1"; shift
 CLIENT_NODES="$@"
-
+echo "----> $CLIENT_NODES"
 [[ -z "$IPA_SERVER" ]] && {
   echo "Syntax error: ldap-ipa server is the 1st arg and is required";
   exit -1; }
@@ -17,7 +17,7 @@ CLIENT_NODES="$@"
   exit -1; }
 
 IPA_DOMAIN="$(ssh $IPA_SERVER "hostname -d")"
-[[ -z "$IPA_DOMAIN ]] && IPA_DOMAIN="$IPA_SERVER"
+[[ -z "$IPA_DOMAIN" ]] && IPA_DOMAIN="$IPA_SERVER"
 
 IPA_REALM='HADOOP' # hard-coded
 
@@ -30,10 +30,12 @@ errcnt=0
 
 # before adding clients, first check that no previous cert exists
 for node in $CLIENT_NODES; do
-    ssh $node "
-	if [[ -f $CERT_FILE ]] ; then
-	  echo \"ERROR: cert file $CERT_FILE exists on \$node\"
-	  echo \"This file needs to be deleted before the ipa client on \$node can be configured.\"
+    echo "before ssh node  = $node"
+    ssh -q $node "
+        echo in ssh $node
+	if [[ -f $CERT_FILE ]] ; then 
+	  echo \"ERROR: cert file $CERT_FILE exists on $node\"
+	  echo \"This file needs to be deleted before the ipa client on $node can be configured.\"
           exit 1
 	fi
         exit 0
@@ -45,7 +47,7 @@ done
 # now do the client install
 err=0
 for node in $CLIENT_NODES; do
-    ssh $node "
+    ssh -q $node "
 	yum -y install ipa-client 2>&1
         # uninstall ipa-client-install for idempotency
         ipa-client-install --uninstall -U 2>&1
@@ -54,7 +56,7 @@ for node in $CLIENT_NODES; do
 		-w $PASSWD 2>&1
         err=\$?
         (( err != 0 )) && {
-	  echo "ERROR \$err: ipa-client-install on \$node"; exit \$err; }
+	  echo "ERROR \$err: ipa-client-install on $node"; exit \$err; }
     "
     err=$?
     (( err != 0 )) && break
