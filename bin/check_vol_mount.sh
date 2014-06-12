@@ -53,7 +53,8 @@ function check_vol_mnt_attrs() {
 
   # live_check: secondary function to check the mount options seen in the
   # gluster "state" file. This file is produced when sending the glusterf
-  # client pid the SIGUSR1 signal. Returns the chk_mnt() rtncode.
+  # client pid the SIGUSR1 signal. Returns 1 on errors, or the chk_mnt()
+  # rtncode.
   function live_check() {
 
     local node="$1"
@@ -65,6 +66,9 @@ function check_vol_mnt_attrs() {
     # find correct glusterfs pid
     pid=($(ssh $node "ps -ef | grep 'glusterfs --.*$VOLNAME' | grep -v grep"))
     pid=${pid[1]} # extract glusterfs pid, 2nd field
+    [[ -z "$pid" ]] && {
+      echo "ERROR: glusterfs client process not running";
+      return 1; }
 
     # generate gluster state file
     ssh $node "kill -SIGUSR1 $pid"
@@ -108,7 +112,6 @@ function check_vol_mnt_attrs() {
 
   ## main 
 
-  # live check:
   echo "--- $node: live $VOLNAME mount options check..."
   live_check $node
   err=$?
@@ -118,7 +121,6 @@ function check_vol_mnt_attrs() {
     ((warncnt++))
   fi
 
-  # fstab check:
   echo "--- $node: /etc/fstab $VOLNAME mount options check..."
   fstab_check $node
   err=$?
