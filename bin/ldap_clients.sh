@@ -29,9 +29,7 @@ errcnt=0
 
 # before adding clients, first check that no previous cert exists
 for node in $CLIENT_NODES; do
-    echo "before ssh node  = $node"
     ssh -q $node "
-        echo in ssh $node
 	if [[ -f $CERT_FILE ]] ; then 
 	  echo \"ERROR: cert file $CERT_FILE exists on $node\"
 	  echo \"This file needs to be deleted before the ipa client can be configured\"

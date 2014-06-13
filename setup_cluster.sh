@@ -718,7 +718,7 @@ copy_bin ${UNIQ_NODES[*]} || exit 1
 install_repo ${UNIQ_NODES[*]} || exit 1
 
 # setup a simple ldap/ipa server on the mgmt node, if requested
-setup_ldap $MGMT_NODE $NODES[*] $YARN_NODE || exit 1
+setup_ldap $MGMT_NODE ${NODES[*]} $YARN_NODE || exit 1
 
 # setup each node for hadoop workloads
 setup_nodes || exit 1
