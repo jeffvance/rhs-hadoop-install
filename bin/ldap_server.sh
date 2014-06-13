@@ -23,7 +23,7 @@ else # use ssh to ldap server
 fi
 
 LDAP_DOMAIN="$(eval "$ssh hostname -d $ssh_close")"
-[[ -z "$LDAP_DOMAIN" ]] && LDAP_DOMAIN="$LDAP_NODE"
+[[ -z "$LDAP_DOMAIN" ]] && LDAP_DOMAIN="${LDAP_NODE#*.}" # remove simple host
 
 USERS="$($PREFIX/gen_users.sh)" # required hadoop users
 USERS+=" $@" # add any additional passed-in users

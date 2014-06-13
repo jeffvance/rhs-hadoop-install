@@ -16,7 +16,7 @@ CLIENT_NODES="$@"
   exit -1; }
 
 IPA_DOMAIN="$(ssh $IPA_SERVER "hostname -d")"
-[[ -z "$IPA_DOMAIN" ]] && IPA_DOMAIN="$IPA_SERVER"
+[[ -z "$IPA_DOMAIN" ]] && IPA_DOMAIN="${IPA_SERVER#*.}" # remove simple host
 
 IPA_REALM="$(echo $IPA_DOMAIN | tr '[:lower:]' '[:upper:]')"
 
