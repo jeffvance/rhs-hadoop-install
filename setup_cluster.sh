@@ -724,6 +724,7 @@ install_repo ${UNIQ_NODES[*]} || exit 1
 #### TEMP! use trad user-mgmt ####
 quiet "******** TEMPORARY: using linux user mgmt for now..."
 for node in ${NODES[*]} $YARN_NODE; do
+    quiet "--- adding users and groups to node: $node"
     ssh $node "
 	/tmp/bin/add_groups.sh
 	/tmp/bin/add_users.sh
