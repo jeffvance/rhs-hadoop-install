@@ -33,6 +33,7 @@ GROUPS="$($PREFIX/gen_groups.sh)"
 # hard-coded admin user and password
 ADMIN='admin'
 PASSWD='admin123' # min of 8 chars
+DFLT_EMAIL='none@none.com'
 
 # hard-coded realm, i.e. LAB.XYZ.COMPANY.COM
 IPA_REALM="$(echo $LDAP_DOMAIN | tr '[:lower:]' '[:upper:]')"
@@ -62,7 +63,7 @@ eval "$ssh
 	# add hadoop users + any extra users
 	for u in $USERS; do
 	    if ! getent passwd \$u >& /dev/null ; then # user does not exist
-	      ipa user-add \$u --first \$u --last \$u  2>&1
+	      ipa user-add \$u --first \$u --last \$u --email $DFLT_EMAIL 2>&1
 	      err=\$?
 	      (( err != 0 )) && {
 		echo \"ERROR \$err: ipa user-add \$u\"; exit \$err; }
