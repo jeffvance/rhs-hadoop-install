@@ -722,8 +722,8 @@ install_repo ${UNIQ_NODES[*]} || exit 1
 #### TEMP! don't use ipa right now ####
 #setup_ldap $MGMT_NODE ${NODES[*]} $YARN_NODE || exit 1
 #### TEMP! use trad user-mgmt ####
-echo "******** TEMPORARY: using linux user mgmt for now..."
-for node in ${NODES[*]} $YARN; do
+quiet "******** TEMPORARY: using linux user mgmt for now..."
+for node in ${NODES[*]} $YARN_NODE; do
     ssh $node "
 	/tmp/bin/add_groups.sh
 	/tmp/bin/add_users.sh
