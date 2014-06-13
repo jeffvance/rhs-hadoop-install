@@ -719,7 +719,17 @@ copy_bin ${UNIQ_NODES[*]} || exit 1
 install_repo ${UNIQ_NODES[*]} || exit 1
 
 # setup a simple ldap/ipa server on the mgmt node, if requested
-setup_ldap $MGMT_NODE ${NODES[*]} $YARN_NODE || exit 1
+#### TEMP! don't use ipa right now ####
+#setup_ldap $MGMT_NODE ${NODES[*]} $YARN_NODE || exit 1
+#### TEMP! use trad user-mgmt ####
+echo "******** TEMPORARY: using linux user mgmt for now..."
+for node in ${NODES[*]} $YARN; do
+    ssh $node "
+	/tmp/bin/add_groups.sh
+	/tmp/bin/add_usersroups.sh
+    "
+done
+#### END OF TEMP CODE ####
 
 # setup each node for hadoop workloads
 setup_nodes || exit 1
