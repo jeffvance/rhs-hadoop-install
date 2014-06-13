@@ -726,7 +726,7 @@ echo "******** TEMPORARY: using linux user mgmt for now..."
 for node in ${NODES[*]} $YARN; do
     ssh $node "
 	/tmp/bin/add_groups.sh
-	/tmp/bin/add_usersroups.sh
+	/tmp/bin/add_users.sh
     "
 done
 #### END OF TEMP CODE ####
