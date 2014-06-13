@@ -174,6 +174,7 @@ VERBOSE=$LOG_QUIET # default
 quiet '***'
 quiet "*** $ME: version $(cat $PREFIX/VERSION)"
 quiet '***'
+debug "date: $(date)"
 
 parse_cmd $@ || exit -1
 
