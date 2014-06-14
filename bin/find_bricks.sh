@@ -27,7 +27,7 @@ VOLNAME="$1" # optional, default=entire pool
 
 [[ "$rhs_node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $rhs_node"
 
-eval "$ssh gluster volume status $VOLNAME" >/tmp/volstatus.out
+eval "$ssh gluster volume status $VOLNAME" >/tmp/volstatus.out 2>&1
 if (( $? != 0 )) ; then
   cat /tmp/volstatus.out
   exit 1
