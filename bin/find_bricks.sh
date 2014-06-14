@@ -10,10 +10,6 @@
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
 
-PREFIX="$(dirname $(readlink -f $0))"
-
-source $PREFIX/functions # need vol_exists()
-
 # parse cmd opts
 while getopts ':n:' opt; do
     case "$opt" in

@@ -7,7 +7,8 @@
 #   $1=volume name in question. Optional, default is every node in pool.
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
-#   -u=output only the unique nodes.
+#   -u=output only the unique nodes, otherwise, if dup nodes are present they 
+#      will all be output.
 
 PREFIX="$(dirname $(readlink -f $0))"
 
@@ -30,9 +31,9 @@ VOLNAME="$1" # optional, default=entire pool
 [[ -n "$rhs_node" ]] && rhs_node_opt="-n $rhs_node" || rhs_node_opt=''
 
 if [[ -z "$VOLNAME" ]] ; then # use peer status to get all nodes in pool
-  NODES=($(eval "
-	ssh $rhs_node gluster peer status | grep Hostname: | awk '{print \$2}'
-  "))
+  # note: ssh'd-to storage node is not included in peer status
+  NODES=($(ssh $rhs_node "
+	gluster peer status | grep Hostname: | awk '{print \$2}'"))
   err=$?
 else # use find_bricks which needs at least one volume created
   NODES=($($PREFIX/find_bricks.sh $rhs_node_opt $VOLNAME))
@@ -51,8 +52,7 @@ else
 fi
 
 [[ -z "$UNIQ" ]] && {
-  echo "${NODES[@]}" | tr ' ' '\n';
-  exit 0; }
+  echo "${NODES[*]}" | tr ' ' '\n'; exit 0; }
 
 # unique nodes
 echo "$(printf '%s\n' "${NODES[@]}" | sort -u)"

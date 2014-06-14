@@ -36,7 +36,7 @@ for brick in $($PREFIX/find_bricks.sh $rhs_node $VOLNAME); do
     brickmnt=${brick#*:}    # remove node
     brickmnt=${brickmnt%/*} # remove volname
     [[ "$node" == "$HOSTNAME" ]] && { ssh=''; ssh_close=''; } || \
-    				     { ssh="ssh $node '"; ssh_close="'"; }
+    				    { ssh="ssh $node '"; ssh_close="'"; }
     eval "$ssh 
 	   mnt=\$(grep $brickmnt /proc/mounts)
 	   (( $INCL_NODE )) && echo -n $node:

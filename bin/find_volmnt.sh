@@ -8,8 +8,6 @@
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
 
-PREFIX="$(dirname $(readlink -f $0))"
-
 # parse cmd opts
 while getopts ':n:' opt; do
     case "$opt" in

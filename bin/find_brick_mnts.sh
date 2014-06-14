@@ -8,8 +8,8 @@
 #  $1=volume name
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
-#   -x=(no-node) if specified, means only output the brick-mnt portion,
-#      omit each node.
+#   -x=(no-node) if specified, means only output the brick-mnt portion, omit 
+#      each node.
 
 INCL_NODE=1 # true, default
 PREFIX="$(dirname $(readlink -f $0))"
