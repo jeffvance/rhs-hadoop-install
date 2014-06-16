@@ -51,9 +51,6 @@ else
   done
 fi
 
-[[ -z "$UNIQ" ]] && {
-  echo "${NODES[*]}" | tr ' ' '\n'; exit 0; }
-
-# unique nodes
-echo "$(printf '%s\n' "${NODES[@]}" | sort -u)"
+[[ -z "$UNIQ" ]] && echo "${NODES[*]}" | tr ' ' '\n' ||
+    echo "$(printf '%s\n' "${NODES[@]}" | sort -u)"
 exit 0
