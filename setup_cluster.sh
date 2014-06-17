@@ -52,7 +52,7 @@ SYNTAX:
 $ME --version | --help
 
 $ME [-y] [--hadoop-management-node <node>] [--yarn-master <node>] \\
-              [--ldap [user1,user2,...]] \\
+              [--ldap [users] | [--users [users] | [--my-ldap host] \\
               [--quiet | --verbose | --debug] \\
               <nodes-spec-list>
 where:
@@ -79,8 +79,12 @@ where:
 --ldap [users]  : (optional) create a simple ldap/ipa server on the hadoop
                   management node, where the required hadoop users will be
                   managed, and any supplied extra users (eg. "tom,sue,...") are
-                  included. The default is that the required hadoop users must
-                  be created/managed outside of this script.
+                  included. This is the default. 
+--users [users] : (optional) add the required hadoop users via the standard
+                  linux commands (useradd, groupadd). Extra users separated by
+                  a comma can be added.
+--my-ldap host  : (optional) use an existing ldap server pointed to by <host>.
+                  Adding extra users is not supported at this time.
 -y              : (optional) auto answer "yes" to all prompts. Default is to 
                   answer a confirmation prompt.
 --quiet         : (optional) output only basic progress/step messages. Default.
@@ -98,13 +102,20 @@ EOF
 #   AUTO_YES
 #   MGMT_NODE
 #   NODE_SPEC
+#   SETUP_LDAP
+#   SETUP_MY_LDAP
+#   SETUP_USERS
 #   VERBOSE
 #   YARN_NODE
 function parse_cmd() {
 
   local opts='y'
-  local long_opts='help,version,yarn-master:,hadoop-mgmt-node:,ldap::,verbose,quiet,debug'
-  local errcnt=0
+  local verbose_opts='verbose,quiet,debug'   # default= --quiet
+  local ldap_opts='ldap::,my-ldap::,users::' # mutually excl, default= --ldap
+  local node_opts='hadoop-mgmt-node:,yarn-master:'
+  local long_opts="help,version,$node_opts,$verbose_opts,$ldap_opts"
+  local errcnt=0; local cnt;
+  local sample_user='cathy'
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
 
@@ -134,9 +145,19 @@ function parse_cmd() {
 	--hadoop-mgmt-node)
 	  MGMT_NODE="$2"; shift 2; continue
 	;;
-	--ldap) # extra users list is optional
+	--ldap) # default, extra users list is optional
 	  EXTRA_USERS="$2" # empty if users omitted, else comma separated list
 	  SETUP_LDAP=1 # true
+	  shift 2; continue
+	;;
+	--my-ldap) # extra users list is optional
+	  EXTRA_USERS="$2" # empty if users omitted, else comma separated list
+	  SETUP_MY_LDAP=1 # true
+	  shift 2; continue
+	;;
+	--users) # extra users list is optional
+	  EXTRA_USERS="$2" # empty if users omitted, else comma separated list
+	  SETUP_USERS=1 # true
 	  shift 2; continue
 	;;
 	--)
@@ -150,6 +171,19 @@ function parse_cmd() {
   [[ -z "$NODE_SPEC" || ${#NODE_SPEC[@]} < 2 ]] && {
     echo "Syntax error: expect list of 2 or more nodes plus brick mount(s) and block dev(s)";
     ((errcnt++)); }
+
+  # mutual exclusion checks and defaults
+  # SETUP_LDAP, _MY_LDAP, _USERS...
+  let cnt=SETUP_USERS+SETUP_LDAP+SETUP_MY_LDAP
+  if (( cnt == 0 )) ; then
+     SETUP_LDAP=1 # true, default
+  elif (( cnt > 1 )) ; then
+    echo "Syntax error: only one of ldap, my-ldap and users can be specified"
+    ((errcnt++))
+  fi
+
+  # EXTRA_USERS...
+  [[ -z "$EXTRA_USERS" ]] && EXTRA_USERS=$sample_user # always add sample user
 
   (( errcnt > 0 )) && return 1
   return 0
@@ -599,6 +633,41 @@ function ambari_server() {
   return 0 
 }
 
+# setup_users: based on the SETUP_ users flag create the required hadoop users.
+# The default is to setup a ldap/ipa server on the management node. Returns 1
+# on errors.
+# Uses globals:
+#   MGMT_NODE
+#   NODES
+#   SETUP_LDAP
+#   SETUP_USERS
+#   YARN_NODE
+function setup_users() {
+
+  local node; local out; local errcnt=0; local err
+
+  if (( SETUP_LDAP )) ; then # default
+    # setup a simple ldap/ipa server on the mgmt node
+    setup_ldap $MGMT_NODE ${NODES[*]} $YARN_NODE || return 1
+
+  elif (( SETUP_USERS )) ; then
+    verbose "--- checking/creating users via useradd..."
+    for node in ${NODES[*]} $YARN_NODE; do
+	out="$(ssh $node "/tmp/bin/add_groups.sh")"
+	err=$?
+	debug "add groups to $node: $out"
+        (( err != 0 )) && { ((errcnt++)); continue; } # don't try to add users
+	out="$(ssh $node "/tmp/bin/add_users.sh")"
+	err=$?
+	debug "add users to $node: $out"
+        (( err != 0 )) && ((errcnt++))
+    done
+  fi
+
+  (( errcnt > 1 )) && return 1
+  return 0
+}
+
 # setup_ldap: if the user requested a simple ldap/ipa setup then create the
 # ipa server on the passed-in node, and setup the ipa clients on all storage
 # nodes and on the yarn-master. Returns 1 on errors.
@@ -674,11 +743,13 @@ function verify_gid_uids() {
 ME="$(basename $0 .sh)"
 NODES=()
 declare -A NODE_BRKMNTS; declare -A NODE_BLKDEVS
-MGMT_INSIDE=0 # assume false
-YARN_INSIDE=0 # assume false
-AUTO_YES=0    # assume false
-SETUP_LDAP=0  # assume false
-VERBOSE=$LOG_QUIET # default
+MGMT_INSIDE=0		# assume false
+YARN_INSIDE=0		# assume false
+AUTO_YES=0		# assume false
+SETUP_LDAP=0		# assume false
+SETUP_MY_LDAP=0		# assume false
+SETUP_USERS=0		# assume false
+VERBOSE=$LOG_QUIET	# default
 errnodes=''; errcnt=0
 
 quiet '***'
@@ -718,19 +789,8 @@ copy_bin ${UNIQ_NODES[*]} || exit 1
 # distribute and install the rhs-hadoop repo file to all nodes
 install_repo ${UNIQ_NODES[*]} || exit 1
 
-# setup a simple ldap/ipa server on the mgmt node, if requested
-#### TEMP! don't use ipa right now ####
-#setup_ldap $MGMT_NODE ${NODES[*]} $YARN_NODE || exit 1
-#### TEMP! use trad user-mgmt ####
-quiet "******** TEMPORARY: using linux user mgmt for now..."
-for node in ${NODES[*]} $YARN_NODE; do
-    quiet "--- adding users and groups to node: $node"
-    ssh $node "
-	/tmp/bin/add_groups.sh
-	/tmp/bin/add_users.sh
-    "
-done
-#### END OF TEMP CODE ####
+# create required hadoop users. Needed before creating the required dirs
+setup_users || exit 
 
 # setup each node for hadoop workloads
 setup_nodes || exit 1
