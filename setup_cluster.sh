@@ -52,7 +52,7 @@ SYNTAX:
 $ME --version | --help
 
 $ME [-y] [--hadoop-management-node <node>] [--yarn-master <node>] \\
-              [--ldap [users] | [--users [users] | [--my-ldap host] \\
+              [--ldap[=users] | [--users[=users] | [--my-ldap host] \\
               [--quiet | --verbose | --debug] \\
               <nodes-spec-list>
 where:
@@ -76,11 +76,11 @@ where:
 --hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server which
                   is expected to be outside of the storage pool. Default is
                   localhost.
---ldap [users]  : (optional) create a simple ldap/ipa server on the hadoop
+--ldap[=users]  : (optional) create a simple ldap/ipa server on the hadoop
                   management node, where the required hadoop users will be
                   managed, and any supplied extra users (eg. "tom,sue,...") are
                   included. This is the default. 
---users [users] : (optional) add the required hadoop users via the standard
+--users[=users] : (optional) add the required hadoop users via the standard
                   linux commands (useradd, groupadd). Extra users separated by
                   a comma can be added.
 --my-ldap host  : (optional) use an existing ldap server pointed to by <host>.
@@ -111,7 +111,7 @@ function parse_cmd() {
 
   local opts='y'
   local verbose_opts='verbose,quiet,debug'   # default= --quiet
-  local ldap_opts='ldap::,my-ldap::,users::' # mutually excl, default= --ldap
+  local ldap_opts='ldap::,my-ldap:,users::' # mutually excl, default= --ldap
   local node_opts='hadoop-mgmt-node:,yarn-master:'
   local long_opts="help,version,$node_opts,$verbose_opts,$ldap_opts"
   local errcnt=0; local cnt;
@@ -297,25 +297,29 @@ function parse_nodes_brkmnts_blkdevs() {
 #   YARN_NODE
 function show_todo() {
 
-  local node
+  local node; local fmt_node; local fill
 
   echo
-  quiet "*** Nodes             : $(echo ${NODES[*]} | tr ' ' ', ')"
+  quiet "*** Nodes              : $(echo ${NODES[*]} | tr ' ' ', ')"
   quiet "*** Brick mounts"
   for node in ${NODES[@]}; do
-      quiet "      $node         : $(echo ${NODE_BRKMNTS[$node]} | tr ' ' ', ')"
+      let fill=(16-${#node}) # to left-justify node
+      fmt_node="$node $(printf ' %.0s' $(seq $fill))"
+      quiet "      $fmt_node: $(echo ${NODE_BRKMNTS[$node]} | tr ' ' ', ')"
   done
 
   quiet "*** Block devices"
   for node in ${NODES[@]}; do
-      quiet "      $node         : $(echo ${NODE_BLKDEVS[$node]} | tr ' ' ', ')"
+      let fill=(16-${#node}) # to left-justify node
+      fmt_node="$node $(printf ' %.0s' $(seq $fill))"
+      quiet "      $fmt_node: $(echo ${NODE_BLKDEVS[$node]} | tr ' ' ', ')"
   done
 
-  quiet "*** Ambari mgmt node  : $MGMT_NODE"
-  quiet "*** Yarn-master server: $YARN_NODE"
+  quiet "*** Ambari mgmt node   : $MGMT_NODE"
+  quiet "*** Yarn-master server : $YARN_NODE"
   if (( SETUP_LDAP )) ; then
     if [[ -n "$EXTRA_USERS" ]] ; then
-      quiet "*** Setting up ldap/ipa with these extra users: ${EXTRA_USERS//,/, }"
+      quiet "*** Setting up ldap/ipa with extra users: ${EXTRA_USERS//,/, }"
     else
       quiet "*** Setting up ldap/ipa with standard hadoop users"
     fi
