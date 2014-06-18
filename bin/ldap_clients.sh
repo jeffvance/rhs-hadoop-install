@@ -28,8 +28,9 @@ CERT_FILE='/etc/ipa/ca.crt'
 err=0
 for node in $CLIENT_NODES; do
     ssh -q $node "
+	echo "ipa-client on node: $node"
 	if [[ -f $CERT_FILE ]] ; then
-	  echo "$node: $CERT_FILE exists thus not proceeding with ipa-client"
+	  echo "$CERT_FILE exists thus not proceeding with ipa-client-install"
 	else
 	  if ! rpm -q ipa-client ; then 
 	    echo "installing ipa-client..."

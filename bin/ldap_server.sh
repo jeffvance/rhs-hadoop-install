@@ -44,8 +44,9 @@ CERT_FILE='/etc/ipa/ca.crt'
 # set up ldap on the LDAP_NODE and add users/groups
 err=0
 eval "$ssh 
+	echo "ipa-server on node: $node"
 	if [[ -f $CERT_FILE ]] ; then
-	  echo "$node: $CERT_FILE exists thus not proceeding with ipa-server"
+	  echo "$CERT_FILE exists thus not proceeding with ipa-server-install"
 	else
           if ! rpm -q ipa-server ; then
 	    echo "installing ipa-server..."
