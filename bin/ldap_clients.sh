@@ -39,6 +39,9 @@ for node in $CLIENT_NODES; do
 	    (( err != 0 )) && {
 	      echo \"ERROR \$err: yum install ipa-client\"; exit \$err; }
 	  fi
+	  # uninstall ipa-client just in case...
+	  ipa-client-install -U --uninstall  # ignore error if any
+	  # install the ipa client on this node
           ipa-client-install -U --enable-dns-updates --domain $IPA_DOMAIN \
 		--server $IPA_SERVER --realm $IPA_REALM -p $ADMIN \
 		-w $PASSWD 2>&1

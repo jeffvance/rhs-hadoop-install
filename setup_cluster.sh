@@ -688,8 +688,6 @@ function setup_ldap() {
   local client_nodes="$@"
   local err; local out
 
-  (( SETUP_LDAP )) || return 0 # default, nothing to do...
-
   verbose "--- setting up ldap/ipa server on $ldap_server..."
   out="$(/tmp/bin/ldap_server.sh $ldap_server ${EXTRA_USERS//,/ })"
   err=$?
@@ -794,7 +792,7 @@ copy_bin ${UNIQ_NODES[*]} || exit 1
 install_repo ${UNIQ_NODES[*]} || exit 1
 
 # create required hadoop users. Needed before creating the required dirs
-setup_users || exit 
+setup_users || exit 1
 
 # setup each node for hadoop workloads
 setup_nodes || exit 1
