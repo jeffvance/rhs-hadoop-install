@@ -45,13 +45,22 @@ done
 err=0
 for node in $CLIENT_NODES; do
     ssh -q $node "
-	yum -y install ipa-client 2>&1
-        ipa-client-install -U --enable-dns-updates --domain $IPA_DOMAIN \
+	if [[ -f $CERT_FILE ]] ; then
+	  echo "$node: $CERT_FILE exists thus not proceeding with ipa-client"
+	else
+	  if ! rpm -q ipa-client ; then 
+	    yum -y install ipa-client 2>&1
+	    err=\$?
+	    (( err != 0 )) && {
+	      echo \"ERROR \$err: yum install ipa-client\"; exit \$err; }
+	  fi
+          ipa-client-install -U --enable-dns-updates --domain $IPA_DOMAIN \
 		--server $IPA_SERVER --realm $IPA_REALM -p $ADMIN \
 		-w $PASSWD 2>&1
-        err=\$?
-        (( err != 0 )) && {
-	  echo "ERROR \$err: ipa-client-install on $node"; exit \$err; }
+          err=\$?
+          (( err != 0 )) && {
+	    echo "ERROR \$err: ipa-client-install on $node"; exit \$err; }
+	fi
     "
     err=$?
     (( err != 0 )) && break

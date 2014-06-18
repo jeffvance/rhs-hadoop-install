@@ -33,34 +33,41 @@ GROUPS="$($PREFIX/gen_groups.sh)"
 # hard-coded admin user and password
 ADMIN='admin'
 PASSWD='admin123' # min of 8 chars
-DFLT_EMAIL='none@none.com'
 
 # hard-coded realm, i.e. LAB.XYZ.COMPANY.COM
 IPA_REALM="$(echo $LDAP_DOMAIN | tr '[:lower:]' '[:upper:]')"
 
+# misc
+DFLT_EMAIL='none@none.com'
+CERT_FILE='/etc/ipa/ca.crt'
+
 # set up ldap on the LDAP_NODE and add users/groups
 err=0
 eval "$ssh 
-	yum -y install ipa-server 2>&1
-        err=\$?
-	(( err != 0 )) && {
-	   echo \"ERROR \$err: yum install ipa-server\"; exit \$err; }
-
-	# uninstall ipa-server-install for idempotency
-	ipa-server-install --uninstall -U 2>&1
-	ipa-server-install -U --hostname=$LDAP_NODE --realm=$IPA_REALM \
+	if [[ -f $CERT_FILE ]] ; then
+	  echo "$node: $CERT_FILE exists thus not proceeding with ipa-server"
+	else
+          if ! rpm -q ipa-server ; then
+	    echo "installing ipa-server..."
+	    yum -y install ipa-server 2>&1
+            err=\$?
+	    (( err != 0 )) && {
+	      echo \"ERROR \$err: yum install ipa-server\"; exit \$err; }
+	  fi
+	  ipa-server-install -U --hostname=$LDAP_NODE --realm=$IPA_REALM \
 		--domain=$LDAP_DOMAIN --ds-password=$PASSWD \
 		--admin-password=$PASSWD 2>&1
-        err=\$?
-	(( err != 0 )) && {
-	   echo \"ERROR \$err: ipa-server-install\"; exit \$err; }
+          err=\$?
+	  (( err != 0 )) && {
+	     echo \"ERROR \$err: ipa-server-install\"; exit \$err; }
+	fi
  
 	echo $PASSWD | kinit $ADMIN 2>&1
         err=\$?
 	(( err != 0 )) && {
 	   echo \"ERROR \$err: kinit $ADMIN\"; exit \$err; }
 
-	# add hadoop users + any extra users
+	# add hadoop users + any extra users (may already exist)
 	for u in $USERS; do
 	    if ! getent passwd \$u >& /dev/null ; then # user does not exist
 	      ipa user-add \$u --first \$u --last \$u --email $DFLT_EMAIL 2>&1
