@@ -23,25 +23,8 @@ IPA_REALM="$(echo $IPA_DOMAIN | tr '[:lower:]' '[:upper:]')"
 # hard-code ldap/ipa admin user and password
 ADMIN="admin"
 PASSWD="admin123"
-
 CERT_FILE='/etc/ipa/ca.crt'
-errcnt=0
 
-# before adding clients, first check that no previous cert exists
-for node in $CLIENT_NODES; do
-    ssh -q $node "
-	if [[ -f $CERT_FILE ]] ; then 
-	  echo \"ERROR: cert file $CERT_FILE exists on $node\"
-	  echo \"This file needs to be deleted before the ipa client can be configured\"
-          exit 1
-	fi
-        exit 0
-    "
-    (( $? != 0 )) && ((errcnt++))
-done
-(( errcnt > 0 )) && exit 1 # don't install the ipa client
-
-# now do the client install
 err=0
 for node in $CLIENT_NODES; do
     ssh -q $node "
@@ -49,6 +32,7 @@ for node in $CLIENT_NODES; do
 	  echo "$node: $CERT_FILE exists thus not proceeding with ipa-client"
 	else
 	  if ! rpm -q ipa-client ; then 
+	    echo "installing ipa-client..."
 	    yum -y install ipa-client 2>&1
 	    err=\$?
 	    (( err != 0 )) && {
