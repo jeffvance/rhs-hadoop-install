@@ -317,10 +317,6 @@ function show_todo() {
       quiet "*** Setting up ldap/ipa with standard hadoop users"
     fi
   fi
-
-  echo
-  echo "*** begin cluster setup... this may take some time..."
-  echo
 }
 
 # copy_bin: copies all bin/* files to /tmp/ on the passed-in nodes. Returns 1
@@ -803,6 +799,10 @@ define_pool ${NODES[*]} || exit 1
 
 # prompt to continue before any changes are made...
 (( ! AUTO_YES )) && ! yesno "  Continue? [y|N] " && exit 0
+
+echo
+echo "*** begin cluster setup... this may take some time..."
+echo
 
 # distribute and install the rhs-hadoop repo file to all nodes
 install_repo ${UNIQ_NODES[*]} || exit 1
