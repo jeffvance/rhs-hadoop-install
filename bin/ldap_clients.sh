@@ -49,6 +49,7 @@ for node in $CLIENT_NODES; do
           (( err != 0 )) && {
 	    echo "ERROR \$err: ipa-client-install on $node"; exit \$err; }
 	fi
+	exit 0
     "
     err=$?
     (( err != 0 )) && break
