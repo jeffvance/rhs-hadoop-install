@@ -52,14 +52,15 @@ SYNTAX:
 $ME --version | --help
 
 $ME [-y] [--hadoop-management-node <node>] [--yarn-master <node>] \\
-              [--ldap[=users] | [--users[=users] | [--my-ldap host] \\
-              [--quiet | --verbose | --debug] \\
-              <nodes-spec-list>
+              [--deploy-ldap-srv[=users] | --ext-ldap-srv host |  \\
+                --local-auth[=users]]                             \\
+              [--quiet | --verbose | --debug]  <nodes-spec-list>
 where:
 
 <node-spec-list>: a list of two or more <node-spec>s.
 <node-spec>     : a storage node followed by a ':', followed by a brick mount
-                  path, followed by another ':', followed by a block device path.
+                  path, followed by another ':', followed by a block device
+                  path.
                   Eg: <node1><:brickmnt1>:<blkdev1> <node2>[:<brickmnt2>]
                       [:<blkdev2>] [<node3>] ...
                   Each node is expected to be separate from the management and 
@@ -76,15 +77,15 @@ where:
 --hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server which
                   is expected to be outside of the storage pool. Default is
                   localhost.
---ldap[=users]  : (optional) create a simple ldap/ipa server on the hadoop
-                  management node, where the required hadoop users will be
+--deploy-ldap-srv: (optional) create a simple ldap/ipa server on the hadoop
+     [=users]     management node, where the required hadoop users will be
                   managed, and any supplied extra users (eg. "tom,sue,...") are
-                  included. This is the default. 
---users[=users] : (optional) add the required hadoop users via the standard
-                  linux commands (useradd, groupadd). Extra users separated by
+                  are also added. This is the default. 
+--local-auth    : (optional) add the required hadoop users via the standard
+     [=users]     linux commands (useradd, groupadd). Extra users separated by
                   a comma can be added.
---my-ldap host  : (optional) use an existing ldap server pointed to by <host>.
-                  Adding extra users is not supported at this time.
+--ext-ldap-srv  : (optional) use an external ldap server pointed to by <host>.
+                   Adding extra users is not supported at this time.
 -y              : (optional) auto answer "yes" to all prompts. Default is to 
                   answer a confirmation prompt.
 --quiet         : (optional) output only basic progress/step messages. Default.
@@ -103,7 +104,7 @@ EOF
 #   MGMT_NODE
 #   NODE_SPEC
 #   SETUP_LDAP
-#   SETUP_MY_LDAP
+#   SETUP_EXT_LDAP
 #   SETUP_USERS
 #   VERBOSE
 #   YARN_NODE
@@ -111,7 +112,7 @@ function parse_cmd() {
 
   local opts='y'
   local verbose_opts='verbose,quiet,debug'   # default= --quiet
-  local ldap_opts='ldap::,my-ldap:,users::' # mutually excl, default= --ldap
+  local ldap_opts='deploy-ldap-srv::,ext-ldap-srv:,local-auth::'
   local node_opts='hadoop-mgmt-node:,yarn-master:'
   local long_opts="help,version,$node_opts,$verbose_opts,$ldap_opts"
   local errcnt=0; local cnt;
@@ -145,17 +146,17 @@ function parse_cmd() {
 	--hadoop-mgmt-node)
 	  MGMT_NODE="$2"; shift 2; continue
 	;;
-	--ldap) # default, extra users list is optional
+	--deploy-ldap-srv) # default, extra users list is optional
 	  EXTRA_USERS="$2" # empty if users omitted, else comma separated list
 	  SETUP_LDAP=1 # true
 	  shift 2; continue
 	;;
-	--my-ldap) # extra users list is optional
+	--ext-ldap-srv) # extra users list is optional
 	  EXTRA_USERS="$2" # empty if users omitted, else comma separated list
-	  SETUP_MY_LDAP=1 # true
+	  SETUP_EXT_LDAP=1 # true
 	  shift 2; continue
 	;;
-	--users) # extra users list is optional
+	--local-auth) # extra users list is optional
 	  EXTRA_USERS="$2" # empty if users omitted, else comma separated list
 	  SETUP_USERS=1 # true
 	  shift 2; continue
@@ -173,8 +174,8 @@ function parse_cmd() {
     ((errcnt++)); }
 
   # mutual exclusion checks and defaults
-  # SETUP_LDAP, _MY_LDAP, _USERS...
-  let cnt=SETUP_USERS+SETUP_LDAP+SETUP_MY_LDAP
+  # SETUP_LDAP, _EXT_LDAP, _USERS...
+  let cnt=SETUP_USERS+SETUP_LDAP+SETUP_EXT_LDAP
   if (( cnt == 0 )) ; then
      SETUP_LDAP=1 # true, default
   elif (( cnt > 1 )) ; then
@@ -692,17 +693,17 @@ function setup_ldap() {
   out="$(/tmp/bin/ldap_server.sh $ldap_server ${EXTRA_USERS//,/ })"
   err=$?
   (( err != 0 )) && {
-    err $err "ldap_server: $out";
+    err -e $err "ldap_server:\n$out";
     return 1; }
-  debug "ldap_server: $out"
+  debug -e "ldap_server:\n$out"
 
   verbose "--- setting up ldap/ipa clients on: ${client_nodes// /, }..."
   out="$(/tmp/bin/ldap_clients.sh $ldap_server $client_nodes)"
   err=$?
   (( err != 0 )) && {
-    err $err "ldap_clients: $out";
+    err -e $err "ldap_clients:\n$out";
     return 1; }
-  debug "ldap_clients: $out"
+  debug -e "ldap_clients:\n$out"
 
   verbose "--- setting up ldap/ipa server and clients complete"
   return 0
@@ -749,7 +750,7 @@ MGMT_INSIDE=0		# assume false
 YARN_INSIDE=0		# assume false
 AUTO_YES=0		# assume false
 SETUP_LDAP=0		# assume false
-SETUP_MY_LDAP=0		# assume false
+SETUP_EXT_LDAP=0	# assume false
 SETUP_USERS=0		# assume false
 VERBOSE=$LOG_QUIET	# default
 errnodes=''; errcnt=0

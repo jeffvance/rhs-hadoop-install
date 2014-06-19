@@ -28,7 +28,7 @@ LDAP_DOMAIN="$(eval "$ssh hostname -d $ssh_close")"
 USERS="$($PREFIX/gen_users.sh)" # required hadoop users
 USERS+=" $@" # add any additional passed-in users
 
-GROUPS="$($PREFIX/gen_groups.sh)"
+GRPS="$($PREFIX/gen_groups.sh)"
 
 # hard-coded admin user and password
 ADMIN='admin'
@@ -42,9 +42,8 @@ DFLT_EMAIL='none@none.com'
 CERT_FILE='/etc/ipa/ca.crt'
 
 # set up ldap on the LDAP_NODE and add users/groups
-err=0
 eval "$ssh 
-	echo "ipa-server on node: $node"
+	echo "ipa-server on node: $LDAP_NODE"
 	if [[ -f $CERT_FILE ]] ; then
 	  echo "$CERT_FILE exists thus not proceeding with ipa-server-install"
 	else
@@ -79,7 +78,7 @@ eval "$ssh
         done
 
 	# add group(s) and associate to users
-	for g in $GROUPS; do
+	for g in $GRPS; do
 	    if ! getent group \$g >& /dev/null ; then
 	      ipa group-add \$g --desc \${g}-group 2>&1
 	      err=\$?
@@ -93,6 +92,7 @@ eval "$ssh
 		exit \$err; }
 	    fi
 	done
+	exit 0
       $ssh_close"
 err=$?
 
