@@ -317,6 +317,9 @@ function show_todo() {
       quiet "*** Setting up ldap/ipa with standard hadoop users"
     fi
   fi
+
+  echo
+  echo "*** begin cluster setup... this may take some time..."
   echo
 }
 
@@ -764,6 +767,13 @@ debug "date: $(date)"
 
 parse_cmd $@ || exit -1
 
+# regardless of which user options may have been specified, force user related 
+# settings to false since we don't create users in the Denali release. But
+# we're keeping the code in place for potential future use.
+SETUP_LDAP=0
+SETUP_EXT_LDAP=0
+SETUP_USERS=0
+
 default_nodes MGMT_NODE 'management' YARN_NODE 'yarn-master' || exit -1
 
 # extract nodes, brick mnts and blk devs arrays from NODE_SPEC
@@ -798,7 +808,8 @@ define_pool ${NODES[*]} || exit 1
 install_repo ${UNIQ_NODES[*]} || exit 1
 
 # create required hadoop users. Needed before creating the required dirs
-setup_users || exit 1
+# NOTE: this is not supported in Denali, the customer creates the hadoop users
+#setup_users || exit 1
 
 # setup each node for hadoop workloads
 setup_nodes || exit 1

@@ -32,7 +32,7 @@ function set_yarn() {
   eval "$ssh
 	  # install glusterfs-fuse if not present
 	  if ! rpm -ql $fuse_rpm >& /dev/null ; then
-	    yum -y install $fuse_rpm
+	    yum -y install $fuse_rpm 2>&1
 	  fi
 	  source /tmp/bin/functions # for function call below
 	  gluster_mnt_vol $RHS_NODE $VOLNAME $VOLMNT
