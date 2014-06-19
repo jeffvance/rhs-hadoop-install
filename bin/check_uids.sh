@@ -6,7 +6,7 @@
 #   $@ = list of nodes expected to contain the hadoop users
 
 PREFIX="$(dirname $(readlink -f $0))"
-errcnt=0
+errcnt=0; usr_errcnt=0
 
 NODES=($@)
 (( ${#NODES[@]} < 2 )) && {
@@ -18,17 +18,20 @@ for u in $($PREFIX/gen_users.sh); do # list of hadoop users
     for node in ${NODES[*]} ; do
 	[[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
 	# if user exists extract its UID
-	out="$(eval "$ssh id -u $u")"
+	out="$(eval "$ssh getent passwd $u")"
 	err=$?
 	if (( err != 0 )) ; then
-	  ((errcnt++))
-	  echo "ERROR $err: user $u may be missing on node $node"
+	  ((usr_errcnt++))
+	  echo "ERROR $err: user \"$u\" missing on $node"
 	  continue
 	fi
-
+	out=(${out//:/ }) # array
+	out=${out[2]}     # just uid
 	# add to uids array
 	uids+=($out) # in node order
     done # with all nodes for this user
+
+    (( usr_errcnt > 0 )) && continue # next user, don't check consistency
 
     # find unique uids
     uniq_uids=($(printf '%s\n' "${uids[@]}" | sort -u))
@@ -43,6 +46,6 @@ for u in $($PREFIX/gen_users.sh); do # list of hadoop users
     fi
 done
 
-(( errcnt > 0 )) && exit 1
+(( errcnt > 0 || usr_errcnt > 0 )) && exit 1
 echo "Consistent UIDs across supplied nodes"
 exit 0

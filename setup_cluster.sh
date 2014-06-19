@@ -726,7 +726,7 @@ function verify_gid_uids() {
   debug "check_gids: $out"
   if (( err != 0 )) ; then
     ((errcnt++))
-    err "inconsistent GIDs: $out"
+    err -e "inconsistent GIDs:\n$out"
   fi
 
   out="$(/tmp/bin/check_uids.sh $nodes)"
@@ -734,7 +734,7 @@ function verify_gid_uids() {
   debug "check_uids: $out"
   if (( err != 0 )) ; then
     ((errcnt++))
-    err "inconsistent UIDs: $out"
+    err -e "inconsistent UIDs:\n$out"
   fi
 
   (( errcnt > 0 )) && return 1
@@ -780,6 +780,9 @@ uniq_nodes UNIQ_NODES ${NODES[*]} $YARN_NODE $MGMT_NODE # sets UNIQ_NODES var
 # check for passwordless ssh connectivity to nodes
 check_ssh ${UNIQ_NODES[*]} || exit 1
 
+# copy bin/* files to /tmp/ on all nodes including mgmt- and yarn-nodes
+copy_bin ${UNIQ_NODES[*]} || exit 1
+
 # verify user UID and group GID consistency across the cluster
 verify_gid_uids ${NODES[*]} $YARN_NODE || exit 1 
 
@@ -790,9 +793,6 @@ define_pool ${NODES[*]} || exit 1
 
 # prompt to continue before any changes are made...
 (( ! AUTO_YES )) && ! yesno "  Continue? [y|N] " && exit 0
-
-# copy bin/* files to /tmp/ on all nodes including mgmt- and yarn-nodes
-copy_bin ${UNIQ_NODES[*]} || exit 1
 
 # distribute and install the rhs-hadoop repo file to all nodes
 install_repo ${UNIQ_NODES[*]} || exit 1

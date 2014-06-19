@@ -6,7 +6,7 @@
 #   $@ = list of nodes expected to contain the hadoop group(s)
 
 PREFIX="$(dirname $(readlink -f $0))"
-errcnt=0
+errcnt=0; grp_errcnt=0
 
 NODES=($@)
 (( ${#NODES[@]} < 2 )) && {
@@ -21,8 +21,8 @@ for g in $($PREFIX/gen_groups.sh); do # list of hadoop groups (1 now)
 	out="$(eval "$ssh getent group $g")"
 	err=$?
 	if (( err != 0 )) ; then
-	  ((errcnt++))
-	  echo "ERROR $err: group $g may be missing on node $node"
+	  ((grp_errcnt++))
+	  echo "ERROR $err: group \"$g\" missing on $node"
 	  continue
 	fi
 
@@ -31,6 +31,8 @@ for g in $($PREFIX/gen_groups.sh); do # list of hadoop groups (1 now)
 	gid=${gid##*:} # extract gid
 	gids+=($gid)   # in node order
     done # with all nodes for this group
+
+    (( grp_errcnt > 0 )) && continue # next group, don't check consistency
 
     # find unique gids
     uniq_gids=($(printf '%s\n' "${gids[@]}" | sort -u))
@@ -45,6 +47,6 @@ for g in $($PREFIX/gen_groups.sh); do # list of hadoop groups (1 now)
     fi
 done
 
-(( errcnt > 0 )) && exit 1
+(( errcnt > 0 || grp_errcnt > 0 )) && exit 1
 echo "Consistent GID across supplied nodes"
 exit 0
