@@ -3,7 +3,7 @@
 # ldap_clients.sh: install and setup the ipa client on the passed-in nodes
 # for the passed-in ldap/ipa server. Exits 1 on errors; otherwise exits 0.
 # Args:
-#   1=(required) ldap/ipa-server,
+#   1 =(required) ldap/ipa-server,
 #   2+=(required) list of client nodes.
 
 IPA_SERVER="$1"; shift

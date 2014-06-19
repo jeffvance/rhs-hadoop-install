@@ -52,8 +52,6 @@ SYNTAX:
 $ME --version | --help
 
 $ME [-y] [--hadoop-management-node <node>] [--yarn-master <node>] \\
-              [--deploy-ldap-srv[=users] | --ext-ldap-srv host |  \\
-                --local-auth[=users]]                             \\
               [--quiet | --verbose | --debug]  <nodes-spec-list>
 where:
 
@@ -77,15 +75,6 @@ where:
 --hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server which
                   is expected to be outside of the storage pool. Default is
                   localhost.
---deploy-ldap-srv: (optional) create a simple ldap/ipa server on the hadoop
-     [=users]     management node, where the required hadoop users will be
-                  managed, and any supplied extra users (eg. "tom,sue,...") are
-                  are also added. This is the default. 
---local-auth    : (optional) add the required hadoop users via the standard
-     [=users]     linux commands (useradd, groupadd). Extra users separated by
-                  a comma can be added.
---ext-ldap-srv  : (optional) use an external ldap server pointed to by <host>.
-                   Adding extra users is not supported at this time.
 -y              : (optional) auto answer "yes" to all prompts. Default is to 
                   answer a confirmation prompt.
 --quiet         : (optional) output only basic progress/step messages. Default.
@@ -99,6 +88,9 @@ EOF
 }
 
 # parse_cmd: use get_opt to parse the command line. Returns 1 on errors.
+# NOTE: for Denali GA we are *not* supporting any ldap-user related options,
+#   but they are still present in the parser and their global variables are
+#   still present.
 # Sets globals:
 #   AUTO_YES
 #   MGMT_NODE
@@ -641,6 +633,9 @@ function ambari_server() {
 # setup_users: based on the SETUP_ users flag create the required hadoop users.
 # The default is to setup a ldap/ipa server on the management node. Returns 1
 # on errors.
+# NOTE: for Denali we are not supporting automatic creation of users. Consistent
+#   UIDs are still required for the hadoop users but that is the customer's
+#   responsibility.
 # Uses globals:
 #   MGMT_NODE
 #   NODES
@@ -650,6 +645,8 @@ function ambari_server() {
 function setup_users() {
 
   local node; local out; local errcnt=0; local err
+
+  return 0 # don't add any new users
 
   if (( SETUP_LDAP )) ; then # default
     # setup a simple ldap/ipa server on the mgmt node
@@ -676,6 +673,9 @@ function setup_users() {
 # setup_ldap: if the user requested a simple ldap/ipa setup then create the
 # ipa server on the passed-in node, and setup the ipa clients on all storage
 # nodes and on the yarn-master. Returns 1 on errors.
+# NOTE: for Denali we are not supporting automatic creation of users. Consistent
+#   UIDs are still required for the hadoop users but that is the customer's
+#   responsibility.
 # Args:
 #   1=(required) ldap/ipa server node,
 #   2=(required) list of client nodes.
@@ -688,6 +688,8 @@ function setup_ldap() {
   local ldap_server="$1"; shift
   local client_nodes="$@"
   local err; local out
+
+  return 0 # don't create any users
 
   verbose "--- setting up ldap/ipa server on $ldap_server..."
   out="$(/tmp/bin/ldap_server.sh $ldap_server ${EXTRA_USERS//,/ })"
@@ -778,6 +780,9 @@ uniq_nodes UNIQ_NODES ${NODES[*]} $YARN_NODE $MGMT_NODE # sets UNIQ_NODES var
 # check for passwordless ssh connectivity to nodes
 check_ssh ${UNIQ_NODES[*]} || exit 1
 
+# verify user UID and group GID consistency across the cluster
+verify_gid_uids ${NODES[*]} $YARN_NODE || exit 1 
+
 show_todo
 
 # figure out which nodes, if any, will be added to the storage pool
@@ -805,9 +810,6 @@ fi
 
 # install and start the ambari server on the MGMT_NODE
 ambari_server || exit 1
-
-# verify user UID and group GID consistency across the cluster
-verify_gid_uids ${NODES[*]} $YARN_NODE || exit 1 
 
 quiet "All nodes verified/setup for hadoop workloads with no errors"
 exit 0
