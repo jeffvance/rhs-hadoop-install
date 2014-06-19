@@ -317,6 +317,8 @@ function show_todo() {
       quiet "*** Setting up ldap/ipa with standard hadoop users"
     fi
   fi
+
+  echo
 }
 
 # copy_bin: copies all bin/* files to /tmp/ on the passed-in nodes. Returns 1
