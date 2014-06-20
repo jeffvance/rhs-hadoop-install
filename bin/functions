@@ -139,10 +139,10 @@ function get_ambari_repo(){
   return 0
 }
 
-# gluster_mnt_vol: persist the passed volume, node and mount as a native
-# glusterfs-fuse mount with the correct owner and permissions. Note: _netdev is
-# appended to the mount opts.
-# Note: returns the returncode from the mount command.
+# gluster_mnt_vol: on localhost, persist the passed-in volume, node, and mount
+# as a native glusterfs-fuse mount with the correct owner and permissions.
+# Returns the exit-code from the mount command.
+# Note: _netdev is appended to the mount opts.
 # Args:
 #   1=storage node
 #   2=volume name

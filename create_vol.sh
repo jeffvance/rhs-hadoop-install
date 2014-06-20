@@ -239,8 +239,9 @@ function mk_volmnt() {
       if (( err != 0 && err != 32 )) ; then # 32==already mounted
 	((errcnt++))
 	err $err "glusterfs mount on $node: $out"
+      else
+	debug "glusterfs mount on $node: $out"
       fi
-      debug "glusterfs mount on $node: $out"
   done
 
   (( errcnt > 0 )) && return 1
