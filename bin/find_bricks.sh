@@ -1,16 +1,14 @@
 #!/bin/bash
 #
-# find_bricks.sh discovers the bricks for the trusted storage pool, or for the
-# given volume if a volume is supplied. In # either case, the list of bricks,
-# "<node>:/<brick-mnt-dir>", are output, one brick per line. Note that the
-# brick-mnt-dir includes the volume name.
+# find_bricks.sh outputs the bricks for the passed-in volume formatted as:
+# "<node>:/<brick-mnt-dir>", one brick per line. Note that the brick-mnt-dir
+# includes the volume name.
 #
-# REQUIREMENT: at least one volume has to have been created in the pool, even if
-#   <volname> is omitted.
-# Note: "detail" is required in gluster command since the standard output
-#   splits its output in the middle of the hostname when the hostname is long.
+# Note: "detail" is required in gluster vol status command since the standard
+#   output splits its output in the middle of the hostname when the hostname is
+#   long.
 # Args:
-#   $1=volume name in question. Optional, default is every node in pool.
+#   $1=(required) volume name,
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
 
@@ -28,7 +26,10 @@ while getopts ':n:' opt; do
 done
 shift $((OPTIND-1))
 
-VOLNAME="$1" # optional, default=entire pool
+VOLNAME="$1"
+[[ -z "$VOLNAME" ]] && {
+  echo "Syntax error: volume is required"; exit -1; }
+
 [[ -z "$rhs_node" ]] && rhs_node="$HOSTNAME"
 
 [[ "$rhs_node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $rhs_node"
