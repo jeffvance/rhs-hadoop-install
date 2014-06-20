@@ -33,8 +33,9 @@
 function setup_iptables() {
 
   iptables -F
-  service iptables save # write to config file
   service iptables stop
+  service iptables save # write to config file
+  chkconfig iptables off
   return 0
 
   # NOTE: old code remains for documentation purposes...

@@ -154,15 +154,15 @@ function check_open_ports() {
 # suitable server records.
 function check_ntp() {
 
-  local errcnt=0; local warncnt=0
+  local errcnt=0
 
   validate_ntp_conf || ((errcnt++))
 
   # is ntpd configured to run on reboot?
   chkconfig ntpd 
   if (( $? != 0 )); then
-    echo "WARN: ntpd not configured to run on reboot"
-    ((warncnt++))
+    echo "ERROR: ntpd not configured to run on reboot"
+    ((errcnt++))
   fi
 
   # verify that ntpd is running
@@ -173,7 +173,7 @@ function check_ntp() {
   fi
 
   (( errcnt > 0 )) && return 1
-  echo "ntpd is running on $NODE with $warncnt warnings"
+  echo "ntpd is running on $NODE"
   return 0
 }
 
