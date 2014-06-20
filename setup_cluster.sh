@@ -161,9 +161,10 @@ function parse_cmd() {
 
   # check required args
   NODE_SPEC=($@) # array of nodes, brick-mnts, blk-devs -- each separated by ":"
-  [[ -z "$NODE_SPEC" || ${#NODE_SPEC[@]} < 2 ]] && {
-    echo "Syntax error: expect list of 2 or more nodes plus brick mount(s) and block dev(s)";
-    ((errcnt++)); }
+  if [[ -z "$NODE_SPEC" ]] || (( ${#NODE_SPEC[@]} < 2 )) ; then
+    echo "Syntax error: expect list of 2 or more nodes plus brick mount(s) and block dev(s)"
+    ((errcnt++))
+  fi
 
   # mutual exclusion checks and defaults
   # SETUP_LDAP, _EXT_LDAP, _USERS...

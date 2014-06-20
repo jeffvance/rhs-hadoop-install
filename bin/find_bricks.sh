@@ -33,7 +33,7 @@ VOLNAME="$1" # optional, default=entire pool
 
 [[ "$rhs_node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $rhs_node"
 
-eval "$ssh 'gluster volume status $VOLNAME detail 2>&1' >$tmpfile"
+eval "$ssh gluster volume status $VOLNAME detail 2>&1" >$tmpfile
 if (( $? != 0 )) ; then
   cat $tmpfile # show error text
   exit 1

@@ -45,12 +45,12 @@ vol_exists $VOLNAME $rhs_node || {
 cmd=''
 for setting in ${!VOL_SETTINGS[@]}; do
     val="${VOL_SETTINGS[$setting]}"
-    cmd+="gluster volume set $VOLNAME $setting $val; "
+    cmd+="gluster volume set $VOLNAME $setting $val 2>&1; "
 done
 
 [[ "$rhs_node" == "$HOSTNAME" ]] && { ssh=''; ssh_close=''; } \
 				 || { ssh="ssh $rhs_node '"; ssh_close="'"; }
-out="$(eval "$ssh $cmd $ssh_close" 2>&1)"
+out="$(eval "$ssh $cmd $ssh_close")"
 err=$?
 if (( err != 0 )) ; then
   echo -e "ERROR $err: $cmd:\n$out"

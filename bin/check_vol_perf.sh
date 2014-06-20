@@ -45,10 +45,12 @@ if ! vol_exists $VOLNAME $rhs_node ; then
 fi
 
 [[ "$rhs_node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $rhs_node"
-eval "$ssh gluster volume info $VOLNAME >$VOLINFO_TMPFILE 2>&1"
+
+eval "$ssh gluster volume info $VOLNAME 2>&1" >$VOLINFO_TMPFILE
 err=$?
 if (( err != 0 )) ; then
   echo "ERROR $err: vol info: cannot obtain information for $VOLNAME"
+  cat $VOLINFO_TMPFILE # error msg
   exit 1
 fi
 
