@@ -1,10 +1,8 @@
 #!/bin/bash
 #
 # TODO:
-# 1) CDN register each node, including yarn and mgmt nodes
-# 2) verify brick xfs mount options, eg noatime
-# 3) wait for nodes to join trusted pool
-# 4) don't set entry-timeout and attribute-timeout in the vol mount
+# 1) verify brick xfs mount options, eg noatime
+# 2) wait for nodes to join trusted pool
 #
 # setup_cluster.sh accepts a list of nodes:brick-mnts:block-devs, along with
 # the name of the yarn-master and hadoop-mgmt servers, and creates a new trusted
@@ -179,6 +177,14 @@ function parse_cmd() {
   # EXTRA_USERS...
   [[ -z "$EXTRA_USERS" ]] && EXTRA_USERS=$sample_user # always add sample user
 
+  # regardless of which user options may have been specified, force user related 
+  # set all user-related variables to false since we don't create users in the
+  # Denali release. But we're keeping the user-related code in place for
+  # potential future use.
+  SETUP_LDAP=0
+  SETUP_EXT_LDAP=0
+  SETUP_USERS=0
+
   (( errcnt > 0 )) && return 1
   return 0
 }
@@ -191,9 +197,10 @@ function parse_cmd() {
 # the list contains only one brick-mnt/block-dev, but to handle the case of the
 # same node repeated with different brick-mnt and/or block-dev paths we use a 
 # list. 
-# A check is made to see if the management node and/or yarn-master node is inside
-# the storage pool and/or are the same node, and if so a warning is reported and
-# the user is prompted to continue. Returns 1 if user answers no.
+# A check is made to see if the management node and/or yarn-master node is
+# inside the storage pool and/or are the same node, and if so a warning is
+# reported and the user is prompted to continue.
+# Returns 1 on errors and if the user answers no.
 # Uses globals:
 #   AUTO_YES
 #   NODE_SPEC
@@ -213,7 +220,7 @@ function parse_nodes_brkmnts_blkdevs() {
   local brkmnts=(); local blkdev
 
   if [[ -z "$def_brkmnt" || -z "$def_blkdev" ]] ; then
-    echo "Syntax error: expect a brick mount and block device to immediately follow the first node (each separated by a \":\")"
+    echo -e "Syntax error: expect a brick mount and block device to immediately follow the\nfirst node (each separated by a \":\")"
     return 1
   fi
 
@@ -277,6 +284,40 @@ function parse_nodes_brkmnts_blkdevs() {
     (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && return 1
   fi
 
+  return 0
+}
+
+# check_blkdevs: check that the list of block devices are likely to be block
+# devices. Returns 1 on errors.
+# Uses globals:
+#   BLKDEVS
+function check_blkdevs() {
+
+  local node; local nodes; local errcnt=0; local out
+
+  nodes="${!BLKDEVS[@]}" # list of unique storage nodes
+
+  for node in $nodes; do
+      ssh $node "
+	errs=0
+	for blkdev in ${BLKDEVS[$node]}; do
+	    if [[ ! -e \$blkdev ]] ; then
+	      err \"ERROR: \$blkdev does not exist on $node\"
+	      ((errs++))
+	      continue
+	    fi
+	    if [[ -b \$blkdev && ! -L \$blkdev ]] ; then
+	      err -e \"ERROR: \$blkdev on $node must be a logical volume but appears\nto be a raw block device. Expecting: /dev/VGname/LVname\"
+	      ((errs++))
+	      continue
+	    fi
+	done
+	(( errs > 0 )) && exit 1 || exit 0
+	"
+      (( $? != 0 )) && ((errcnt++))
+  done
+
+  (( errcnt > 0 )) && return 1
   return 0
 }
 
@@ -766,13 +807,6 @@ debug "date: $(date)"
 
 parse_cmd $@ || exit -1
 
-# regardless of which user options may have been specified, force user related 
-# settings to false since we don't create users in the Denali release. But
-# we're keeping the code in place for potential future use.
-SETUP_LDAP=0
-SETUP_EXT_LDAP=0
-SETUP_USERS=0
-
 default_nodes MGMT_NODE 'management' YARN_NODE 'yarn-master' || exit -1
 
 # extract nodes, brick mnts and blk devs arrays from NODE_SPEC
@@ -788,6 +822,9 @@ uniq_nodes UNIQ_NODES ${NODES[*]} $YARN_NODE $MGMT_NODE # sets UNIQ_NODES var
 
 # check for passwordless ssh connectivity to nodes
 check_ssh ${UNIQ_NODES[*]} || exit 1
+
+# check that the block devs are (likely to be) block devices
+check_blkdevs || exit 1
 
 # copy bin/* files to /tmp/ on all nodes including mgmt- and yarn-nodes
 copy_bin ${UNIQ_NODES[*]} || exit 1
@@ -811,7 +848,8 @@ echo
 install_repo ${UNIQ_NODES[*]} || exit 1
 
 # create required hadoop users. Needed before creating the required dirs
-# NOTE: this is not supported in Denali, the customer creates the hadoop users
+# NOTE: this is not supported in Denali, the customer must creates the required
+#   hadoop users prior to running this script.
 #setup_users || exit 1
 
 # setup each node for hadoop workloads
