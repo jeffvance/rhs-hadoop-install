@@ -4,14 +4,14 @@
 # 1) verification
 #
 # create_vol.sh accepts a volume name, volume mount path prefix, and a list of
-# two or more "node:brick_mnt" pairs, and creates a new volume with the
-# appropriate performance settings set. Each node spanned by the new volume is
-# checked to make sure it is setup for hadoop workloads. The new volume is
-# startedxi and the volume is mounted with the correct glusterfs-fuse mount
-# options. Lastly, distributed, hadoop-specific directories are created.
-# Note: nodes that are not spanned by the new volume are not modified in any
-#   way. See enable_vol.sh, which establishes a nfs mount on the yarn-master
-#   node and handles core-site file changes.
+# two or more "node:brick_mnt" pairs, and creates a new volume, spanning the
+# supplied nodes, with the appropriate performance settings set. Each node
+# spanned by the new volume is checked to make sure it is setup for hadoop
+# workloads. The new volume is started and the volume is mounted with the
+# correct glusterfs-fuse mount options. Lastly, the distributed hadoop-specific
+# directories are created.
+# Note: nodes that are not spanned by the new volume will still have the volume
+#   mounted so that hadoop jobs running on these nodes have access to the data.
 #
 # See useage() for syntax.
 
@@ -119,18 +119,18 @@ function parse_cmd() {
   return 0
 }
 
-# parse_nodes: set the global NODES array from NODE_SPEC.
+# parse_nodes: set the global VOL_NODES array from NODE_SPEC.
 # Uses globals:
 #   NODE_SPEC
 # Sets globals:
-#   NODES
+#   VOL_NODES
 function parse_nodes() {
 
   local node_spec
 
   # parse out list of nodes, format: "node:brick-mnt"
   for node_spec in ${NODE_SPEC[@]}; do
-      NODES+=(${node_spec%%:*})
+      VOL_NODES+=(${node_spec%%:*})
   done
 }
 
@@ -174,13 +174,43 @@ function parse_brkmnts() {
   return 0
 }
 
+# set_non_vol_nodes: find all nodes in the storage pool that are not spanned by
+# the new volume. Returns 1 on errors.
+# Uses globals:
+#   FIRST_NODE
+#   VOL_NODES
+# Sets globals:
+#   EXTRA_NODES
+function set_non_vol_nodes() {
+
+  local node; local pool; local err
+  EXTRA_NODES=() # set global var, can be empty
+
+  pool=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE)) # nodes in existing pool
+  err=$?
+  (( err !+= 0 )) && {
+    err -e $err "cannot find storage pool nodes\n${pool[*]}";
+    return 1; }
+
+  debug "all nodes in storage pool: ${pool[*]}"
+
+  # find nodes in pool that are not spanned by volume
+  for node in ${pool[@]}; do
+      [[ "${VOL_NODES[*]}" =~ $node ]] && continue
+      EXTRA_NODES+=($node)
+  done
+
+  debug "nodes *not* spanned by new volume: ${EXTRA_NODES[*]}"
+  return 0
+}
+
 # chk_nodes: verify that each node that will be spanned by the new volume is 
 # prepped for hadoop workloads by invoking bin/check_node.sh. Returns 1 on 
 # errors. Assumes all nodes have current bin/ scripts in /tmp.
 # Uses globals:
 #   BRKMNTS
 #   LOGFILE
-#   NODES
+#   VOL_NODES
 #   VOLNAME
 function chk_nodes() {
 
@@ -189,7 +219,7 @@ function chk_nodes() {
   verbose "--- checking all nodes spanned by $VOLNAME..."
 
   # verify that each node is prepped for hadoop workloads
-  for node in ${NODES[@]}; do
+  for node in ${VOL_NODES[@]}; do
       [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
 
       out="$(eval "$ssh /tmp/bin/check_node.sh ${BRKMNTS[$i]}")"
@@ -213,9 +243,10 @@ function chk_nodes() {
 # VOLNAME appended. The mount is persisted in /etc/fstab. Returns 1 on errors.
 # Assumptions:
 #   1) the bin scripts have been copied to each node in /tmp/bin,
-#   2) the hadoop group and users have been created.
+#   2) the required hadoop group and hadoop users have been created.
 # Uses globals:
-#   NODES
+#   EXTRA_NODES (can be empty)
+#   VOL_NODES
 #   VOLMNT
 #   VOLNAME
 function mk_volmnt() {
@@ -224,9 +255,9 @@ function mk_volmnt() {
   local ssh; local ssh_close
   local volmnt="$VOLMNT/$VOLNAME"
 
-  verbose "--- creating glusterfs-fuse mount for $VOLNAME..."
+  verbose "--- creating glusterfs-fuse mounts for $VOLNAME..."
 
-  for node in ${NODES[*]}; do
+  for node in ${VOL_NODES[*]} ${EXTRA_NODES[*]}; do
       [[ "$node" == "$HOSTNAME" ]] && { ssh=''; ssh_close=''; } \
 			           || { ssh="ssh $node '"; ssh_close="'"; }
       out="$(eval "
@@ -245,7 +276,7 @@ function mk_volmnt() {
   done
 
   (( errcnt > 0 )) && return 1
-  verbose "--- created glusterfs-fuse mount for $VOLNAME"
+  verbose "--- created glusterfs-fuse mounts for $VOLNAME"
   return 0
 }
 
@@ -282,9 +313,9 @@ function add_distributed_dirs() {
 # create_vol: gluster vol create VOLNAME with a hard-codes replica 2 and set
 # its performance settings. Returns 1 on errors.
 # Uses globals:
-#   FIRST_NODE
-#   NODES
 #   BRKMNTS
+#   FIRST_NODE
+#   VOL_NODES
 #   VOLNAME
 function create_vol() {
 
@@ -293,8 +324,8 @@ function create_vol() {
   verbose "--- creating the new $VOLNAME volume..."
 
   # create the gluster volume, replica 2 is hard-coded for now
-  for (( i=0; i<${#NODES[@]}; i++ )); do
-      bricks+="${NODES[$i]}:${BRKMNTS[$i]}/$VOLNAME "
+  for (( i=0; i<${#VOL_NODES[@]}; i++ )); do
+      bricks+="${VOL_NODES[$i]}:${BRKMNTS[$i]}/$VOLNAME "
   done
   debug "bricks: $bricks"
 
@@ -353,7 +384,7 @@ function start_vol() {
 
 ME="$(basename $0 .sh)"
 AUTO_YES=0 # assume false
-BRKMNTS=(); NODES=()
+BRKMNTS=(); VOL_NODES=()
 VERBOSE=$LOG_QUIET # default
 errcnt=0
 
@@ -365,30 +396,36 @@ debug "date: $(date)"
 parse_cmd $@ || exit -1
 
 parse_nodes
-FIRST_NODE=${NODES[0]} # use this storage node for all gluster cli cmds
-
-# check for passwordless ssh connectivity to nodes
-check_ssh ${NODES[*]} || exit 1
+FIRST_NODE=${VOL_NODES[0]} # use this storage node for all gluster cli cmds
 
 # make sure the volume doesn't already exist
 vol_exists $VOLNAME $FIRST_NODE && {
   err "volume \"$VOLNAME\" already exists";
   exit 1; }
 
-parse_brkmnts || exit 1
+parse_brkmnts || exit -1
+
+# find the nodes in the pool but not spanned by the new volume
+set_non_vol_nodes || exit 1 # sets EXTRA_NODES array (can be empty)
+
+# check for passwordless ssh connectivity to nodes
+check_ssh ${VOL_NODES[*]} ${EXTRA_NODES[*]} || exit 1
 
 echo
-quiet "*** Volume      : $VOLNAME"
-quiet "*** Nodes       : $(echo ${NODES[*]}   | tr ' ' ', ')"
-quiet "*** Brick mounts: $(echo ${BRKMNTS[*]} | tr ' ' ', ')"
+quiet "*** Volume                  : $VOLNAME"
+quiet "*** Nodes                   : $(echo ${VOL_NODES[*]} | tr ' ' ', ')"
+[[ -n "$EXTRA_NODES" ]] && {
+  quiet "*** Nodes not spanned by vol: $(echo ${EXTRA_NODES[*]} | \
+	tr ' ' ', ')"; }
+quiet "*** Brick mounts            : $(echo ${BRKMNTS[*]}   | tr ' ' ', ')"
 echo
 
 # verify that each node is prepped for hadoop workloads
 chk_nodes  || exit 1
 
 # prompt to continue before any changes are made...
-(( ! AUTO_YES )) && ! yesno "Creating new volume $VOLNAME. Continue? [y|N] " && \
-  exit 0
+(( ! AUTO_YES )) && \
+  ! yesno "Creating new volume $VOLNAME. Continue? [y|N] " && exit 0
 
 # create and start the replica 2 volume and set perf settings
 create_vol || exit 1
