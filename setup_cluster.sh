@@ -290,33 +290,41 @@ function parse_nodes_brkmnts_blkdevs() {
 # check_blkdevs: check that the list of block devices are likely to be block
 # devices. Returns 1 on errors.
 # Uses globals:
-#   BLKDEVS
+#   NODE_BLKDEVS
 function check_blkdevs() {
 
-  local node; local nodes; local errcnt=0; local out
+  local node; local nodes; local err; local errcnt=0; local out
 
-  nodes="${!BLKDEVS[@]}" # list of unique storage nodes
+  debug "---checking block devices..."
+  nodes="${!NODE_BLKDEVS[@]}" # list of unique storage nodes
 
   for node in $nodes; do
-      ssh $node "
-	errs=0
-	for blkdev in ${BLKDEVS[$node]}; do
-	    if [[ ! -e \$blkdev ]] ; then
-	      err \"ERROR: \$blkdev does not exist on $node\"
-	      ((errs++))
-	      continue
-	    fi
-	    if [[ -b \$blkdev && ! -L \$blkdev ]] ; then
-	      err -e \"ERROR: \$blkdev on $node must be a logical volume but appears\nto be a raw block device. Expecting: /dev/VGname/LVname\"
-	      ((errs++))
-	      continue
-	    fi
-	done
-	(( errs > 0 )) && exit 1 || exit 0
-	"
-      (( $? != 0 )) && ((errcnt++))
+      out="$(ssh $node "
+	  errs=0
+	  for blkdev in ${NODE_BLKDEVS[$node]}; do
+	      if [[ ! -e \$blkdev ]] ; then
+	        echo \"ERROR: \$blkdev does not exist on $node\"
+	        ((errs++))
+	        continue
+	      fi
+	      if [[ -b \$blkdev && ! -L \$blkdev ]] ; then
+	        echo -e \"ERROR: \$blkdev on $node must be a logical volume but appears\nto be a raw block device. Expecting: /dev/VGname/LVname\"
+	        ((errs++))
+	        continue
+	      fi
+	  done
+	  (( errs > 0 )) && exit 1 || exit 0
+	")"
+      err=$?
+      if (( err != 0 )) ; then
+	((errcnt++))
+        force "$out"
+      else
+	debug "$out"
+      fi
   done
 
+  debug "done checking block devices"
   (( errcnt > 0 )) && return 1
   return 0
 }
@@ -827,7 +835,7 @@ check_ssh ${UNIQ_NODES[*]} || exit 1
 check_blkdevs || exit 1
 
 # copy bin/* files to /tmp/ on all nodes including mgmt- and yarn-nodes
-copy_bin ${UNIQ_NODES[*]} || exit 1
+copy_bin ${UNIQ_NODES[*]} $HOSTNAME || exit 1
 
 # verify user UID and group GID consistency across the cluster
 verify_gid_uids ${NODES[*]} $YARN_NODE || exit 1 
