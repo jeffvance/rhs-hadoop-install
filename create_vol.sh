@@ -188,7 +188,7 @@ function set_non_vol_nodes() {
 
   pool=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE)) # nodes in existing pool
   err=$?
-  (( err !+= 0 )) && {
+  (( err != 0 )) && {
     err -e $err "cannot find storage pool nodes\n${pool[*]}";
     return 1; }
 
