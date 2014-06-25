@@ -348,14 +348,14 @@ function show_todo() {
   for node in ${NODES[@]}; do
       let fill=(16-${#node}) # to left-justify node
       fmt_node="$node $(printf ' %.0s' $(seq $fill))"
-      quiet "      $fmt_node: $(echo ${NODE_BRKMNTS[$node]} | tr ',' ', ')"
+      quiet "      $fmt_node: ${NODE_BRKMNTS[$node]// /, }"
   done
 
   quiet "*** Block devices"
   for node in ${NODES[@]}; do
       let fill=(16-${#node}) # to left-justify node
       fmt_node="$node $(printf ' %.0s' $(seq $fill))"
-      quiet "      $fmt_node: $(echo ${NODE_BLKDEVS[$node]} | tr ',' ', ')"
+      quiet "      $fmt_node: ${NODE_BLKDEVS[$node]// /, }"
   done
 
   quiet "*** Ambari mgmt node   : $MGMT_NODE"
@@ -513,8 +513,8 @@ function setup_nodes() {
   verbose "--- setup_datanode on all nodes..."
 
   for node in ${NODES[@]}; do
-      brkmnt=${NODE_BRKMNTS[$node]} # 1 or more brk-mnt path(s)
-      blkdev=${NODE_BLKDEVS[$node]} # 1 or more blk-dev path(s)
+      brkmnt="${NODE_BRKMNTS[$node]}" # 1 or more brk-mnt path(s)
+      blkdev="${NODE_BLKDEVS[$node]}" # 1 or more blk-dev path(s)
       do_node "$node" "$blkdev" "$brkmnt" || {
 	  errnodes+="$node ";
 	  ((errcnt++)); }
