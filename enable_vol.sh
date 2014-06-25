@@ -166,11 +166,38 @@ function setup_nodes() {
   return 0
 }
 
-# chk_nodes: this is the first opportunity to setup the yarn-master 
-# server because we need both the yarn-master node and a volume. Next,
-# check_vol is called to verify that VOLNAME has been setup for hadoop
-# workloads, including each node spanned by the volume. If setup issues are
-# detected then, for now, an error is reported and the user needs to re-run
+# yarn_mount: this is the first opportunity to setup the yarn-master server
+# because we need both the yarn-master node and a volume. Invokes setup_yarn.sh
+# script. Returns 1 for errors.
+# Uses globals:
+#   PREFIX
+#   RHS_NODE
+#   VOLNAME
+#   YARN_INSIDE
+#   YARN_NODE
+function yarn_mount() {
+
+  local out; local err
+
+  (( YARN_INSIDE )) && return 0 # already mounted as a storage node
+
+  verbose "--- setting up the yarn-master: $YARN_NODE..."
+
+  out="$($PREFIX/bin/setup_yarn.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME)"
+  err=$?
+  if (( err != 0 )) ; then
+    err -e $err "setup_yarn on $YARN_NODE:\n$out"
+    return 1
+  fi
+
+  debug -e "setup_yarn on $YARN_NODE:\n$out"
+  verbose "--- done setting up the yarn-master"
+  return 0
+}
+
+# chk_nodes: check_vol is called to verify that VOLNAME has been setup for
+# hadoop workloads, including each node spanned by the volume. If setup issues
+# are detected then, for now, an error is reported and the user needs to re-run
 # the setup_cluster script. Later, we may let the user correct issues here.
 # Returns 1 for errors.
 # Uses globals:
@@ -179,23 +206,9 @@ function setup_nodes() {
 #   NODES
 #   RHS_NODE
 #   VOLNAME
-#   YARN_INSIDE
-#   YARN_NODE
 function chk_nodes() {
 
   local errcnt=0; local out; local err
-
-  if (( ! YARN_INSIDE )) ; then # need to setup gluster-fuse mnt
-    verbose "--- setting up the yarn-master: $YARN_NODE..."
-    out="$($PREFIX/bin/setup_yarn.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME)"
-    err=$?
-    if (( err != 0 )) ; then
-      ((errcnt++))
-      err -e $err "setup_yarn on $YARN_NODE:\n$out"
-    else
-      debug -e "setup_yarn on $YARN_NODE:\n$out"
-    fi
-  fi
 
   verbose "--- checking that $VOLNAME is setup for hadoop workloads..."
   out="$($PREFIX/bin/check_vol.sh -n $RHS_NODE $VOLNAME)"
@@ -293,6 +306,9 @@ echo
 # prompt to continue before any changes are made...
 (( ! AUTO_YES )) && ! yesno "Enabling volume $VOLNAME. Continue? [y|N] " && \
   exit 0
+
+# setup volume mount on yarn-node
+yarn_mount || exit 1
 
 # verify nodes spanned by the volume are ready for hadoop workloads, and if
 # not prompt user to fix problems.

@@ -44,24 +44,24 @@ function chk_mnt() {
 
 # check_vol_mnt_attrs: verify that the correct mount settings for VOLNAME have
 # been set on the passed-in node. This include verifying both the "live" 
-# settings, determined by gluster state, and the "persistent" settings,
-# defined in /etc/fstab.
+# settings, defined by gluster state; and the "persistent" settings, defined
+# in /etc/fstab.
 function check_vol_mnt_attrs() {
 
   local node="$1"
   local warncnt=0; local errcnt=0; local err
 
   # live_check: secondary function to check the mount options seen in the
-  # gluster "state" file. This file is produced when sending the glusterf
+  # gluster "state" file. This file is produced when sending the glusterfs
   # client pid the SIGUSR1 signal. Returns 1 on errors, or the chk_mnt()
-  # rtncode.
+  # rtn-code.
   function live_check() {
 
     local node="$1"
     local mntopts; local pid
     local state_file_dir='/var/run/gluster'
     local state_file='glusterdump.' # prefix
-    local section='\[xlator.mount.fuse.priv\]'
+    local section='^\[xlator.mount.fuse.priv\]'
 
     # find correct glusterfs pid
     pid=($(ssh $node "ps -ef | grep 'glusterfs --.*$VOLNAME' | grep -v grep"))
@@ -75,14 +75,14 @@ function check_vol_mnt_attrs() {
 
     # copy state file back to local, expected to be 1 file but could match more
     state_file="$state_file${pid}.dump.[0-9]*" # glob -- don't know full name
-    scp -q $node:/$state_file_dir/$state_file /tmp
+    scp $node:/$state_file_dir/$state_file /tmp
 
     # assign exact state file name
     state_file=($(ls -r /tmp/$state_file)) # array in reverse order (new -> old)
     state_file="${state_file[0]}" # newest
 
     # extract mount opts section from state file
-    mntopts="$(sed -n "/^$section/,/^$/p" $state_file | tr '\n' ' ')"
+    mntopts="$(sed -n "/^$section/,/^\[/p" $state_file | tr '\n' ' ')"
 
     # verify the current mnt options and return chk_mnts rtncode
     chk_mnt "$mntopts" "$CHK_MNTOPTS_LIVE" "$CHK_MNTOPTS_LIVE_WARN"
@@ -117,7 +117,7 @@ function check_vol_mnt_attrs() {
   err=$?
   if (( err == 1 )) ; then
     ((errcnt++))
-  elif (( err = 2 )) ; then
+  elif (( err == 2 )) ; then
     ((warncnt++))
   fi
 
@@ -126,7 +126,7 @@ function check_vol_mnt_attrs() {
   err=$?
   if (( err == 1 )) ; then
     ((errcnt++))
-  elif (( err = 2 )) ; then
+  elif (( err == 2 )) ; then
     ((warncnt++))
   fi
 
@@ -145,13 +145,20 @@ errcnt=0; cnt=0
 PREFIX="$(dirname $(readlink -f $0))"
 
 # assign all combos of mount options (live, fstab, warn, required)
-CHK_MNTOPTS="$($PREFIX/gen_vol_mnt_options.sh)" # required fstab mnt opts
+# required fstab mount options
+CHK_MNTOPTS="$($PREFIX/gen_vol_mnt_options.sh)"
 CHK_MNTOPTS="${CHK_MNTOPTS//,/ }" # replace commas with spaces
-CHK_MNTOPTS_LIVE="$($PREFIX/gen_vol_mnt_options.sh -l)" # live required mnt opts
+
+# required "live" mount options
+CHK_MNTOPTS_LIVE="$($PREFIX/gen_vol_mnt_options.sh -l)"
 CHK_MNTOPTS_LIVE="${CHK_MNTOPTS_LIVE//,/ }"
-CHK_MNTOPTS_WARN="$($PREFIX/gen_vol_mnt_options.sh -w)" # fstab opts to warn on
+
+# fstab opts to warn user if set
+CHK_MNTOPTS_WARN="$($PREFIX/gen_vol_mnt_options.sh -w)"
 CHK_MNTOPTS_WARN="${CHK_MNTOPTS_WARN//,/ }"
-CHK_MNTOPTS_LIVE_WARN="$($PREFIX/gen_vol_mnt_options.sh -wl)" # live-warn opts
+
+# "live" opts to warn user if set
+CHK_MNTOPTS_LIVE_WARN="$($PREFIX/gen_vol_mnt_options.sh -wl)"
 CHK_MNTOPTS_LIVE_WARN="${CHK_MNTOPTS_LIVE_WARN//,/ }"
 
 # parse cmd opts
