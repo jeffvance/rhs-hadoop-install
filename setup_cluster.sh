@@ -290,18 +290,18 @@ function parse_nodes_brkmnts_blkdevs() {
 # check_blkdevs: check that the list of block devices are likely to be block
 # devices. Returns 1 on errors.
 # Uses globals:
+#   NODES (unique storage nodes)
 #   NODE_BLKDEVS
 function check_blkdevs() {
 
-  local node; local nodes; local err; local errcnt=0; local out
+  local node; local blkdev; local err; local errcnt=0; local out
 
   debug "---checking block devices..."
-  nodes="${!NODE_BLKDEVS[@]}" # list of unique storage nodes
 
-  for node in $nodes; do
+  for node in ${NODES[@]}; do
       out="$(ssh $node "
 	  errs=0
-	  for blkdev in ${NODE_BLKDEVS[$node]}; do
+	  for blkdev in ${NODE_BLKDEVS[$node]//,/ }; do
 	      if [[ ! -e \$blkdev ]] ; then
 	        echo \"ERROR: \$blkdev does not exist on $node\"
 	        ((errs++))
@@ -348,14 +348,14 @@ function show_todo() {
   for node in ${NODES[@]}; do
       let fill=(16-${#node}) # to left-justify node
       fmt_node="$node $(printf ' %.0s' $(seq $fill))"
-      quiet "      $fmt_node: $(echo ${NODE_BRKMNTS[$node]} | tr ' ' ', ')"
+      quiet "      $fmt_node: $(echo ${NODE_BRKMNTS[$node]} | tr ',' ', ')"
   done
 
   quiet "*** Block devices"
   for node in ${NODES[@]}; do
       let fill=(16-${#node}) # to left-justify node
       fmt_node="$node $(printf ' %.0s' $(seq $fill))"
-      quiet "      $fmt_node: $(echo ${NODE_BLKDEVS[$node]} | tr ' ' ', ')"
+      quiet "      $fmt_node: $(echo ${NODE_BLKDEVS[$node]} | tr ',' ', ')"
   done
 
   quiet "*** Ambari mgmt node   : $MGMT_NODE"
