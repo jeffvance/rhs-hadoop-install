@@ -79,6 +79,9 @@ function check_vol_mnt_attrs() {
 
     # assign exact state file name
     state_file=($(ls -r /tmp/$state_file)) # array in reverse order (new -> old)
+    (( ${#state_file[@]} == 0 )) && { # missing glusterdump file
+      echo "ERROR: glusterdump state file not generated for PID $pid";
+      return 1; }
     state_file="${state_file[0]}" # newest
 
     # extract mount opts section from state file
