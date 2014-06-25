@@ -85,7 +85,7 @@ function check_vol_mnt_attrs() {
     state_file="${state_file[0]}" # newest
 
     # extract mount opts section from state file
-    mntopts="$(sed -n "/^$section/,/^\[/p" $state_file | tr '\n' ' ')"
+    mntopts="$(sed -n "/$section/,/^\[/p" $state_file | tr '\n' ' ')"
 
     # verify the current mnt options and return chk_mnts rtncode
     chk_mnt "$mntopts" "$CHK_MNTOPTS_LIVE" "$CHK_MNTOPTS_LIVE_WARN"
