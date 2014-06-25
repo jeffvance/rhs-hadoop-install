@@ -217,7 +217,7 @@ function chk_nodes() {
   if (( err != 0 )) ; then # 1 or more issues detected on volume
     ((errcnt++))
     err "issues with 1 or more nodes spanned by $VOLNAME"
-    debug -e "Nodes spanned by $VOLNAME:\n${NODES[*]}"
+    debug "Nodes spanned by $VOLNAME: ${NODES[*]}"
     force "A suggestion is to re-run the setup_cluster.sh script to ensure that"
     force "all nodes in the cluster are set up correctly for Hadoop workloads."
     force "See the $LOGFILE log file for additional info."

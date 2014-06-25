@@ -9,8 +9,7 @@
 
 warncnt=0
 VOLINFO_TMPFILE="$(mktemp --suffix '.volinfo')"
-LAST_N=3 # tail records containing vol settings (vol info cmd)
-TAG='Options Reconfigured:'
+TAG='^Options Reconfigured:'
 PREFIX="$(dirname $(readlink -f $0))"
 
 source $PREFIX/functions # need vol_exists()
@@ -54,18 +53,16 @@ if (( err != 0 )) ; then
   exit 1
 fi
 
-out="$(sed -e "1,/$TAG/d" $VOLINFO_TMPFILE)" # output from tag to eof
-out="${out//: /:}" # "key:value" (no space)
+out="$(sed -n "1,/$TAG/d;s/: /:/;p" $VOLINFO_TMPFILE)" # "setting:value ..."
 
-for setting in $out ; do
-    k=${setting%:*} # strip off the value part
-    v=${setting#*:} # strip off the key part
-    if [[ "$v" != "${EXPCT_SETTINGS[$k]}" ]] ; then
-      echo "WARN: $k set to \"$v\", expect \"${EXPCT_SETTINGS[$k]}\""
+for key in ${!EXPCT_SETTINGS[@]}; do
+    val="${EXPCT_SETTINGS[$key]}"
+    setting="$key:$val"
+    if ! grep -q "$setting" <<<$out ; then
+      echo "WARN: $key not be set to \"$val\""
       ((warncnt++))
     fi
 done
 
-(( warncnt > 0 )) && exit 0 # no errors, just warnings
-echo "All $VOLNAME performance settings are correct"
+(( warncnt == 0 )) && echo "All $VOLNAME performance settings are correct"
 exit 0
