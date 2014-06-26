@@ -68,7 +68,7 @@ function mount_blkdev() {
   local blkdev; local brkmnt; local i=0
   local mntopts="noatime,inode64"
 
-  [[ -z "$BLKDEV" || -z "$BRICKMNT" ]] && return 0 # need both to mount brickt
+  [[ -z "$BLKDEV" || -z "$BRICKMNT" ]] && return 0 # need both to mount bricks
 
   for brkmnt in ${BRICKMNT[@]}; do
       blkdev=${BLKDEV[$i]}
@@ -240,20 +240,14 @@ function setup_xfs() {
   return 0
 }
 
-# add_local_dirs: add the local directories for each brick mount if the brick
-# mount is defined.
+# add_local_dirs: add the local directories under the first brick mount point.
+# So, even if multiple brick mounts are defined for this node, we only create
+# one set of local dirs (eg. mapredlocal). Returns add_dir's rtn-code
 function add_local_dirs() {
-
-  local brkmnt; local errcnt=0
 
   [[ -z "$BRICKMNT" ]] && return 0 # nothing to do
 
-  for brkmnt in ${BRICKMNT[*]}; do
-      $PREFIX/add_dirs.sh -l $brkmnt || ((errcnt++))
-  done
-
-  (( errcnt > 0 )) && return 1
-  return 0
+  $PREFIX/add_dirs.sh -l ${BRICKMNT[0]} # return add_dir's rnt-code
 }
 
 
