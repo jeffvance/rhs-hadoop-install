@@ -252,19 +252,14 @@ function chk_nodes() {
 function mk_volmnt() {
 
   local err; local errcnt=0; local out; local node
-  local ssh; local ssh_close
   local volmnt="$VOLMNT/$VOLNAME"
 
   verbose "--- creating glusterfs-fuse mounts for $VOLNAME..."
 
   for node in ${VOL_NODES[*]} ${EXTRA_NODES[*]}; do
-      [[ "$node" == "$HOSTNAME" ]] && { ssh=''; ssh_close=''; } \
-			           || { ssh="ssh $node '"; ssh_close="'"; }
-      out="$(eval "
-	$ssh
-	  source /tmp/bin/functions # for function call below
+      out="$(ssh $node "
+	  source /tmp/bin/functions
           gluster_mnt_vol $node $VOLNAME $volmnt
-	$ssh_close
       ")"
       err=$?
       if (( err != 0 && err != 32 )) ; then # 32==already mounted

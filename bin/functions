@@ -166,13 +166,14 @@ function gluster_mnt_vol() {
   fi
 
   # always attempt to create the dir, set owner/perms
-  mkdir -p $mnt
-  chmod $perms $mnt
-  chown $owner $mnt
+  mkdir -p $mnt 2>&1     && \
+  chmod $perms $mnt 2>&1 && \
+  chown $owner $mnt 2>&1
+  err=$?
 
   # mount the vol if not already mounted
-  if ! grep -qs $mnt /proc/mounts ; then
-    mount $mnt
+  if (( err == 0 )) && ! grep -qs $mnt /proc/mounts ; then
+    mount $mnt 2>&1
     err=$? # return with mount's exit-value
   fi
 
