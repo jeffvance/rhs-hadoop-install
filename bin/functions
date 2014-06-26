@@ -142,6 +142,7 @@ function get_ambari_repo(){
 # gluster_mnt_vol: on localhost, persist the passed-in volume, node, and mount
 # as a native glusterfs-fuse mount with the correct owner and permissions.
 # Returns the exit-code from the mount command.
+# Note: the order of mounting first then setting perms and owner matters!
 # Note: _netdev is appended to the mount opts.
 # Args:
 #   1=storage node
@@ -165,16 +166,20 @@ function gluster_mnt_vol() {
     echo $node:/$vol $mnt glusterfs $mntopts 0 0 >>/etc/fstab
   fi
 
-  # always attempt to create the dir, set owner/perms
-  mkdir -p $mnt 2>&1     && \
-  chmod $perms $mnt 2>&1 && \
-  chown $owner $mnt 2>&1
-  err=$?
+  # create the mount dir
+  mkdir -p $mnt 2>&1
 
-  # mount the vol if not already mounted
+  # mount the vol if not already mounted. MUST be done before chmod/chown!
   if (( err == 0 )) && ! grep -qs $mnt /proc/mounts ; then
     mount $mnt 2>&1
-    err=$? # return with mount's exit-value
+    err=$?
+    (( err == 32 )) && err=0 # 32==already mounted
+  fi
+
+  if (( err == 0 )) ; then
+    # set owner/perms *after* mounting
+    chmod $perms $mnt 2>&1 && chown $owner $mnt 2>&1
+    err=$?
   fi
 
   return $err

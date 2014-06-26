@@ -39,7 +39,7 @@ function set_yarn() {
 	$ssh_close
        "
   err=$?
-  (( err != 0 && err != 32 )) && { # 32==already mounted
+  (( err != 0 )) && {
     echo "ERROR $err on $YARN_NODE (yarn-master)";
     return 1; }
 

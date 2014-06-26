@@ -262,7 +262,7 @@ function mk_volmnt() {
           gluster_mnt_vol $node $VOLNAME $volmnt
       ")"
       err=$?
-      if (( err != 0 && err != 32 )) ; then # 32==already mounted
+      if (( err != 0 )) ; then
 	((errcnt++))
 	err $err "glusterfs mount on $node: $out"
       else
