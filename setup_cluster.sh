@@ -382,11 +382,11 @@ function copy_bin() {
 
   verbose "--- copying bin/ to /tmp on all nodes..."
 
-  for node in $@ ; do
+  for node in $@; do
       [[ "$nodes_seen" =~ " $node " ]] && continue # dup node
       nodes_seen+=" $node " # frame with spaces
 
-      [[ "$node" == "$HOSTNAME" ]] && cmd="cp -r $PREFIX/bin /tmp" \
+      [[ "$node" == "$HOSTNAME" ]] && cmd="cp -fr $PREFIX/bin /tmp" \
 				   || cmd="scp -qr $PREFIX/bin $node:/tmp"
       out="$(eval "$cmd")"
       err=$?
@@ -853,7 +853,8 @@ echo "*** begin cluster setup... this may take some time..."
 echo
 
 # distribute and install the rhs-hadoop repo file to all nodes
-install_repo ${UNIQ_NODES[*]} || exit 1
+# NO LONGER NEEDED IN DENALI...
+#install_repo ${UNIQ_NODES[*]} || exit 1
 
 # create required hadoop users. Needed before creating the required dirs
 # NOTE: this is not supported in Denali, the customer must creates the required
