@@ -343,19 +343,19 @@ function show_todo() {
   local node; local fmt_node; local fill
 
   echo
-  quiet "*** Nodes              : $(echo ${NODES[*]} | tr ' ' ', ')"
+  quiet "*** Nodes              : $(echo ${NODES[*]} | sed 's/ /, /g')"
   quiet "*** Brick mounts"
   for node in ${NODES[@]}; do
       let fill=(16-${#node}) # to left-justify node
       fmt_node="$node $(printf ' %.0s' $(seq $fill))"
-      quiet "      $fmt_node: ${NODE_BRKMNTS[$node]// /, }"
+      quiet "      $fmt_node: ${NODE_BRKMNTS[$node]//,/, }"
   done
 
   quiet "*** Block devices"
   for node in ${NODES[@]}; do
       let fill=(16-${#node}) # to left-justify node
       fmt_node="$node $(printf ' %.0s' $(seq $fill))"
-      quiet "      $fmt_node: ${NODE_BLKDEVS[$node]// /, }"
+      quiet "      $fmt_node: ${NODE_BLKDEVS[$node]//,/, }"
   done
 
   quiet "*** Ambari mgmt node   : $MGMT_NODE"

@@ -296,9 +296,9 @@ BLKDEVS=($($PREFIX/bin/find_blocks.sh -xn $RHS_NODE $VOLNAME))
 
 echo
 quiet "*** Volume            : $VOLNAME"
-quiet "*** Nodes             : $(echo ${NODES[*]}   | tr ' ' ', ')"
-quiet "*** Brick mounts      : $(echo ${BRKMNTS[*]} | tr ' ' ', ')"
-quiet "*** Block devices     : $(echo ${BLKDEVS[*]} | tr ' ' ', ')"
+quiet "*** Nodes             : $(echo ${NODES[*]}   | sed 's/ /, /g')"
+quiet "*** Brick mounts      : $(echo ${BRKMNTS[*]} | sed 's/ /, /g')"
+quiet "*** Block devices     : $(echo ${BLKDEVS[*]} | sed 's/ /, /g')"
 quiet "*** Ambari mgmt node  : $MGMT_NODE"
 quiet "*** Yarn-master server: $YARN_NODE"
 echo

@@ -413,11 +413,11 @@ check_ssh ${VOL_NODES[*]} ${EXTRA_NODES[*]} || exit 1
 
 echo
 quiet "*** Volume                  : $VOLNAME"
-quiet "*** Nodes                   : $(echo ${VOL_NODES[*]} | tr ' ' ', ')"
+quiet "*** Nodes                   : $(echo ${VOL_NODES[*]} | sed 's/ /, /g')"
 [[ -n "$EXTRA_NODES" ]] && {
   quiet "*** Nodes not spanned by vol: $(echo ${EXTRA_NODES[*]} | \
-	tr ' ' ', ')"; }
-quiet "*** Brick mounts            : $(echo ${BRKMNTS[*]}   | tr ' ' ', ')"
+	sed 's/ /, /g')"; }
+quiet "*** Brick mounts            : $(echo ${BRKMNTS[*]} | sed 's/ /, /g' )"
 echo
 
 # verify that each node is prepped for hadoop workloads
