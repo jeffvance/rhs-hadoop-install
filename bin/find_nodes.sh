@@ -11,6 +11,7 @@
 #      will all be output.
 
 PREFIX="$(dirname $(readlink -f $0))"
+ssh=''; ssh_close=''; rhs_opt=''
 
 # parse cmd opts
 while getopts ':un:' opt; do
@@ -28,12 +29,17 @@ done
 shift $((OPTIND-1))
 
 VOLNAME="$1" # optional, default=entire pool
-[[ -n "$rhs_node" ]] && rhs_node_opt="-n $rhs_node" || rhs_node_opt=''
+
+if [[ -n "$rhs_node" ]] ; then
+  ssh="ssh $rhs_node '"; ssh_close="'"
+  rhs_node_opt="-n $rhs_node"
+fi
 
 if [[ -z "$VOLNAME" ]] ; then # use peer status to get all nodes in pool
   # note: ssh'd-to storage node is not included in peer status
-  NODES=($(ssh $rhs_node "
-	gluster peer status | grep Hostname: | awk '{print \$2}'"))
+  NODES=($(eval "$ssh
+           gluster peer status | grep ^Hostname: | cut -d\" \" -f2 \
+	 $ssh_close"))
   err=$?
 else # use find_bricks which needs at least one volume created
   NODES=($($PREFIX/find_bricks.sh $rhs_node_opt $VOLNAME))

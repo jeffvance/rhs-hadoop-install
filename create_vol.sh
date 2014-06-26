@@ -186,10 +186,10 @@ function set_non_vol_nodes() {
   local node; local pool; local err
   EXTRA_NODES=() # set global var, can be empty
 
-  pool=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE)) # nodes in existing pool
+  pool=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE -u)) # uniq nodes in pool
   err=$?
   (( err != 0 )) && {
-    err -e $err "cannot find storage pool nodes\n${pool[*]}";
+    err $err "cannot find storage pool nodes: ${pool[*]}";
     return 1; }
 
   debug "all nodes in storage pool: ${pool[*]}"
@@ -405,11 +405,14 @@ vol_exists $VOLNAME $FIRST_NODE && {
 
 parse_brkmnts || exit -1
 
+# check for passwordless ssh connectivity to storage nodes
+check_ssh ${VOL_NODES[*]} || exit 1
+
 # find the nodes in the pool but not spanned by the new volume
 set_non_vol_nodes || exit 1 # sets EXTRA_NODES array (can be empty)
 
-# check for passwordless ssh connectivity to nodes
-check_ssh ${VOL_NODES[*]} ${EXTRA_NODES[*]} || exit 1
+# check for passwordless ssh connectivity to extra nodes
+check_ssh ${EXTRA_NODES[*]} || exit 1
 
 echo
 quiet "*** Volume                  : $VOLNAME"

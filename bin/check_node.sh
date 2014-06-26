@@ -66,35 +66,43 @@ function check_brick_mount() {
 }
 
 # check_dirs: check that the required hadoop local directories are present on
-# this node. Also check that the perms and owner are set correctly.
+# this node. Also check that the perms and owner are set correctly. Note: only
+# one mapredlocal dir is needed per node and it could have been created for
+# any of the brick mounts on a node.
 function check_dirs() {
 
-  local dir; local perm; local owner; local tuple
+  local dir; local dircnt; local brick
+  local perm; local owner; local tuple
   local out; local errcnt=0; local warncnt=0
+  local brks_on_node="$($PREFIX/find_brick_mnts.sh -h $HOSTNAME -x)"
 
   for tuple in $($PREFIX/gen_dirs.sh -l); do # only local dirs
-      dir="$BRICKMNT/${tuple%%:*}"
+      dircnt=0
       perm=${tuple%:*}; perm=${perm#*:}
       owner=${tuple##*:}
 
-      if [[ ! -d $dir ]] ; then
-	echo "ERROR: $dir is missing on $NODE"
-	((errcnt++))
-	continue # next dir
-      fi
+      for brick in $brks_on_node; do
+	  dir="$brick/${tuple%%:*}" # dir may not exist under this mount
+	  [[ ! -d $dir ]] && continue # next dir
+	  ((dircnt++)) # dir exists
+	  if (( dircnt > 1 )) ; then
+	    echo "WARN: $dir only needs to exist under one brick"
+	    ((warncnt++))
+	  fi
 
-      # check dir's perms and owner
-      out="$(stat -c %a $dir)"
-      [[ ${#out} == 3 ]] && out="0$out"; # leading 0
-      if [[ $out != $perm ]] ; then
-	echo "WARN: $dir perms are $out, expected to be: $perm"
-	((warncnt++))
-      fi
-      out="$(stat -c %U $dir)"
-      if [[ $out != $owner ]] ; then
-	echo "WARN: $dir owner is $out, expected to be: $owner"
-	((warncnt++))
-      fi
+	  # check dir's perms and owner
+	  out="$(stat -c %a $dir)"
+	  [[ ${#out} == 3 ]] && out="0$out"; # leading 0
+	  if [[ $out != $perm ]] ; then
+	    echo "WARN: $dir perms are $out, expected to be: $perm"
+	    ((warncnt++))
+	  fi
+	  out="$(stat -c %U $dir)"
+	  if [[ $out != $owner ]] ; then
+	    echo "WARN: $dir owner is $out, expected to be: $owner"
+	    ((warncnt++))
+	  fi
+      done
   done
 
   (( errcnt > 0 )) && return 1
@@ -111,13 +119,13 @@ function check_open_ports() {
 
   # return 0 if iptables is not even running
   if ! service iptables status >& /dev/null ; then
-    echo "iptables not running on $HOSTNAME"
+    echo "iptables not running on $NODE"
     return 0
   fi
 
   # return 0 if iptables is running but all ports are open
   if ! iptables -S | grep -v ACCEPT ; then
-    echo "no iptables rules, all ports are open on $HOSTNAME"
+    echo "no iptables rules, all ports are open on $NODE"
     return 0
   fi
 

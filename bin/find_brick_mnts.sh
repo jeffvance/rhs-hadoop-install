@@ -5,23 +5,28 @@
 # case, the list of brick-mnts are output, one mount per line. Format:
 # "<node>:/<brick-mnt-dir>"
 # Syntax:
-#  $1=volume name
+#   $1=volume name (optional), default='all',
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
-#      storage node.
+#      storage node,
+#   -h=(host) if specified, means only output brick mounts for this host.
 #   -x=(no-node) if specified, means only output the brick-mnt portion, omit 
 #      each node.
 
 INCL_NODE=1 # true, default
+HOST_FILTER='' # don't filter by host
 PREFIX="$(dirname $(readlink -f $0))"
 
 # parse cmd opts
-while getopts ':xn:' opt; do
+while getopts ':xn:h:' opt; do
     case "$opt" in
       n)
         rhs_node="$OPTARG"
         ;;
       x)
         INCL_NODE=0 # false
+        ;;
+      h)
+        HOST_FILTER="$OPTARG"
         ;;
       \?) # invalid option
         ;;
@@ -38,7 +43,9 @@ BRICKS="$($PREFIX/find_bricks.sh $rhs_node $VOLNAME)"
   exit 1; }
 
 for brick in $BRICKS; do
-    (( INCL_NODE )) && echo -n "${brick%:*}:" # node:
+    node="${brick%:*}"
+    [[ -n "$HOST_FILTER" && "$node" != "$HOST_FILTER" ]] && continue # skip
+    (( INCL_NODE )) && echo -n "${node}:"
     brick=${brick%/*} # omit trailing volname
-    echo ${brick#*:}  # omit node
+    echo ${brick#*:}  # don't echo node twice
 done
