@@ -1,15 +1,16 @@
 #!/bin/bash
 #
-# find_bricks.sh outputs the bricks for the passed-in volume formatted as:
-# "<node>:/<brick-mnt-dir>", one brick per line. Note that the brick-mnt-dir
-# includes the volume name.
+# find_bricks.sh outputs the bricks for either the passed-in volume or all
+# volumes, formatted as:
+#   "<node>:/<brick-mnt-dir>", 
+# one brick per line. Note that <brick-mnt-dir> includes the volume name.
 #
 # Note: "detail" is required in gluster vol status command since the standard
 #   output splits its output in the middle of the hostname when the hostname is
 #   long.
 # Args:
-#   $1=(required) volume name,
-#   -n=any storage node. Optional, but if not supplied then localhost must be a
+#   $1=(optional) volume name,
+#   -n=(optional) any storage node, if not supplied then localhost must be a
 #      storage node.
 
 tmpfile='/tmp/volstatus.out'
@@ -27,8 +28,7 @@ done
 shift $((OPTIND-1))
 
 VOLNAME="$1"
-[[ -z "$VOLNAME" ]] && {
-  echo "Syntax error: volume is required"; exit -1; }
+[[ -z "$VOLNAME" ]] && VOLNAME='all'
 
 [[ -z "$rhs_node" ]] && rhs_node="$HOSTNAME"
 
@@ -39,7 +39,7 @@ if (( $? != 0 )) ; then
   cat $tmpfile # show error text
   exit 1
 fi
-grep -w 'Brick' $tmpfile | awk '{print $4}'
+grep -w '^Brick' $tmpfile | awk '{print $4}'
 exit
 
 ### Note: if we later need to add back --xml to gluster vol status then the
