@@ -795,8 +795,7 @@ function verify_gid_uids() {
 
 # update_yarn: yum installs the latest glusterfs client bits on the yarn node
 # if the gluster client version is older than 3.6. The yarn node is expected to
-# be a RHEL 6.5 server It could be a storage node but rhel 6.5 is recommended.
-# Returns 1 for errors.
+# be a RHEL 6.5 server, but it could be a storage node. Returns 1 for errors.
 # Uses globals:
 #   YARN_INSIDE
 #   YARN_NODE
@@ -806,9 +805,7 @@ function update_yarn() {
   local major; local minor
   local gluster_rpms='glusterfs glusterfs-api glusterfs-fuse glusterfs-libs'
 
-  (( YARN_INSIDE )) && return 0 # rhs nodes have correct client bits
-
-  verbose "--- updating yarn-master ($YARN_NODE) with latest gluster client..."
+  (( YARN_INSIDE )) && return 0 # rhs nodes have the correct client bits
 
   out=($(ssh $YARN_NODE "yum list glusterfs 2>&1 | grep glusterfs"))
   if (( $? != 0 || ${#out} == 0 )) ; then
@@ -824,6 +821,7 @@ function update_yarn() {
 
   # if glusterfs version is lower than 3.6 yum install newer bits
   if (( major < 3 || ( major == 3 && minor <= 5 ) )) ; then
+    verbose "--- updating yarn-master ($YARN_NODE) to latest gluster client..."
     out="$(ssh $YARN_NODE "yum -y install $gluster_rpms 2>&1")"
     err=$?
     if (( err != 0 )) ; then
@@ -831,9 +829,11 @@ function update_yarn() {
       return 1
     fi
     debug "yum install $gluster_rpms: $out"
+    verbose "--- done updating $YARN_NODE to latest gluster client bits"
+  else
+    verbose "--- yarn-master ($YARN_NODE) is ok at gluster version $gluster_ver"
   fi
 
-  verbose "--- done updating $YARN_NODE with latest gluster client bits"
   return 0
 }
 
