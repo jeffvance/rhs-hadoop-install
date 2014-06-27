@@ -799,11 +799,34 @@ function verify_gid_uids() {
 # Uses globals:
 #   YARN_INSIDE
 #   YARN_NODE
+# NOTE: the code below is not GA ready due to rhel 6.5 not having the latest
+#  glusterfs client bits in place. In order for the installer to work for Dev
+#  and for QE it is coded for a pre-GA environment, meaning glusterfs 3.4 client
+#  bits are expected on rhel 6.5.
 function update_yarn() {
 
   local out; local err; local gluster_ver
   local major; local minor
   local gluster_rpms='glusterfs glusterfs-api glusterfs-fuse glusterfs-libs'
+
+  # this nested function should be deleted once we reach GA. It exists soley
+  # to bridge the gap between "now" and GA so that Dev and QE can use the
+  # installer.
+  function pre_GA_update() {
+
+    local repo_file='rhs3.0-client-el6.repo'
+
+    # create repo file for rhel 6.5 that points to the gluster 3.6 client bits
+    cat <<EOF >/tmp/$repo_file
+[3.0-client-el6]
+name=rhs3.0-client-el6
+baseurl=http://rhsqe-repo.lab.eng.blr.redhat.com/rhs3.0-client-latest-el6
+enabled=1
+gpgcheck=0
+EOF
+    # copy repo file to yarn-node
+    scp -q /tmp/$repo_file $YARN_NODE:/etc/yum.repos.d/
+  }
 
   (( YARN_INSIDE )) && return 0 # rhs nodes have the correct client bits
 
@@ -822,6 +845,11 @@ function update_yarn() {
   # if glusterfs version is lower than 3.6 yum install newer bits
   if (( major < 3 || ( major == 3 && minor <= 5 ) )) ; then
     verbose "--- updating yarn-master ($YARN_NODE) to latest gluster client..."
+
+    ### NOTE: the function below is temporary until we GA, after-which it
+    ###       should be removed.
+    pre_GA_update
+
     out="$(ssh $YARN_NODE "yum -y install $gluster_rpms 2>&1")"
     err=$?
     if (( err != 0 )) ; then
