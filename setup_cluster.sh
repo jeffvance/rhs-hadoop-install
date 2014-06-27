@@ -793,6 +793,50 @@ function verify_gid_uids() {
   return 0
 } 
 
+# update_yarn: yum installs the latest glusterfs client bits on the yarn node
+# if the gluster client version is older than 3.6. The yarn node is expected to
+# be a RHEL 6.5 server It could be a storage node but rhel 6.5 is recommended.
+# Returns 1 for errors.
+# Uses globals:
+#   YARN_INSIDE
+#   YARN_NODE
+function update_yarn() {
+
+  local out; local err; local gluster_ver
+  local major; local minor
+  local gluster_rpms='glusterfs gluster-api glusterfs-fuse glusterfs-libs'
+
+  (( YARN_INSIDE )) && return 0 # rhs nodes have correct client bits
+
+  verbose "--- updating yarn-master ($YARN_NODE) with latest gluster client..."
+
+  out=($(ssh $YARN_NODE "yum list glusterfs | grep glusterfs"))
+  if (( $? != 0 || ${#out} == 0 )) ; then
+    err "can't yum list glusterfs"
+    return 1
+  fi
+  gluster_ver=${out[1]/rhs-*/}
+  debug "$YARN_NODE glusterfs version: $gluster_ver"
+
+  # extract major and minor version numbers
+  major=${gluster_ver%%.*}
+  minor=${gluster_ver#*.}; minor=${minor%%.*}
+
+  # if glusterfs version is lower than 3.6 yum install newer bits
+  if (( major < 3 || ( major == 3 && minor <= 5 ) )) ; then
+    out="$(ssh $YARN_NODE "yum -y install $gluster_rpms")"
+    err=$?
+    if (( err != 0 )) ; then
+      err $err "yum install $gluster_rpms: $out"
+      return 1
+    fi
+    debug "yum install $gluster_rpms: $out"
+  fi
+
+  verbose "--- done updating $YARN_NODE with latest gluster client bits"
+  return 0
+}
+
 
 ## main ##
 
@@ -871,6 +915,9 @@ fi
 
 # install and start the ambari server on the MGMT_NODE
 ambari_server || exit 1
+
+# set up yarn-master with the correct glusterfs bits
+update_yarn || exit 1
 
 quiet "All nodes verified/setup for hadoop workloads with no errors"
 exit 0

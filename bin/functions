@@ -44,8 +44,7 @@ function debug() {
   display $opt "DEBUG: $1" $LOG_DEBUG
 }
 
-
-# default_nodes: Detects the any/all of the supplied *_node options has been 
+# default_nodes: Detects if any/all of the supplied *_node options have been 
 # omitted and prompts the user to confirm if they wish to use localhost as 
 # the missing node's default value. Following each option is its human readable
 # name, eg 'MGMT_NODE' 'management'. Returns 1 if the answer is no.
