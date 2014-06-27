@@ -303,12 +303,12 @@ function check_blkdevs() {
 	  errs=0
 	  for blkdev in ${NODE_BLKDEVS[$node]//,/ }; do
 	      if [[ ! -e \$blkdev ]] ; then
-	        echo \"ERROR: \$blkdev does not exist on $node\"
+	        echo \"\$blkdev does not exist on $node\"
 	        ((errs++))
 	        continue
 	      fi
 	      if [[ -b \$blkdev && ! -L \$blkdev ]] ; then
-	        echo -e \"ERROR: \$blkdev on $node must be a logical volume but appears\nto be a raw block device. Expecting: /dev/VGname/LVname\"
+	        echo \"\$blkdev on $node must be a logical volume but appearsto be a raw block device. Expecting: /dev/VGname/LVname\"
 	        ((errs++))
 	        continue
 	      fi
@@ -318,8 +318,8 @@ function check_blkdevs() {
       err=$?
       if (( err != 0 )) ; then
 	((errcnt++))
-        force "$out"
-      else
+        err "$out"
+      elif [[ -n "$out" ]] ; then
 	debug "$out"
       fi
   done

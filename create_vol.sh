@@ -415,6 +415,7 @@ quiet "*** Nodes                   : $(echo ${VOL_NODES[*]} | sed 's/ /, /g')"
 [[ -n "$EXTRA_NODES" ]] && {
   quiet "*** Nodes not spanned by vol: $(echo ${EXTRA_NODES[*]} | \
 	sed 's/ /, /g')"; }
+quiet "*** Volume mount            : $VOLMNT"
 quiet "*** Brick mounts            : $(echo ${BRKMNTS[*]} | sed 's/ /, /g' )"
 echo
 
