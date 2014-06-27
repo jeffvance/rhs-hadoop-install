@@ -401,71 +401,6 @@ function copy_bin() {
   return 0
 }
 
-# install_repo: copies the repo file expected to be on the install-from node
-# (localhost) to the passed-in nodes, and yum installs the packages. Returns 1
-# for errors.
-function install_repo() {
-
-  local nodes="$@"
-  local node; local errcnt=0; local err
-  local repo_file='/etc/yum.repos.d/rhs-hadoop.repo'
-
-  # nested function copies the repo file to the passed-in node.
-  # Returns 1 on errors.
-  function cp_repo() {
-
-    local node="$1"; local err
-
-    out="$(scp $repo_file $node:$repo_file)"
-    err=$?
-    if (( err != 0 )) ; then
-      err -e $err "copying $file to $node:\n$out"
-      return 1
-    fi
-    debug -e "copying repo file to $node in $(dirname $repo_file):\n$out"
-    return 0
-  }
-
-  # nested function installs the package on the passed-in node.
-  # Returns 1 on errors.
-  function install_repo() {
-
-    local node="$1"; local err
-
-    out="$(ssh $node 'yum install -y --nogpgcheck rhs-hadoop 2>&1')"
-    err=$?
-    if (( err != 0 )) ; then
-      err -e $err "yum installing $file on $node:\n$out"
-      return 1
-    fi
-    debug -e "yum install repo file on $node:\n$out"
-    return 0
-  }
-
-  ## main ##
-
-  verbose "--- copying $repo_file and installing on all nodes..."
-
-  [[ ! -f "$repo_file" ]] && {
-    err "$repo_file is missing. Cannot install rhs-hadoop package on cluster";
-    return 1; }
-
-  for node in $nodes; do
-      err=0
-      if [[ "$node" != "$HOSTNAME" ]] ; then
-	cp_repo $node
-        err=$?
-        (( err != 0 )) && ((errcnt++))
-      fi
-      if (( err == 0 )) ; then
-	install_repo $node || ((errcnt++))
-      fi
-  done
-
-  (( errcnt > 0 )) && return 1
-  return 0
-}
-
 # setup_nodes: setup each node for hadoop workloads by invoking bin/
 # setup_datanodes.sh, which is also run for the yarn-master node if it is
 # outside of the storage pool. Note: if the hadoop mgmt-node is outside of the
@@ -925,10 +860,6 @@ define_pool ${NODES[*]} || exit 1
 echo
 echo "*** begin cluster setup... this may take some time..."
 echo
-
-# distribute and install the rhs-hadoop repo file to all nodes
-# NO LONGER NEEDED IN DENALI...
-#install_repo ${UNIQ_NODES[*]} || exit 1
 
 # create required hadoop users. Needed before creating the required dirs
 # NOTE: this is not supported in Denali, the customer must creates the required
