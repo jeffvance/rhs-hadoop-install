@@ -804,15 +804,15 @@ function update_yarn() {
 
   local out; local err; local gluster_ver
   local major; local minor
-  local gluster_rpms='glusterfs gluster-api glusterfs-fuse glusterfs-libs'
+  local gluster_rpms='glusterfs glusterfs-api glusterfs-fuse glusterfs-libs'
 
   (( YARN_INSIDE )) && return 0 # rhs nodes have correct client bits
 
   verbose "--- updating yarn-master ($YARN_NODE) with latest gluster client..."
 
-  out=($(ssh $YARN_NODE "yum list glusterfs | grep glusterfs"))
+  out=($(ssh $YARN_NODE "yum list glusterfs 2>&1 | grep glusterfs"))
   if (( $? != 0 || ${#out} == 0 )) ; then
-    err "can't yum list glusterfs"
+    err "can't yum list glusterfs: ${out[*]}"
     return 1
   fi
   gluster_ver=${out[1]/rhs-*/}
@@ -824,7 +824,7 @@ function update_yarn() {
 
   # if glusterfs version is lower than 3.6 yum install newer bits
   if (( major < 3 || ( major == 3 && minor <= 5 ) )) ; then
-    out="$(ssh $YARN_NODE "yum -y install $gluster_rpms")"
+    out="$(ssh $YARN_NODE "yum -y install $gluster_rpms 2>&")"
     err=$?
     if (( err != 0 )) ; then
       err $err "yum install $gluster_rpms: $out"
