@@ -596,9 +596,9 @@ function define_pool() {
     verbose "storage pool exists"
 
     # find all nodes in trusted pool
-    POOL=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE)) # nodes in existing pool
+    POOL=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE -u))
     FIRST_NODE=${POOL[0]} # peer probe from this node
-    debug "existing pool nodes: ${POOL[@]}"
+    debug "existing pool nodes: ${POOL[*]}"
 
     # find nodes in pool that are not supplied $nodes (ie. unique)
     for node in ${nodes[@]}; do
@@ -608,18 +608,18 @@ function define_pool() {
 
     # are we adding nodes, or just checking existing nodes?
     POOL=(${uniq[@]}) # nodes to potentially add to existing pool, can be 0
-    debug "unique nodes to add to pool: ${POOL[@]}"
+    debug "unique nodes to add to pool: ${POOL[*]}"
 
     if (( ${#uniq[@]} > 0 )) ; then # we have nodes not in pool
       echo
-      force -e "The following nodes are not in the existing storage pool:\n  ${uniq[@]}"
+      force -e "The following nodes are not in the existing storage pool:\n  ${uniq[*]}"
       (( ! AUTO_YES )) && ! yesno  "  Add nodes? [y|N] " && return 1 # will exit
     else # no unique nodes
       quiet "No new nodes being added so checking/setting up existing nodes..."
     fi
 
   else # no pool
-    quiet "Will create a storage pool consisting of ${#nodes[@]} new nodes..."
+    quiet "Will create a storage pool consisting of ${#nodes[*]} new nodes..."
     POOL=(${nodes[@]})
   fi
 
@@ -802,7 +802,9 @@ function verify_gid_uids() {
 # NOTE: the code below is not GA ready due to rhel 6.5 not having the latest
 #  glusterfs client bits in place. In order for the installer to work for Dev
 #  and for QE it is coded for a pre-GA environment, meaning glusterfs 3.4 client
-#  bits are expected on rhel 6.5.
+#  bits are expected on rhel 6.5. However, by simply deleting the nested
+#  function, pre_GA_update(), and the call to it below, this code should be 
+#  good-to-go for Denali GA.
 function update_yarn() {
 
   local out; local err; local gluster_ver
