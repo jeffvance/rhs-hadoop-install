@@ -824,7 +824,7 @@ function update_yarn() {
 
   # if glusterfs version is lower than 3.6 yum install newer bits
   if (( major < 3 || ( major == 3 && minor <= 5 ) )) ; then
-    out="$(ssh $YARN_NODE "yum -y install $gluster_rpms 2>&")"
+    out="$(ssh $YARN_NODE "yum -y install $gluster_rpms 2>&1")"
     err=$?
     if (( err != 0 )) ; then
       err $err "yum install $gluster_rpms: $out"
