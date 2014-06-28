@@ -707,6 +707,26 @@ EOF
     scp -q /tmp/$repo_file $YARN_NODE:/etc/yum.repos.d/
   }
 
+  # this nested function adds the appropriate channel so that rhel 6.5 can be
+  # updated to glusterfs 3.6+ client bits.  Returns 1 on errors.
+  # NOTE: for pre-GA this function is not invoked.
+  function post_GA_update() {
+
+    local out; local err
+    local channel='rhel-x86_64-server-rhsclient-6'
+
+    out="$(ssh $YARN_NODE "rhn-channel --add --channel=$channel")"
+    err=$?
+    if (( err != 0 )) ; then
+      err -e $err "rhn-channel add $channel:\n$out"
+      return 1
+    fi
+
+    debug "rhn-channel add $channel: $out"
+    return 0
+  }
+
+  ## main
   (( YARN_INSIDE )) && return 0 # rhs nodes have the correct client bits
 
   out=($(ssh $YARN_NODE "yum list glusterfs 2>&1 | grep glusterfs"))
@@ -726,8 +746,9 @@ EOF
     verbose "--- updating yarn-master ($YARN_NODE) to latest gluster client..."
 
     ### NOTE: the function below is temporary until we GA, after-which it
-    ###       should be removed.
+    ###   should be removed and the post_GA_update function uncommented.
     pre_GA_update
+    #post_GA_update
 
     out="$(ssh $YARN_NODE "yum -y install $gluster_rpms 2>&1")"
     err=$?
