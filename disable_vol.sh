@@ -204,7 +204,7 @@ echo
 quiet "*** Nodes    : $(echo ${NODES[*]} | sed 's/ /, /g')"
 echo
 
-force -e "$VOLNAME will be removed from all hadoop config files and thus will not be available\nfor any hadoop workloads"
+force -e "$VOLNAME will be removed from all hadoop config files and thus will not\nbe available for any hadoop workloads."
 if (( AUTO_YES )) || yesno "  Continue? [y|N] " ; then
   edit_core_site || exit 1
 fi

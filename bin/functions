@@ -215,6 +215,28 @@ function quiet() {
   display $opt "$1" $LOG_QUIET
 }
 
+# uniq_nodes: find the unique nodes in the list of nodes provided and set the
+# passed-in variable name to this list.
+# Args:
+#   1=variable *name* to hold list of uniq nodes
+#   2+=list of nodes
+# Sets globals:
+#   <varname in $1>
+function uniq_nodes() {
+
+  local varname=$1; shift
+  local nodes=($@)
+  local node; local uniq=()
+ 
+  for node in ${nodes[*]}; do
+      [[ "${uniq[*]}" =~ $node ]] && continue
+      uniq+=($node)
+  done
+
+  # set passed-in global var to $uniq array
+  eval "$varname=(${uniq[*]})"
+}
+
 # validate_ntp_conf: validate the ntp config file by ensuring there is at least
 # one time-server suitable for ntp use. Return 1 for errors.
 function validate_ntp_conf(){
@@ -259,6 +281,37 @@ function verbose() {
     opt="$1"; shift # assume echo option
   fi
   display $opt "$1" $LOG_VERBOSE
+}
+
+# verify_gid_uids: checks that the UIDs and GIDs for the hadoop users and hadoop
+# group are the same numeric value across all of the passed-in nodes. Returns 1
+# on inconsistency errors. Assumes utility scripts are in /tmp/bin.
+function verify_gid_uids() {
+
+  local nodes="$@"
+  local errcnt=0; local out; local err
+
+  verbose "--- verifying consistent hadoop UIDs and GIDs across nodes..."
+
+  out="$(/tmp/bin/check_gids.sh $nodes)"
+  err=$?
+  debug "check_gids: $out"
+  if (( err != 0 )) ; then
+    ((errcnt++))
+    err -e "inconsistent GIDs:\n$out"
+  fi
+
+  out="$(/tmp/bin/check_uids.sh $nodes)"
+  err=$?
+  debug "check_uids: $out"
+  if (( err != 0 )) ; then
+   ((errcnt++))
+    err -e "inconsistent UIDs:\n$out"
+  fi
+
+  (( errcnt > 0 )) && return 1
+  verbose "--- completed verifying hadoop UIDs and GIDs"
+  return 0
 }
 
 # vol_exists: invokes gluster vol info to see if VOLNAME exists. Returns 1 on

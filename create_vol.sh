@@ -205,16 +205,21 @@ function set_non_vol_nodes() {
 }
 
 # chk_nodes: verify that each node that will be spanned by the new volume is 
-# prepped for hadoop workloads by invoking bin/check_node.sh. Returns 1 on 
+# prepped for hadoop workloads by invoking bin/check_node.sh. Also, verify that
+# the hadoop GID and user UIDs are consistent across the nodes. Returns 1 on
 # errors. Assumes all nodes have current bin/ scripts in /tmp.
 # Uses globals:
 #   BRKMNTS
+#   EXTRA_NODES
 #   LOGFILE
 #   VOL_NODES
 #   VOLNAME
 function chk_nodes() {
 
   local i=0; local node; local err; local errcnt=0; local out; local ssh
+
+  verify_gid_uids ${VOL_NODES[*]} ${EXTRA_NODES[*]}
+  (( $? != 0 )) && ((errcnt+))
 
   verbose "--- checking all nodes spanned by $VOLNAME..."
 

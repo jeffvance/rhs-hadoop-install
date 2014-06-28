@@ -210,7 +210,11 @@ function chk_nodes() {
 
   local errcnt=0; local out; local err
 
+  verify_gid_uids ${NODES[*]} $YARN_NODE 
+  (( $? != 0 )) && ((errcnt+))
+
   verbose "--- checking that $VOLNAME is setup for hadoop workloads..."
+
   out="$($PREFIX/bin/check_vol.sh -n $RHS_NODE $VOLNAME)"
   err=$?
   debug "check_vol: $out"

@@ -5,28 +5,24 @@
 # 2) wait for nodes to join trusted pool
 #
 # setup_cluster.sh accepts a list of nodes:brick-mnts:block-devs, along with
-# the name of the yarn-master and hadoop-mgmt servers, and creates a new trusted
+# the name of the yarn-master and hadoop-mgmt servers, and creates a trusted
 # pool with each node in the node-list setup as a storage/data node. If the pool
-# already exists then the supplied nodes are setup anyway as a verification step.
-# The yarn and mgmt nodes are expected to be outside of the pool, and not to be
-# the same server; however these recommendations are not enforced by the script.
-#
-# Before any steps can be performed the user-created repo file is copied to all
-# nodes provided (including the yarn-master and management nodes), and a yum
-# install is done to install the rhs-hadoop plugin and the rhs-hadoop-install
-# installer. That is how this script become available.
+# already exists then the supplied nodes are checked (actually setup anyway) as
+# a verification step.
+# The yarn and mgmt nodes are expected to be rhel 6.5 servers outside of the
+# pool, and not to be the same server; however these recommendations are not
+# enforced by the script.
 #
 # On each node the blk-device is setup as an xfs file system and mounted to the
-# brick mount dir, ntp config is verified, required gluster & ambari ports are
-# checked to be open, selinux is set to permissive, hadoop required users are
-# optionally created, and the required hadoop local directories are created
-# (note: the required distributed dirs are not created here).
+# brick mount dir, ntp config is verified, iptables is disabled, selinux is set
+# to permissive, and the required hadoop local directories are created (note:
+# the required distributed dirs are not created here).
 #
-# Also, on all nodes (assumed to be storage- data-nodes) and on the yarn-master
-# server node, the ambari agent is installed (updated if present) and started.
-# If the hadoop management node is outside of the storage pool then it will not
-# have the agent installed. Last, the ambari-server is installed and started on
-# the mgmt-node.
+# Also, on all passed-in nodes (assumed to be storage nodes) and on the yarn-
+# master server node, the ambari agent is installed (updated if present) and
+# started. If the hadoop management node is outside of the storage pool then it
+# will not have the agent installed. Last, the ambari-server is installed and
+# started on the mgmt-node.
 #
 # Tasks related to volumes and/or ambari setup are not done here.
 #
@@ -177,7 +173,6 @@ function parse_cmd() {
   # EXTRA_USERS...
   [[ -z "$EXTRA_USERS" ]] && EXTRA_USERS=$sample_user # always add sample user
 
-  # regardless of which user options may have been specified, force user related 
   # set all user-related variables to false since we don't create users in the
   # Denali release. But we're keeping the user-related code in place for
   # potential future use.
@@ -486,28 +481,6 @@ function pool_exists() {
   return 0
 }
 
-# uniq_nodes: find the unique nodes in the list of nodes provided and set the 
-# passed-in variable name to this list. 
-# Args:
-#   1=variable *name* to hold list of uniq nodes
-#   2+=list of nodes
-# Sets globals:
-#   <varname in $1>
-function uniq_nodes() {
-
-  local varname=$1; shift
-  local nodes=($@)
-  local node; local uniq=()
-  
-  for node in ${nodes[*]}; do
-      [[ "${uniq[*]}" =~ $node ]] && continue
-      uniq+=($node)
-  done
-
-  # set passed-in global var to $uniq array
-  eval "$varname=(${uniq[*]})"
-}
-    
 # define_pool: If the trusted pool already exists then figure out which nodes
 # are new (can be none) and assign them to the global POOL array, which is used
 # for the gluster peer probe. Returns 1 if it's not ok to add node(s) to the
@@ -697,37 +670,6 @@ function setup_ldap() {
   return 0
 }
 
-# verify_gid_uids: checks that the UIDs and GIDs for the hadoop users and hadoop
-# group are the same numeric value across all of the passed-in nodes. Returns 1
-# on inconsistency errors.
-function verify_gid_uids() {
-
-  local nodes="$@"
-  local errcnt=0; local out; local err
-
-  verbose "--- verifying consistent hadoop UIDs and GIDs across nodes..."
-
-  out="$(/tmp/bin/check_gids.sh $nodes)"
-  err=$?
-  debug "check_gids: $out"
-  if (( err != 0 )) ; then
-    ((errcnt++))
-    err -e "inconsistent GIDs:\n$out"
-  fi
-
-  out="$(/tmp/bin/check_uids.sh $nodes)"
-  err=$?
-  debug "check_uids: $out"
-  if (( err != 0 )) ; then
-    ((errcnt++))
-    err -e "inconsistent UIDs:\n$out"
-  fi
-
-  (( errcnt > 0 )) && return 1
-  verbose "--- completed verifying hadoop UIDs and GIDs"
-  return 0
-} 
-
 # update_yarn: yum installs the latest glusterfs client bits on the yarn node
 # if the gluster client version is older than 3.6. The yarn node is expected to
 # be a RHEL 6.5 server, but it could be a storage node. Returns 1 for errors.
@@ -811,9 +753,9 @@ declare -A NODE_BRKMNTS; declare -A NODE_BLKDEVS
 MGMT_INSIDE=0		# assume false
 YARN_INSIDE=0		# assume false
 AUTO_YES=0		# assume false
-SETUP_LDAP=0		# assume false
-SETUP_EXT_LDAP=0	# assume false
-SETUP_USERS=0		# assume false
+#SETUP_LDAP=0		# assume false
+#SETUP_EXT_LDAP=0	# assume false
+#SETUP_USERS=0		# assume false
 VERBOSE=$LOG_QUIET	# default
 errnodes=''; errcnt=0
 
@@ -861,8 +803,7 @@ echo
 echo "*** begin cluster setup... this may take some time..."
 echo
 
-# create required hadoop users. Needed before creating the required dirs
-# NOTE: this is not supported in Denali, the customer must creates the required
+# NOTE: this is not supported in Denali, the customer must create the required
 #   hadoop users prior to running this script.
 #setup_users || exit 1
 
