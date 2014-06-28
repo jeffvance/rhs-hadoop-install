@@ -76,7 +76,7 @@ currentSiteTag () {
   found=''
     
   #currentSite=`cat ds.json | grep -E "$SITE|tag"`; 
-  currentSite=`curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER?fields=Clusters/desired_configs" | grep -E "$SITE|tag"`;
+  currentSite=`curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER?fields=Clusters/desired_configs" 2>&1 | grep -E "$SITE|tag" 2>&1`;
   for line in $currentSite; do
     if [ $line != "{" -a $line != ":" -a $line != '"tag"' ] ; then
       if [ -n "$found" -a -z "$currentSiteTag" ]; then
@@ -88,9 +88,9 @@ currentSiteTag () {
     fi
   done;
   if [ -z $currentSiteTag ]; then
-    errOutput=`curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER?fields=Clusters/desired_configs"`;
+    errOutput=`curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER?fields=Clusters/desired_configs" 2>&1`;
     echo "[ERROR] \"$SITE\" not found in server response.";
-    echo "[ERROR] Output of \`curl -s -u $USERID:$PASSWD \"$AMBARIURL/api/v1/clusters/$CLUSTER?fields=Clusters/desired_configs\"\` is:";
+    echo "[ERROR] Output of \`curl -s -u $USERID:$PASSWD \"$AMBARIURL/api/v1/clusters/$CLUSTER?fields=Clusters/desired_configs\" 2>&1\` is:";
     echo $errOutput | while read -r line; do
       echo "[ERROR] $line";
     done;
@@ -116,7 +116,7 @@ doConfigUpdate1 () {
   currentSiteTag
   DEBUG echo "########## Performing '$MODE' $CONFIGKEY:$CONFIGVALUE on (Site:$SITE, Tag:$SITETAG)";
   propertiesStarted=0;
-  curl -k -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/configurations?type=$SITE&tag=$SITETAG" | while read -r line; do
+  curl -k -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/configurations?type=$SITE&tag=$SITETAG" 2>&1 | while read -r line; do
     ## echo ">>> $line";
     if [ "$propertiesStarted" -eq 0 -a "`echo $line | grep "\"properties\""`" ]; then
       propertiesStarted=1
@@ -161,7 +161,7 @@ doConfigUpdate () {
   currentSiteTag
   echo "########## Performing '$MODE' $CONFIGKEY:$CONFIGVALUE on (Site:$SITE, Tag:$SITETAG)";
   propertiesStarted=0;
-  curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/configurations?type=$SITE&tag=$SITETAG" | while read -r line; do
+  curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/configurations?type=$SITE&tag=$SITETAG" 2>&1 | while read -r line; do
     ## echo ">>> $line";
     if [ "$propertiesStarted" -eq 0 -a "`echo $line | grep "\"properties\""`" ]; then
       propertiesStarted=1
@@ -189,8 +189,9 @@ doConfigUpdate () {
         newFile="doSet_$newTag.json"
         echo "########## PUTting json into: $newFile"
         echo $finalJson > $newFile
-        curl -u $USERID:$PASSWD -X PUT -H "X-Requested-By: ambari" "$AMBARIURL/api/v1/clusters/$CLUSTER" --data @$newFile
+        curl -u $USERID:$PASSWD -X PUT -H "X-Requested-By: ambari" "$AMBARIURL/api/v1/clusters/$CLUSTER" --data @$newFile 2>&1
         currentSiteTag
+        rm -fr $newFile
         echo "########## NEW Site:$SITE, Tag:$SITETAG";
       elif [ "`echo $line | grep "\"$CONFIGKEY\""`" ]; then
         echo "########## Config found. Skipping origin value"
@@ -216,8 +217,9 @@ doConfigFileUpdate () {
       newFile="$FILENAME"
       echo $finalJson>$newFile
       echo "########## PUTting file:\"$FILENAME\" into config(type:\"$SITE\", tag:$newTag) via $newFile"
-      curl -u $USERID:$PASSWD -X PUT -H "X-Requested-By: ambari" "$AMBARIURL/api/v1/clusters/$CLUSTER" --data @$newFile
+      curl -u $USERID:$PASSWD -X PUT -H "X-Requested-By: ambari" "$AMBARIURL/api/v1/clusters/$CLUSTER" --data @$newFile 2>&1
       currentSiteTag
+      rm -fr $newFile
       echo "########## NEW Site:$SITE, Tag:$SITETAG";
     else
       echo "[ERROR] File \"$FILENAME\" should be in the following JSON format:";
@@ -246,7 +248,7 @@ doGet () {
   currentSiteTag
   echo "########## Performing 'GET' on (Site:$SITE, Tag:$SITETAG)";
   propertiesStarted=0;
-  curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/configurations?type=$SITE&tag=$SITETAG" | while read -r line; do
+  curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/configurations?type=$SITE&tag=$SITETAG" 2>&1 | while read -r line; do
     ## echo ">>> $line";
     if [ "$propertiesStarted" -eq 0 -a "`echo $line | grep "\"properties\""`" ]; then
       propertiesStarted=1
