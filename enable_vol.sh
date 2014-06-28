@@ -323,6 +323,4 @@ edit_core_site || exit 1
 
 quiet "$VOLNAME enabled for hadoop workloads with no errors"
 #delete json files
-rm -fr doSet_version*
-rm -fr doUpdate_version*
 exit 0
