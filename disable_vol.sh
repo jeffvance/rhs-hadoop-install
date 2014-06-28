@@ -210,4 +210,7 @@ if (( AUTO_YES )) || yesno "  Continue? [y|N] " ; then
 fi
 
 quiet "$VOLNAME disabled for hadoop workloads"
+#delete json files
+rm -fr doSet_version*
+rm -fr doUpdate_version*
 exit 0
