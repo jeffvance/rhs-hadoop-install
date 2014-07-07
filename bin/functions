@@ -242,16 +242,10 @@ function quiet() {
   display $opt "$1" $LOG_QUIET
 }
 
-# uniq_nodes: find the unique nodes in the list of nodes provided and set the
-# passed-in variable name to this list.
-# Args:
-#   1=variable *name* to hold list of uniq nodes
-#   2+=list of nodes
-# Sets globals:
-#   <varname in $1>
+# uniq_nodes: output the unique nodes from the list of nodes provided.
+# $@=list of nodes.
 function uniq_nodes() {
 
-  local varname=$1; shift
   local nodes=($@)
   local node; local uniq=()
  
@@ -260,8 +254,7 @@ function uniq_nodes() {
       uniq+=($node)
   done
 
-  # set passed-in global var to $uniq array
-  eval "$varname=(${uniq[*]})"
+  echo "${uniq[*]}"
 }
 
 # validate_ntp_conf: validate the ntp config file by ensuring there is at least

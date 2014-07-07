@@ -798,7 +798,7 @@ FIRST_NODE=${NODES[0]}
 # for cases where storage nodes are repeated and/or the mgmt and/or yarn nodes
 # are inside the pool, there is some improved efficiency in reducing the nodes
 # to just the unique nodes
-uniq_nodes UNIQ_NODES ${NODES[*]} $YARN_NODE $MGMT_NODE # sets UNIQ_NODES var
+UNIQ_NODES=($(uniq_nodes ${NODES[*]} $YARN_NODE $MGMT_NODE))
 
 # check for passwordless ssh connectivity to nodes
 check_ssh ${UNIQ_NODES[*]} || exit 1

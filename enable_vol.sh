@@ -293,7 +293,7 @@ fi
 debug "nodes spanned by $VOLNAME: ${NODES[*]}"
 
 # check for passwordless ssh connectivity to nodes
-check_ssh ${NODES[*]} $YARN_NODE || exit 1
+check_ssh $(uniq_nodes ${NODES[*]} $YARN_NODE) || exit 1
 
 BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh -xn $RHS_NODE $VOLNAME))
 BLKDEVS=($($PREFIX/bin/find_blocks.sh -xn $RHS_NODE $VOLNAME))
