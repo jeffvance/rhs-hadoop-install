@@ -205,6 +205,33 @@ function match_port_live() {
   iptables -n -L | grep -qs "^ACCEPT *$proto .*:$port"
 }
 
+# path_avail: given a file or directory name, a list of nodes, and a companion
+# list of path prefixes, return 0 (true) if the full path is available on *all*
+# of the nodes (== does not exist on any node). Return false (1) if the full
+# path is not available on *all* of the nodes (== exists on a node).
+# Args:
+#   $1=file/directory name to check,
+#   $2=${name[@]} *name* of array variable containing the nodes to check,
+#   $3=${name[@]} *name* of array variable containing the pathnames to prepend
+#      to "dirname".
+# Calling example: path_avail $a_dir "nodes[@]" "paths[@]" #note: no ${}
+# Note: $2 and $3 are expected to be parallel (companion) arrays.
+function path_avail() {
+
+  local name="$1"; local nodes=(${!2}); local paths=(${!3})
+  local node; local path; local i=0
+
+  for node in ${nodes[*]}; do
+      path=${paths[$i]}/$name
+      ssh $node "[[ -e $path ]] && exit 0 || exit 1"
+      (( $? == 0 )) && break # name exists on this node
+      ((i++))
+  done
+
+  (( i == ${#nodes[@]} )) && return 0 # name not found on any node
+  return 1 # name found on a node
+}
+
 # quiet: call display() using LOG_QUIET. $1 can be an echo option or the msg.
 function quiet() {
 

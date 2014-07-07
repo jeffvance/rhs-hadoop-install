@@ -111,9 +111,10 @@ function parse_cmd() {
   [[ -z "$VOLMNT" ]] && {
     echo "Syntax error: volume mount path prefix is required";
     ((errcnt++)); }
-  [[ -z "$NODE_SPEC" || ${#NODE_SPEC[@]} < 2 ]] && {
-    echo "Syntax error: expect list of 2 or more nodes plus brick mount(s)";
-    ((errcnt++)); }
+  if [[ -z "$NODE_SPEC" ]] || (( ${#NODE_SPEC[@]} < 2 )) ; then
+    echo "Syntax error: expect list of 2 or more nodes plus brick mount(s)"
+    ((errcnt++))
+  fi
 
   (( errcnt > 0 )) && return 1
   return 0
@@ -407,6 +408,11 @@ parse_brkmnts || exit -1
 
 # check for passwordless ssh connectivity to storage nodes
 check_ssh ${VOL_NODES[*]} || exit 1
+
+# volume name can't conflict with other names under the brick mnts
+path_avail "$VOLNAME" VOL_NODES[@] BRKMNTS[@] || {
+  err $VOLNAME exists under one of the brick mounts and thus cannot be created";
+  exit 1; }
 
 # find the nodes in the pool but not spanned by the new volume
 set_non_vol_nodes || exit 1 # sets EXTRA_NODES array (can be empty)
