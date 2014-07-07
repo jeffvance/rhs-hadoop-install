@@ -2,8 +2,8 @@
 #
 # check_vol_mount.sh verifies that each node spanned by the supplied volume
 # has the vol mount setup correctly. This include verifying both the "live"
-# settings, determined by ps, and the "persistent" settings, defined in
-# /etc/fstab.
+# settings, determined by the gluster "state" file, and the "persistent"
+# settings, defined in /etc/fstab.
 # Syntax:
 #   $1=volume name
 #   $2=optional list of nodes to check

@@ -84,7 +84,7 @@ EOF
 # parse_cmd: use get_opt to parse the command line. Returns 1 on errors.
 # NOTE: for Denali GA we are *not* supporting any ldap-user related options,
 #   but they are still present in the parser and their global variables are
-#   still present.
+#   still present but set to "False".
 # Sets globals:
 #   AUTO_YES
 #   MGMT_NODE
@@ -161,17 +161,17 @@ function parse_cmd() {
   fi
 
   # mutual exclusion checks and defaults
-  # SETUP_LDAP, _EXT_LDAP, _USERS...
-  let cnt=SETUP_USERS+SETUP_LDAP+SETUP_EXT_LDAP
-  if (( cnt == 0 )) ; then
-     SETUP_LDAP=1 # true, default
-  elif (( cnt > 1 )) ; then
-    echo "Syntax error: only one of ldap, my-ldap and users can be specified"
-    ((errcnt++))
-  fi
+  # SETUP_LDAP, _EXT_LDAP, _USERS... NOTE: not needed until ldap/ipa supported
+  #let cnt=SETUP_USERS+SETUP_LDAP+SETUP_EXT_LDAP
+  #if (( cnt == 0 )) ; then
+     #SETUP_LDAP=1 # true, default
+  #elif (( cnt > 1 )) ; then
+    #echo "Syntax error: only one of ldap, my-ldap and users can be specified"
+    #((errcnt++))
+  #fi
 
-  # EXTRA_USERS...
-  [[ -z "$EXTRA_USERS" ]] && EXTRA_USERS=$sample_user # always add sample user
+  # EXTRA_USERS... NOTE: not needed until ldap/ipa support
+  #[[ -z "$EXTRA_USERS" ]] && EXTRA_USERS=$sample_user # always add sample user
 
   # set all user-related variables to false since we don't create users in the
   # Denali release. But we're keeping the user-related code in place for
