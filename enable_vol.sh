@@ -322,4 +322,5 @@ chk_nodes || exit 1
 edit_core_site || exit 1
 
 quiet "$VOLNAME enabled for hadoop workloads with no errors"
+#delete json files
 exit 0

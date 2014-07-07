@@ -279,6 +279,7 @@ doUpdate () {
         sleep 4
         echo  "changed $configkey. New value is [$configvalue]."
         currentSiteTag
+        rm -fr $newFile
         debug echo "########## NEW Site:$SITE, Tag:$SITETAG";
       elif [ "`echo $line | grep "\"$configkey\""`" ]; then
         debug echo "########## Config found. Skipping origin value"
