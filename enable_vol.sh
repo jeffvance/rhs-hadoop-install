@@ -298,11 +298,6 @@ check_ssh $(uniq_nodes ${NODES[*]} $YARN_NODE) || exit 1
 BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh -xn $RHS_NODE $VOLNAME))
 BLKDEVS=($($PREFIX/bin/find_blocks.sh -xn $RHS_NODE $VOLNAME))
 
-# volume name can't conflict with other names under the brick mnts
-path_avail "$VOLNAME" VOL_NODES[@] BRKMNTS[@] || {
-  err $VOLNAME exists under one of the brick mounts and thus cannot be enabled";
-  exit 1; }
-
 echo
 quiet "*** Volume            : $VOLNAME"
 quiet "*** Nodes             : $(echo ${NODES[*]}   | sed 's/ /, /g')"

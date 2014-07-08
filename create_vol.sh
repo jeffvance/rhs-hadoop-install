@@ -411,7 +411,7 @@ check_ssh ${VOL_NODES[*]} || exit 1
 
 # volume name can't conflict with other names under the brick mnts
 path_avail "$VOLNAME" VOL_NODES[@] BRKMNTS[@] || {
-  err $VOLNAME exists under one of the brick mounts and thus cannot be created";
+  err "\"$VOLNAME\" exists under one of the brick mounts and thus cannot be created";
   exit 1; }
 
 # find the nodes in the pool but not spanned by the new volume
