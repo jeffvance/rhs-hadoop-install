@@ -246,10 +246,9 @@ function quiet() {
 # $@=list of nodes.
 function uniq_nodes() {
 
-  local nodes=($@)
   local node; local uniq=()
  
-  for node in ${nodes[*]}; do
+  for node in $@; do
       [[ "${uniq[*]}" =~ $node ]] && continue
       uniq+=($node)
   done
