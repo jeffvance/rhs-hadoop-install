@@ -3,16 +3,16 @@
 # find_brick_mnts.sh discovers the brick mount dirs for the trusted storage
 # pool, or for the given volume if the <volName> arg is supplied. In either
 # case, the list of brick-mnts are output, one mount per line. Format:
-# "<node>:/<brick-mnt-dir>"
+# "<node>:/<brick-mnt-dir>" (volname is omitted).
 # Syntax:
 #   $1=volume name (optional), default='all',
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node,
 #   -h=(host) if specified, means only output brick mounts for this host.
 #   -x=(no-node) if specified, means only output the brick-mnt portion, omit 
-#      each node.
+#      the node name.
 
-INCL_NODE=1 # true, default
+INCL_NODE=1    # true, default
 HOST_FILTER='' # don't filter by host
 PREFIX="$(dirname $(readlink -f $0))"
 

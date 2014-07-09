@@ -113,8 +113,8 @@ function check_dirs() {
 # check_open_ports: verify that the ports needed by gluster and ambari are all
 # open, both "live" (iptables) and persisted (iptables conf file). NOTE: due to
 # RMI ports and Java's allowing of port number 0 to be randomly assigned, we 
-# cannot open all of the needed hadoop ports. Therefore, unfortunately, we need
-# to check that iptables is stopped.
+# cannot verify all of the needed hadoop ports. Therefore, unfortunately, we
+# need to check that iptables is stopped.
 function check_open_ports() {
 
   # return 0 if iptables is not even running

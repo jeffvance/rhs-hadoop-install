@@ -676,12 +676,13 @@ function setup_ldap() {
 # Uses globals:
 #   YARN_INSIDE
 #   YARN_NODE
+#
 # NOTE: the code below is not GA ready due to rhel 6.5 not having the latest
 #  glusterfs client bits in place. In order for the installer to work for Dev
 #  and for QE it is coded for a pre-GA environment, meaning glusterfs 3.4 client
-#  bits are expected on rhel 6.5. However, by simply deleting the nested
-#  function, pre_GA_update(), and the call to it below, this code should be 
-#  good-to-go for Denali GA.
+#  bits are found on rhel 6.5. However, by simply deleting the nested function
+#  pre_GA_update(), the call to it, and uncommenting the call to
+#  post_GA_update(), this code should be good-to-go for Denali GA.
 function update_yarn() {
 
   local out; local err; local gluster_ver
@@ -708,7 +709,7 @@ EOF
   }
 
   # this nested function adds the appropriate channel so that rhel 6.5 can be
-  # updated to glusterfs 3.6+ client bits.  Returns 1 on errors.
+  # updated to glusterfs 3.6+ client bits. Returns 1 on errors.
   # NOTE: for pre-GA this function is not invoked.
   function post_GA_update() {
 
