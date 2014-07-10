@@ -683,6 +683,7 @@ function update_yarn() {
 
   local out; local err
   local major; local minor; local fix
+  local channel='rhel-x86_64-server-rhsclient-6'
   local gluster_rpms='glusterfs glusterfs-api glusterfs-fuse glusterfs-libs'
 
   # this nested function exists soley to bridge the gap between pre- and post-GA
@@ -748,7 +749,7 @@ EOF
   # we have available glusterfs pkg but is it 3.6+?
   gluster_version "${out[1]}" # sets major/minor/fix local vars
   if (( major < 3 || ( major == 3 && minor <= 5 ) )) ; then
-    err -e "the available glusterfs packages are older than 3.6 and therefore should not be yum installed on the yarn-master ($YARN_NODE)./nEnsure that the rhs client channel $channel has been added"
+    err -e "the available glusterfs packages are older than 3.6 and therefore should not be yum installed on the yarn-master ($YARN_NODE).\nEnsure that the rhs client channel $channel has been added"
     return 1
   fi
 
