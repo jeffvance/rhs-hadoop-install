@@ -742,14 +742,14 @@ EOF
         grep ^glusterfs | \
         head -n 1"))
   if (( ${#out[*]} == 0 )) ; then
-    err -e "unable to find any glusterfs packages to install on the yarn-master ($YARN_NODE).\nEnsure that the rhs client channel $channel has been added"
+    err -e "unable to find any glusterfs packages to install on the yarn-master ($YARN_NODE).\nEnsure that the client channel \"$channel\" has been added"
     return 1
   fi
 
   # we have available glusterfs pkg but is it 3.6+?
   gluster_version "${out[1]}" # sets major/minor/fix local vars
   if (( major < 3 || ( major == 3 && minor <= 5 ) )) ; then
-    err -e "the available glusterfs packages are older than 3.6 and therefore should not be yum installed on the yarn-master ($YARN_NODE).\nEnsure that the rhs client channel $channel has been added"
+    err -e "the available glusterfs client packages are older than 3.6 and therefore should not be yum installed on the yarn-master ($YARN_NODE).\nEnsure that the client channel \"$channel\" has been added"
     return 1
   fi
 
