@@ -706,12 +706,11 @@ EOF
   }
 
   # nested function that extracts the glusterfs major, minor, and fix level
-  # from the passed-in string. Sets these variables.
+  # from the passed-in long version string. Sets these variables.
   function gluster_version() {
 
-    local ver="$1"
+    local ver=(${1//./ }) # easy convert to array
 
-    ver=(${ver//./ }) # easy convert to array
     major=${ver[0]} # main function local
     minor=${ver[1]} # main function local
     fix=${ver[2]}   # main function local
