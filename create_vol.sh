@@ -140,12 +140,12 @@ function parse_nodes() {
 # (required). Returns 1 on syntax errors.
 # Uses globals:
 #   NODE_SPEC
+#   REPLICA_CNT
 # Sets globals:
 #   BRKMNTS
 function parse_brkmnts() {
 
-  local brkmnts
-  local node_spec; local i
+  local brkmnts; local node_spec; local i
   # extract the required brick-mnt from the 1st node-spec entry
   local brkmnt=${NODE_SPEC[0]#*:}
 
@@ -172,6 +172,12 @@ function parse_brkmnts() {
 	  ;;
       esac
   done
+
+  # verify that the number of bricks is a multiple of the replica count
+  if (( ${#BRKMNTS[@]} % REPLICA_CNT != 0 )) ; then
+    err "the number of bricks must be a multiple of the replica, which is $REPLICA_CNT"
+    return 1
+  fi
   return 0
 }
 
@@ -316,6 +322,7 @@ function add_distributed_dirs() {
 # Uses globals:
 #   BRKMNTS
 #   FIRST_NODE
+#   REPLICA_CNT
 #   VOL_NODES
 #   VOLNAME
 function create_vol() {
@@ -330,8 +337,8 @@ function create_vol() {
   done
   debug "bricks: $bricks"
 
-  out="$(ssh $FIRST_NODE "gluster volume create $VOLNAME replica 2 $bricks 2>&1"
-       )"
+  out="$(ssh $FIRST_NODE "
+	    gluster volume create $VOLNAME replica $REPLICA_CNT $bricks 2>&1")"
   err=$?
   if (( err != 0 )) ; then
     err $err "gluster vol create $VOLNAME $bricks: $out"
@@ -386,6 +393,7 @@ function start_vol() {
 ME="$(basename $0 .sh)"
 AUTO_YES=0 # assume false
 BRKMNTS=(); VOL_NODES=()
+REPLICA_CNT=2  # hard-coded for now
 VERBOSE=$LOG_QUIET # default
 errcnt=0
 
