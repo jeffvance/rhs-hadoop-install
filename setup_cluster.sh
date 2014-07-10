@@ -677,21 +677,17 @@ function setup_ldap() {
 #   YARN_INSIDE
 #   YARN_NODE
 #
-# NOTE: the code below is not GA ready due to rhel 6.5 not having the latest
-#  glusterfs client bits in place. In order for the installer to work for Dev
-#  and for QE it is coded for a pre-GA environment, meaning glusterfs 3.4 client
-#  bits are found on rhel 6.5. However, by simply deleting the nested function
-#  pre_GA_update(), the call to it, and uncommenting the call to
-#  post_GA_update(), this code should be good-to-go for Denali GA.
+# NOTE: the code below is now GA ready. If it needs to be set back to pre-GA
+#   state then uncomment the call to pre_GA_update.
 function update_yarn() {
 
-  local out; local err; local gluster_ver
-  local major; local minor
+  local out; local err
+  local major; local minor; local fix
   local gluster_rpms='glusterfs glusterfs-api glusterfs-fuse glusterfs-libs'
 
-  # this nested function should be deleted once we reach GA. It exists soley
-  # to bridge the gap between "now" and GA so that Dev and QE can use the
-  # installer.
+  # this nested function exists soley to bridge the gap between pre- and post-GA
+  # so that Dev and QE can use the installer before the rhel6.5 glusterfs 3.6
+  # client bits are yum install-able.
   function pre_GA_update() {
 
     local repo_file='rhs3.0-client-el6.repo'
@@ -708,61 +704,69 @@ EOF
     scp -q /tmp/$repo_file $YARN_NODE:/etc/yum.repos.d/
   }
 
-  # this nested function adds the appropriate channel so that rhel 6.5 can be
-  # updated to glusterfs 3.6+ client bits. Returns 1 on errors.
-  # NOTE: for pre-GA this function is not invoked.
-  function post_GA_update() {
+  # nested function that extracts the glusterfs major, minor, and fix level
+  # from the passed-in string. Sets these variables.
+  function gluster_version() {
 
-    local out; local err
-    local channel='rhel-x86_64-server-rhsclient-6'
+    local ver="$1"
 
-    out="$(ssh $YARN_NODE "rhn-channel --add --channel=$channel")"
-    err=$?
-    if (( err != 0 )) ; then
-      err -e $err "rhn-channel add $channel:\n$out"
-      return 1
-    fi
-
-    debug "rhn-channel add $channel: $out"
-    return 0
+    ver=(${ver//./ }) # easy convert to array
+    major=${ver[0]} # main function local
+    minor=${ver[1]} # main function local
+    fix=${ver[2]}   # main function local
+    debug "glusterfs version on yarn-master ($YARN_NODE): ${major}.${minor}.$fix"
   }
 
   ## main
   (( YARN_INSIDE )) && return 0 # rhs nodes have the correct client bits
 
-  out=($(ssh $YARN_NODE "yum list glusterfs 2>&1 | grep glusterfs"))
-  if (( $? != 0 || ${#out} == 0 )) ; then
-    err "can't yum list glusterfs: ${out[*]}"
+  # which glusterfs version is installed on the yarn-node
+  out=($(ssh $YARN_NODE "yum list installed glusterfs 2>&1 | \
+	grep ^glusterfs | \
+	head -n 1"))
+  if (( ${#out[*]} > 0 )) ; then # see if current enough version is installed
+    gluster_version "${out[1]}" # sets major/minor/fix variables
+    if (( major > 3 || ( major == 3 && minor >= 6 ) )) ; then # 3.6+
+      verbose "--- yarn-master ($YARN_NODE) has the correct glusterfs client version"
+      return 0 # no need to update glusterfs
+    else
+      debug "installed glusterfs client version is pre 3.6 and needs updating"
+    fi
+  else
+    debug "no installed glusterfs client packages on $YARN_NODE"
+  fi
+
+  # check available glusterfs packages
+  out=($(ssh $YARN_NODE "yum list available glusterfs 2>&1 | \
+        grep ^glusterfs | \
+        head -n 1"))
+  if (( ${#out[*]} == 0 )) ; then
+    err -e "unable to find any glusterfs packages to install on the yarn-master ($YARN_NODE).\nEnsure that the rhs client channel $channel has been added"
     return 1
   fi
-  gluster_ver=${out[1]/rhs-*/}
-  debug "$YARN_NODE glusterfs version: $gluster_ver"
 
-  # extract major and minor version numbers
-  major=${gluster_ver%%.*}
-  minor=${gluster_ver#*.}; minor=${minor%%.*}
-
-  # if glusterfs version is lower than 3.6 yum install newer bits
+  # we have available glusterfs pkg but is it 3.6+?
+  gluster_version "${out[1]}" # sets major/minor/fix local vars
   if (( major < 3 || ( major == 3 && minor <= 5 ) )) ; then
-    verbose "--- updating yarn-master ($YARN_NODE) to latest gluster client..."
-
-    ### NOTE: the function below is temporary until we GA, after-which it
-    ###   should be removed and the post_GA_update function uncommented.
-    pre_GA_update
-    #post_GA_update
-
-    out="$(ssh $YARN_NODE "yum -y install $gluster_rpms 2>&1")"
-    err=$?
-    if (( err != 0 )) ; then
-      err $err "yum install $gluster_rpms: $out"
-      return 1
-    fi
-    debug "yum install $gluster_rpms: $out"
-    verbose "--- done updating $YARN_NODE to latest gluster client bits"
-  else
-    verbose "--- yarn-master ($YARN_NODE) is ok at gluster version $gluster_ver"
+    err -e "the available glusterfs packages are older than 3.6 and therefore should not be yum installed on the yarn-master ($YARN_NODE)./nEnsure that the rhs client channel $channel has been added"
+    return 1
   fi
 
+  verbose "--- updating yarn-master ($YARN_NODE) to gluster client ${major}.${minor}.$fix ..."
+
+  ### NOTE: the pre_GA_update call below is temporary until we GA, after-which
+  ###   it needs to be commented out.
+  #pre_GA_update
+
+  out="$(ssh $YARN_NODE "yum -y install $gluster_rpms 2>&1")"
+  err=$?
+  if (( err != 0 )) ; then
+    err $err "yum install $gluster_rpms: $out"
+    return 1
+  fi
+
+  debug "yum install $gluster_rpms: $out"
+  verbose "--- done updating $YARN_NODE to latest gluster client bits"
   return 0
 }
 
@@ -823,6 +827,7 @@ define_pool ${NODES[*]} || exit 1
 
 echo
 echo "*** begin cluster setup... this may take some time..."
+(( VERBOSE > LOG_DEBUG )) && echo "    see $LOGFILE to view progress..."
 echo
 
 # NOTE: this is not supported in Denali, the customer must create the required
