@@ -281,19 +281,19 @@ parse_cmd $@ || exit -1
 default_nodes MGMT_NODE 'management' YARN_NODE 'yarn-master' \
 	RHS_NODE 'RHS storage' || exit -1
 
+# check for passwordless ssh connectivity to nodes
+check_ssh $(uniq_nodes $MGMT_NODE $YARN_NODE $RHS_NODE) || exit 1
+
 vol_exists $VOLNAME $RHS_NODE || {
   err "volume $VOLNAME does not exist";
   exit 1; }
 
 NODES=($($PREFIX/bin/find_nodes.sh -n $RHS_NODE $VOLNAME)) # spanned by vol
 if (( $? != 0 )) ; then
-  err "${NODE[*]}" # error from find_nodes
+  err "${NODES[*]}" # error from find_nodes
   exit 1
 fi
 debug "nodes spanned by $VOLNAME: ${NODES[*]}"
-
-# check for passwordless ssh connectivity to nodes
-check_ssh $(uniq_nodes ${NODES[*]} $YARN_NODE) || exit 1
 
 BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh -xn $RHS_NODE $VOLNAME))
 BLKDEVS=($($PREFIX/bin/find_blocks.sh -xn $RHS_NODE $VOLNAME))

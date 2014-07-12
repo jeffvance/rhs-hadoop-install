@@ -1,10 +1,8 @@
 #!/bin/bash
 #
-# find_volmnt.sh discovers the gluster volume mount directory for the passed in
-# volume (required). A single line containing just the "vol-mnt" is output. Eg.
-# "/mnt/glusterfs/HadoopVol".
+# find_volumes.sh returns a list of all gluster volumes in the (expected to be)
+# existing storage pool.
 # Args:
-#   $1=volume name (required).
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
 
@@ -19,20 +17,19 @@ while getopts ':n:' opt; do
     esac
 done
 shift $((OPTIND-1))
-VOLNAME="$1"
-[[ -z "$VOLNAME" ]] && {
-  echo "Syntax error: volume name is required";
+
+[[ -n "$1" ]] && {
+  echo "Syntax error: no arguments other than -n are expected"
   exit -1; }
 
 if [[ -z "$rhs_node" ]] ; then
-  ssh=''; ssh_close='' # assume localhost
+  ssh=''; ssh_close=''
 else  # use supplied node
   ssh="ssh $rhs_node '"; ssh_close="'"
 fi
 
 out="$(eval "$ssh 
-	mnt=(\$(grep -w $VOLNAME /proc/mounts)) # array
-	echo \${mnt[1]} # node:/volmnt
+	gluster vol status | grep \"^Status of volume:\" | cut -d\" \" -f4
       $ssh_close
 ")"
 
