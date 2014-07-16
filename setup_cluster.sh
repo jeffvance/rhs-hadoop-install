@@ -9,6 +9,7 @@
 # pool with each node in the node-list setup as a storage/data node. If the pool
 # already exists then the supplied nodes are checked (actually setup anyway) as
 # a verification step.
+#
 # The yarn and mgmt nodes are expected to be rhel 6.5 servers outside of the
 # pool, and not to be the same server; however these recommendations are not
 # enforced by the script.
@@ -16,7 +17,7 @@
 # On each node the blk-device is setup as an xfs file system and mounted to the
 # brick mount dir, ntp config is verified, iptables is disabled, selinux is set
 # to permissive, and the required hadoop local directories are created (note:
-# the required distributed dirs are not created here).
+# the required Hadoop distributed dirs are not created here).
 #
 # Also, on all passed-in nodes (assumed to be storage nodes) and on the yarn-
 # master server node, the ambari agent is installed (updated if present) and
@@ -191,11 +192,10 @@ function parse_cmd() {
 # The brick mount and block dev values are a comma separated list. Most times
 # the list contains only one brick-mnt/block-dev, but to handle the case of the
 # same node repeated with different brick-mnt and/or block-dev paths we use a 
-# list. 
-# A check is made to see if the management node and/or yarn-master node is
-# inside the storage pool and/or are the same node, and if so a warning is
-# reported and the user is prompted to continue.
-# Returns 1 on errors and if the user answers no.
+# list. A check is made to see if the management node and/or yarn-master node
+# is inside the storage pool and/or are the same node, and if so a warning is
+# reported and the user is prompted to continue. Returns 1 on errors and if the
+# user answers no.
 # Uses globals:
 #   AUTO_YES
 #   NODE_SPEC
@@ -324,7 +324,7 @@ function check_blkdevs() {
   return 0
 }
 
-# show_todo: show summary of actions to be done.
+# show_todo: show summary of actions that will be done.
 # Uses globals:
 #   BLKDEVS
 #   BRKMNTS
@@ -481,10 +481,10 @@ function pool_exists() {
   return 0
 }
 
-# define_pool: If the trusted pool already exists then figure out which nodes
+# define_pool: if the trusted pool already exists then figure out which nodes
 # are new (can be none) and assign them to the global POOL array, which is used
-# for the gluster peer probe. Returns 1 if it's not ok to add node(s) to the
-# pool. In all other cases 0 is returned.
+# for the gluster peer probe. Returns 1 if the user answers that it's not ok to
+# add node(s) to the pool. In all other cases 0 is returned.
 # Args:
 #   $@=list of nodes
 # Uses globals:
@@ -566,7 +566,7 @@ function create_pool() {
 
 # ambari_server: install and start the ambari server on the MGMT_NODE. Returns
 # 1 on errors.
-# ASSUMPTION: 1) bin/* has been copied to /tmp on all nodes
+# ASSUMPTION: bin/* has been copied to /tmp on all nodes.
 # Uses globals:
 #   MGMT_NODE
 function ambari_server() {
@@ -730,7 +730,7 @@ EOF
       verbose "--- yarn-master ($YARN_NODE) has the correct glusterfs client version"
       return 0 # no need to update glusterfs
     else
-      debug "installed glusterfs client version is pre 3.6 and needs updating"
+      debug "installed glusterfs client version on $YARN_NODE is pre 3.6 and needs updating"
     fi
   else
     debug "no installed glusterfs client packages on $YARN_NODE"
@@ -747,7 +747,7 @@ EOF
 
   # we have available glusterfs pkg but is it 3.6+?
   gluster_version "${out[1]}" # sets major/minor/fix local vars
-  if (( major < 3 || ( major == 3 && minor <= 5 ) )) ; then
+  if (( major < 3 || ( major == 3 && minor < 6 ) )) ; then
     err -e "the available glusterfs client packages are older than 3.6 and therefore should not be yum installed on the yarn-master ($YARN_NODE).\nEnsure that the client channel \"$channel\" has been added"
     return 1
   fi

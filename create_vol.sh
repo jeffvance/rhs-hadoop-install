@@ -287,8 +287,8 @@ function mk_volmnt() {
   return 0
 }
 
-# add_distributed_dirs: create, if needed, the distributed hadoop directories.
-# Returns 1 on errors.
+# add_distributed_dirs: create the distributed hadoop directories. Returns 1 on
+# errors.
 # Note: the gluster-fuse mount, by convention, is the VOLMNT prefix with the
 #   volume name appended.
 # ASSUMPTION: all bin/* scripts have been copied to /tmp/bin on the FIRST_NODE.
@@ -317,7 +317,7 @@ function add_distributed_dirs() {
   return 0
 }
 
-# create_vol: gluster vol create VOLNAME with a hard-codes replica 2 and set
+# create_vol: gluster vol create VOLNAME with a hard-coded replica 2 and set
 # its performance settings. Returns 1 on errors.
 # Uses globals:
 #   BRKMNTS
