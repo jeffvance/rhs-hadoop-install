@@ -489,9 +489,9 @@ function pool_exists() {
 #   $@=list of nodes
 # Uses globals:
 #   AUTO_YES
+#   FIRST_NODE
 #   PREFIX
 # Sets globals:
-#   FIRST_NODE
 #   POOL
 function define_pool() {
 
@@ -505,7 +505,6 @@ function define_pool() {
 
     # find all nodes in trusted pool
     POOL=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE -u))
-    FIRST_NODE=${POOL[0]} # peer probe from this node
     debug "existing pool nodes: ${POOL[*]}"
 
     # find nodes in pool that are not supplied $nodes (ie. unique)

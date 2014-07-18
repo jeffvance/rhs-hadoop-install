@@ -152,7 +152,7 @@ function gluster_mnt_vol() {
 
   local node=$1; local vol=$2; local mnt=$3; local mntopts=$4
   local owner="yarn:hadoop" # assumes both have been created!
-  local perms=0774 # rwxrwxr--
+  local perms=0755 # rwxr-xr-x
   local err=0
 
   # append to fstab if not present

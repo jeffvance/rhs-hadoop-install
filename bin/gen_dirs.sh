@@ -9,7 +9,8 @@
 
 # single out sub-dirs under the user/ dir since this is a late addition
 # and there may be a need to remove it
-user_dirs='user/hcat:0755:hcat user/hive:0755:hive user/mapred:0755:mapred user/yarn:0755:yarn'
+# REMOVED FROM DENALI
+#user_dirs='user/hcat:0755:hcat user/hive:0755:hive user/mapred:0755:mapred user/yarn:0755:yarn'
 
 # parse cmd opts
 while getopts ':adl' opt; do
