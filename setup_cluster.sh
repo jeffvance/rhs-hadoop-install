@@ -463,22 +463,72 @@ function setup_nodes() {
   return 0
 }
 
-# pool_exists: return 0 if the trusted storage pool exists, else 1.
+# pool_exists: returns true (shell 0) if a trusted storage pool exists, else
+# returns false (1). Determining if a pool exists is tricky since the nodes
+# passed to setup_cluster may be nodes used to expand an existing pool; however,
+# none of the supplied nodes are in the pool yet, hence gluster peer status 
+# will return 0 and number of nodes 0. This would make us conclude that there
+# is not a storage pool; however, it only means that from the node used to 
+# execute the peer status (FIRST_NODE) there is no pool. The solution is that
+# if peer status indicates that no pool exists then we need to ssh to the
+# yarn-node and extract the gluster-fuse mount node, if it exists. Then we
+# can re-execute peer status from this node. If the pool exists then FIRST_NODE
+# is set to the node used to execute peer status from.
 # Uses globals:
 #   FIRST_NODE
+#   YARN_NODE
+# Sets globals:
+#   FIRST_NODE (only if the pool exists)
 function pool_exists() {
 
-  local ssh; local out; local err
+  local out; local err
 
-  [[ "$FIRST_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $FIRST_NODE" 
-  out="$(eval "$ssh gluster peer status")"
-  err=$?
-  debug "gluster peer status: $out"
-  (( err != 0 )) && return 1
+  # nested function which executes gluster peer status from the passed-in node.
+  # Returns 0 if a pool exists, else returns 1.
+  function peer_status() {
 
-  # peer status returns 0 even when no pool exists, so parse output
-  grep -qs 'Peers: 0' <<<$out && return 1
-  return 0
+    local node=$1
+    local ssh; local out; local err
+
+    [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node" 
+
+    out="$(eval "$ssh gluster peer status")"
+    err=$?
+    debug "gluster peer status: $out"
+    (( err != 0 )) && return 1 # no pool
+
+    # peer status returns 0 even when no pool exists, so parse output
+    grep -qs 'Peers: 0' <<<$out && return 1 # no pool
+    return 0 # pool exists
+  }
+
+  # nested function which extracts a the node used in a glusterfs-fuse mount
+  # from /etc/fstab on the yarn-node. Sets FIRST_NODE to this node if found.
+  # Returns 1 if a glusterfs-fuse mount exists, else returns 0.
+  function node_from_yarn_mnt() {
+
+    local node
+
+    # extract node from glusterfs-fuse mount if it exists
+    node="$(ssh $YARN_NODE "grep -m 1 ' glusterfs ' /etc/fstab | cut -d: -f1")"
+    [[ -z "$node" ]] && {
+      debug "no glusterfs-fuse mount found on yarn-master ($YARN_NODE)";
+      return 1; } # no pool
+
+    debug "found node $node in /etc/fstab on $YARN_NODE"
+    # set FIRST_NODE to node and return 0 (true)
+    FIRST_NODE=$node
+    return 0
+  }
+
+  ## main
+  peer_status $FIRST_NODE && return 0 # pool exists
+
+  # maybe no pool; see if a volume is mounted on the known yarn-node
+  node_from_yarn_mnt || return 1 # no pool
+  # note: FIRST_NODE has been set from call above
+  peer_status $FIRST_NODE && return 0 # pool exists
+  return 1 # no pool
 }
 
 # define_pool: if the trusted pool already exists then figure out which nodes
@@ -518,7 +568,6 @@ function define_pool() {
     debug "unique nodes to add to pool: ${POOL[*]}"
 
     if (( ${#uniq[@]} > 0 )) ; then # we have nodes not in pool
-      echo
       force -e "The following nodes are not in the existing storage pool:\n  ${uniq[*]}"
       (( ! AUTO_YES )) && ! yesno  "  Add nodes? [y|N] " && return 1 # will exit
     else # no unique nodes
