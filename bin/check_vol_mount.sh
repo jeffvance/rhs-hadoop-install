@@ -73,6 +73,10 @@ function check_vol_mnt_attrs() {
     # generate gluster state file
     ssh $node "kill -SIGUSR1 $pid"
 
+    # sleep a few seconds to handle the case where occassionally the state
+    # file is not created prior to the access attempt
+    sleep 3
+
     # copy state file back to local, expected to be 1 file but could match more
     state_file="$state_file${pid}.dump.[0-9]*" # glob -- don't know full name
     scp $node:$state_file_dir/$state_file /tmp
