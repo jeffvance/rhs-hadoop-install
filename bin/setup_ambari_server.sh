@@ -17,7 +17,7 @@ source $PREFIX/functions
 [[ -f $AMBARI_SERVER_PID ]] && ambari-server status && \
   SERVER_ALREADY_INSTALLED=1 # true
 
-# stop ambaqri-server if running
+# stop ambari-server if running
 if (( SERVER_ALREADY_INSTALLED )) ; then
   out="$(ambari-server stop 2>&1)"
   err=$?
