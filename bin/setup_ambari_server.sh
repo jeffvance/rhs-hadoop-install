@@ -14,7 +14,7 @@ SERVER_ALREADY_INSTALLED=0 # false
 ## functions ##
 source $PREFIX/functions
 
-[[ -f $AMBARI_SERVER_PID && ambari-service status ]] && \
+[[ -f $AMBARI_SERVER_PID ]] && ambari-server status && \
   SERVER_ALREADY_INSTALLED=1 # true
 
 # stop ambaqri-server if running
