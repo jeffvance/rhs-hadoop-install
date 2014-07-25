@@ -2,7 +2,7 @@
 #
 # enable_vol.sh accepts a volume name, discovers and checks the volume mount on
 # each node spanned by the volume to be sure they are setup for hadoop work-
-# loads, and then updates the core-site file to contain the volume. 
+# loads, and then updates the Hadoop core-site file to contain the volume. 
 #
 # See usage() for syntax.
 

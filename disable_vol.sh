@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# disable_vol.sh accepts a volume name and removes this volume from core-site
-# on all relevant nodes.
+# disable_vol.sh accepts a volume name and removes this volume from the Hadoop
+# core-site on all relevant nodes.
 #
 # See usage() for syntax.
 

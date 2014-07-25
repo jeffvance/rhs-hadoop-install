@@ -1,8 +1,5 @@
 #!/bin/bash
 #
-# TODO:
-# 1) verification
-#
 # create_vol.sh accepts a volume name, volume mount path prefix, and a list of
 # two or more "node:brick_mnt" pairs, and creates a new volume, spanning the
 # supplied nodes, with the appropriate performance settings set. Each node
