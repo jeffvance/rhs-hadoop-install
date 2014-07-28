@@ -83,27 +83,19 @@ EOF
 }
 
 # parse_cmd: use get_opt to parse the command line. Returns 1 on errors.
-# NOTE: for Denali GA we are *not* supporting any ldap-user related options,
-#   but they are still present in the parser and their global variables are
-#   still present but set to "False".
 # Sets globals:
 #   AUTO_YES
 #   MGMT_NODE
 #   NODE_SPEC
-#   SETUP_LDAP
-#   SETUP_EXT_LDAP
-#   SETUP_USERS
 #   VERBOSE
 #   YARN_NODE
 function parse_cmd() {
 
   local opts='y'
   local verbose_opts='verbose,quiet,debug'   # default= --quiet
-  local ldap_opts='deploy-ldap-srv::,ext-ldap-srv:,local-auth::'
   local node_opts='hadoop-mgmt-node:,yarn-master:'
-  local long_opts="help,version,$node_opts,$verbose_opts,$ldap_opts"
+  local long_opts="help,version,$node_opts,$verbose_opts"
   local errcnt=0; local cnt;
-  local sample_user='cathy'
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
 
@@ -133,21 +125,6 @@ function parse_cmd() {
 	--hadoop-mgmt-node)
 	  MGMT_NODE="$2"; shift 2; continue
 	;;
-	--deploy-ldap-srv) # default, extra users list is optional
-	  EXTRA_USERS="$2" # empty if users omitted, else comma separated list
-	  SETUP_LDAP=1 # true
-	  shift 2; continue
-	;;
-	--ext-ldap-srv) # extra users list is optional
-	  EXTRA_USERS="$2" # empty if users omitted, else comma separated list
-	  SETUP_EXT_LDAP=1 # true
-	  shift 2; continue
-	;;
-	--local-auth) # extra users list is optional
-	  EXTRA_USERS="$2" # empty if users omitted, else comma separated list
-	  SETUP_USERS=1 # true
-	  shift 2; continue
-	;;
 	--)
 	  shift; break
 	;;
@@ -160,26 +137,6 @@ function parse_cmd() {
     echo "Syntax error: expect list of 2 or more nodes plus brick mount(s) and block dev(s)"
     ((errcnt++))
   fi
-
-  # mutual exclusion checks and defaults
-  # SETUP_LDAP, _EXT_LDAP, _USERS... NOTE: not needed until ldap/ipa supported
-  #let cnt=SETUP_USERS+SETUP_LDAP+SETUP_EXT_LDAP
-  #if (( cnt == 0 )) ; then
-     #SETUP_LDAP=1 # true, default
-  #elif (( cnt > 1 )) ; then
-    #echo "Syntax error: only one of ldap, my-ldap and users can be specified"
-    #((errcnt++))
-  #fi
-
-  # EXTRA_USERS... NOTE: not needed until ldap/ipa support
-  #[[ -z "$EXTRA_USERS" ]] && EXTRA_USERS=$sample_user # always add sample user
-
-  # set all user-related variables to false since we don't create users in the
-  # Denali release. But we're keeping the user-related code in place for
-  # potential future use.
-  SETUP_LDAP=0
-  SETUP_EXT_LDAP=0
-  SETUP_USERS=0
 
   (( errcnt > 0 )) && return 1
   return 0
@@ -328,10 +285,8 @@ function check_blkdevs() {
 # Uses globals:
 #   BLKDEVS
 #   BRKMNTS
-#   EXTRA_USERS
 #   MGMT_NODE
 #   NODES
-#   SETUP_LDAP
 #   YARN_NODE
 function show_todo() {
 
@@ -355,14 +310,6 @@ function show_todo() {
 
   quiet "*** Ambari mgmt node   : $MGMT_NODE"
   quiet "*** Yarn-master server : $YARN_NODE"
-  if (( SETUP_LDAP )) ; then
-    if [[ -n "$EXTRA_USERS" ]] ; then
-      quiet "*** Setting up ldap/ipa with extra users: ${EXTRA_USERS//,/, }"
-    else
-      quiet "*** Setting up ldap/ipa with standard hadoop users"
-    fi
-  fi
-
   echo
 }
 
@@ -637,87 +584,6 @@ function ambari_server() {
   return 0 
 }
 
-# setup_users: based on the SETUP_ users flag create the required hadoop users.
-# The default is to setup a ldap/ipa server on the management node. Returns 1
-# on errors.
-# NOTE: for Denali we are not supporting automatic creation of users. Consistent
-#   UIDs are still required for the hadoop users but that is the customer's
-#   responsibility.
-# Uses globals:
-#   MGMT_NODE
-#   NODES
-#   SETUP_LDAP
-#   SETUP_USERS
-#   YARN_NODE
-function setup_users() {
-
-  local node; local out; local errcnt=0; local err
-
-  return 0 # don't add any new users
-
-  if (( SETUP_LDAP )) ; then # default
-    # setup a simple ldap/ipa server on the mgmt node
-    setup_ldap $MGMT_NODE ${NODES[*]} $YARN_NODE || return 1
-
-  elif (( SETUP_USERS )) ; then
-    verbose "--- checking/creating users via useradd..."
-    for node in ${NODES[*]} $YARN_NODE; do
-	out="$(ssh $node "/tmp/bin/add_groups.sh")"
-	err=$?
-	debug "add groups to $node: $out"
-        (( err != 0 )) && { ((errcnt++)); continue; } # don't try to add users
-	out="$(ssh $node "/tmp/bin/add_users.sh")"
-	err=$?
-	debug "add users to $node: $out"
-        (( err != 0 )) && ((errcnt++))
-    done
-  fi
-
-  (( errcnt > 1 )) && return 1
-  return 0
-}
-
-# setup_ldap: if the user requested a simple ldap/ipa setup then create the
-# ipa server on the passed-in node, and setup the ipa clients on all storage
-# nodes and on the yarn-master. Returns 1 on errors.
-# NOTE: for Denali we are not supporting automatic creation of users. Consistent
-#   UIDs are still required for the hadoop users but that is the customer's
-#   responsibility.
-# Args:
-#   1=(required) ldap/ipa server node,
-#   2=(required) list of client nodes.
-# Uses globals:
-#   EXTRA_USERS, can be empty
-#   NODES()
-#   YARN_NODE
-function setup_ldap() {
-
-  local ldap_server="$1"; shift
-  local client_nodes="$@"
-  local err; local out
-
-  return 0 # don't create any users
-
-  verbose "--- setting up ldap/ipa server on $ldap_server..."
-  out="$(/tmp/bin/ldap_server.sh $ldap_server ${EXTRA_USERS//,/ })"
-  err=$?
-  (( err != 0 )) && {
-    err -e $err "ldap_server:\n$out";
-    return 1; }
-  debug -e "ldap_server:\n$out"
-
-  verbose "--- setting up ldap/ipa clients on: ${client_nodes// /, }..."
-  out="$(/tmp/bin/ldap_clients.sh $ldap_server $client_nodes)"
-  err=$?
-  (( err != 0 )) && {
-    err -e $err "ldap_clients:\n$out";
-    return 1; }
-  debug -e "ldap_clients:\n$out"
-
-  verbose "--- setting up ldap/ipa server and clients complete"
-  return 0
-}
-
 # update_yarn: yum installs the latest glusterfs client bits on the yarn node
 # if the gluster client version is older than 3.6. The yarn node is expected to
 # be a RHEL 6.5 server, but it could be a storage node. Returns 1 for errors.
@@ -827,9 +693,6 @@ declare -A NODE_BRKMNTS; declare -A NODE_BLKDEVS
 MGMT_INSIDE=0		# assume false
 YARN_INSIDE=0		# assume false
 AUTO_YES=0		# assume false
-#SETUP_LDAP=0		# assume false
-#SETUP_EXT_LDAP=0	# assume false
-#SETUP_USERS=0		# assume false
 VERBOSE=$LOG_QUIET	# default
 errnodes=''; errcnt=0
 
@@ -877,10 +740,6 @@ echo
 echo "*** begin cluster setup... this may take some time..."
 (( VERBOSE > LOG_DEBUG )) && echo "    see $LOGFILE to view progress..."
 echo
-
-# NOTE: this is not supported in Denali, the customer must create the required
-#   hadoop users prior to running this script.
-#setup_users || exit 1
 
 # setup each node for hadoop workloads
 setup_nodes || exit 1
