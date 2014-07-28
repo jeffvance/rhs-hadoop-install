@@ -33,7 +33,7 @@ where:
 <volname>    : the RHS volume to be disabled for hadoop workloads.
 --yarn-master: hostname or ip of the yarn-master server which is expected to
                be outside of the storage pool.
---rhs_node   : (optional) hostname of any of the storage nodes. This is needed in
+--rhs-node   : (optional) hostname of any of the storage nodes. This is needed in
                order to access the gluster command. Default is localhost which,
                must have gluster cli access.
 --hadoop-mgmt-node : (optional) hostname or ip of the hadoop mgmt server which
