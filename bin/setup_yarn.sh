@@ -12,8 +12,8 @@ PREFIX="$(dirname $(readlink -f $0))"
 errcnt=0
 
 # set_yarn: if the yarn node does not already have VOLNAME mounted then
-# append an glusterfs-fuse volume mount to fstab and mount it. Note: since
-# the yarn-master node is expected to be a RHEL server we have to install
+# append the glusterfs-fuse volume mount to fstab and mount it. Note: since
+# the yarn-master node is expected to be a RHEL server we may have to install
 # glusterfs-fuse first.
 # Uses globals:
 #   PREFIX
@@ -26,8 +26,8 @@ function set_yarn() {
   local err; local ssh=''; local ssh_close=''
   local fuse_rpm='glusterfs-fuse'
 
-  [[ "$YARN_NODE" != "$HOSTNAME" ]] && \
-	{ ssh="ssh $YARN_NODE '"; ssh_close="'"; }
+  [[ "$YARN_NODE" != "$HOSTNAME" ]] && {
+    ssh="ssh $YARN_NODE '"; ssh_close="'"; }
 
   eval "$ssh
 	  # install glusterfs-fuse if not present

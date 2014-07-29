@@ -2,7 +2,8 @@
 #
 # enable_vol.sh accepts a volume name, discovers and checks the volume mount on
 # each node spanned by the volume to be sure they are setup for hadoop work-
-# loads, and then updates the Hadoop core-site file to contain the volume. 
+# loads, creates the volume mount on the yarn-master, and updates the Hadoop
+# core-site file to contain the volume. 
 #
 # See usage() for syntax.
 
