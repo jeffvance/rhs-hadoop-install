@@ -7,10 +7,7 @@
 # -d, output only the distributed dirs, skip local dirs
 # -l, output only the local dirs, skip distributed dirs
 
-# single out sub-dirs under the user/ dir since this is a late addition
-# and there may be a need to remove it
-# REMOVED FROM DENALI
-#user_dirs='user/hcat:0755:hcat user/hive:0755:hive user/mapred:0755:mapred user/yarn:0755:yarn'
+user_dirs='user/hcat:0755:hcat user/hive:0755:hive user/mapred:0755:mapred user/yarn:0755:yarn'
 
 # parse cmd opts
 while getopts ':adl' opt; do
