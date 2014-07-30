@@ -7,7 +7,8 @@
 PREFIX="$(dirname $(readlink -f $0))"
 warncnt=0
 AMBARI_SERVER_PID='/var/run/ambari-server/ambari-server.pid'
-METAINFO_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.0.6.GlusterFS/metainfo.xml'
+#METAINFO_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.0.6.GlusterFS/metainfo.xml' # hdp 2.0
+METAINFO_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.1.GlusterFS/metainfo.xml' # hdp 2.1
 ACTIVE_FALSE='<active>false<'; ACTIVE_TRUE='<active>true<'
 SERVER_ALREADY_INSTALLED=0 # false
 
