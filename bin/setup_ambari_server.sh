@@ -1,8 +1,9 @@
 #!/bin/bash
 #
 # setup_ambari_server.sh installs and starts the ambari-server on this node 
-# (localhost). The active flag is set to true in the meta info xml file. This
-# makes ambari aware of alternative HCFS file systems, like RHS/glusterfs.
+# (localhost). SELinux is set to permissive mode. The active flag is set to
+# true in the meta info xml file, which makes ambari aware of alternative HCFS
+# file systems, like RHS/glusterfs.
 
 PREFIX="$(dirname $(readlink -f $0))"
 warncnt=0
@@ -48,19 +49,25 @@ fi
 sed -i -e "s/$ACTIVE_FALSE/$ACTIVE_TRUE/" $METAINFO_PATH
 
 # start the server now
-out="$(ambari-server start 2>&1)"
-err=$?
-if (( err != 0 )) ; then
-  echo "ERROR $err: ambari-server start: $out"
-  exit 1
-fi
-
-# restart the server after a reboot
-out="$(chkconfig ambari-server on 2>&1)"
+ambari-server start 2>&1
 err=$?
 (( err != 0 )) && {
-  echo "WARN $err: chkconfig ambari-server on: $out";
+  echo "ERROR $err: ambari-server start";
+  exit 1; }
+
+# restart the server after a reboot
+chkconfig ambari-server on 2>&1
+err=$?
+(( err != 0 )) && {
+  echo "WARN $err: chkconfig ambari-server on";
   ((warncnt++)); }
+
+# set selinux to permissive mode
+setup_selinux
+err=$?
+(( err != 0 )) && {
+  echo "ERROR $err: setting up selinux";
+  exit 1; }
 
 echo "ambari-server installed and running with $warncnt warnings"
 exit 0

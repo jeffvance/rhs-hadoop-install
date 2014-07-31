@@ -190,33 +190,6 @@ function setup_ntp() {
   return 0
 }
 
-# setup_selinux: if selinux is enabled then set it to permissive. This seems
-# to be a requirement for HDP. Returns 1 on errors.
-function setup_selinux() {
-
-  local err
-  local conf='/etc/sysconfig/selinux' # symlink to /etc/selinux/config
-  local selinux_key='SELINUX='
-  local permissive='permissive'
-
-  # set selinux to permissive (audit errors reported but not enforced)
-  setenforce $permissive 2>&1
-
-  # keep selinux permissive on reboots
-  if [[ ! -f $conf ]] ; then
-    echo "WARN: SELinux config file $conf missing"
-    return # nothing more to do...
-  fi
-
-  # config SELINUX=permissive which takes effect the next reboot
-  sed -i -e "/^$selinux_key/c\\$selinux_key$permissive" $conf
-  err=$?
-  if (( err != 0 )) ; then
-    echo "ERROR $err: trying to set selinux to permissive in $conf"
-    return 1
-  fi
-}
-
 # setup_xfs: mkfs.xfs on the block device. Returns 1 on error.
 function setup_xfs() {
 

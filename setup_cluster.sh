@@ -878,10 +878,6 @@ echo "*** begin cluster setup... this may take some time..."
 (( VERBOSE > LOG_DEBUG )) && echo "    see $LOGFILE to view progress..."
 echo
 
-# NOTE: this is not supported in Denali, the customer must create the required
-#   hadoop users prior to running this script.
-#setup_users || exit 1
-
 # setup each node for hadoop workloads
 setup_nodes || exit 1
 

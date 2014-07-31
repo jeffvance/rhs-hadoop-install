@@ -3,7 +3,7 @@
 # $1= list of nodes, including yarn-master and ambari nodes. If empty then
 #     the default list of "ambari.hdp yarn.hdp rhs-1.hdp rhs-2.hdp" is assumed.
 #
-NODES="$1"
+NODES="$@"
 DEFLT_NODES='ambari.hdp yarn.hdp rhs-1.hdp rhs-2.hdp'
 echo
 
@@ -40,15 +40,17 @@ for node in $NODES; do
       subscription-manager repos --disable '*'
       subscription-manager repos --enable=rhel-6-server-rpms --enable=rhs-big-data-3-for-rhel-6-server-rpms --enable=rhs-3-for-rhel-6-server-rpms --enable=rhel-scalefs-for-rhel-6-server-rpms
 
-     # create hadoop users
-     if [[ "$node" != 'ambari.hdp' ]] ; then
-       groupadd hadoop -g 590
-       useradd -u 591 mapred -g hadoop
-       useradd -u 592 yarn -g hadoop
-       useradd -u 594 hcat -g hadoop
-       useradd -u 595 hive -g hadoop
-       useradd -u 596 ambari-qa -g hadoop
-     fi
+      # create hadoop users on all nodes except for the ambari server
+      if [[ ! "$node" =~ ambari ]] ; then
+	echo
+	echo '---- add hadoop users...'
+	groupadd hadoop -g 590
+	useradd -u 591 mapred -g hadoop
+	useradd -u 592 yarn -g hadoop
+	useradd -u 594 hcat -g hadoop
+	useradd -u 595 hive -g hadoop
+	useradd -u 596 ambari-qa -g hadoop
+      fi
     "
 done
 
