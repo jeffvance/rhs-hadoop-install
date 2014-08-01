@@ -27,7 +27,7 @@ $ME --version | --help
 
 $ME [-y] [--quiet | --verbose | --debug] \\
            [--user <ambari-admin-user>] [--pass <ambari-admin-password>] \\
-           [--port <port-num>] [--hadoop-management-node <node>] \\
+           [--port <port-num>] [--hadoop-mgmt-node <node>] \\
            [--rhs-node <node>] [--yarn-master <node>] \\
            <volname>
 where:

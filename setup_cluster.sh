@@ -46,18 +46,18 @@ SYNTAX:
 
 $ME --version | --help
 
-$ME [-y] [--hadoop-management-node <node>] [--yarn-master <node>] \\
+$ME [-y] [--hadoop-mgmt-node <node>] [--yarn-master <node>] \\
               [--quiet | --verbose | --debug]  <nodes-spec-list>
 where:
 
-<node-spec-list>: a list of two or more <node-spec>s.
+<nodes-spec-list>: a list of two or more <node-spec's>.
 <node-spec>     : a storage node followed by a ':', followed by a brick mount
                   path, followed by another ':', followed by a block device
                   path.
                   Eg: <node1><:brickmnt1>:<blkdev1> <node2>[:<brickmnt2>]
                       [:<blkdev2>] [<node3>] ...
-                  Each node is expected to be separate from the management and 
-                  yarn-master nodes. Only the brick mount path and the block
+                  It is recommended that each node is be separate from the mgmt
+                  and yarn-master nodes. Only the brick mount path and the block
                   device path associated with the first node are required. If
                   omitted from the other <node-spec-list> members then each node
                   assumes the values of the first node for brick mount path and
