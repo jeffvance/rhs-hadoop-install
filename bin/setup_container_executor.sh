@@ -21,14 +21,14 @@ perms=6050
 task_controller='/usr/lib/hadoop-yarn/bin/container-executor'
 task_cfg='/etc/hadoop/conf/container-executor.cfg'
 
-echo "Configuring the Linux Container Executor for Hadoop"
+echo "$HOSTNAME: configuring the Linux Container Executor for Hadoop"
 create_container_executor
 
-echo "changing owner and permissions on $task_controller"
+echo "$HOSTNAME: changing owner and permissions on $task_controller"
 chown root:$process_group $task_controller || ((errcnt++))
 chmod $perms $task_controller || ((errcnt++))
 
-echo "changing owner on $task_cfg"
+echo "$HOSTNAME: changing owner on $task_cfg"
 chown root:$process_group $task_cfg || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1

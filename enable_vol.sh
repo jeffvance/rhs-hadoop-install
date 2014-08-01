@@ -237,7 +237,7 @@ function chk_nodes() {
 # setup_multi_tenancy: invoke bin/setup_container_executor.sh on each of the 
 # passed in nodes (which are expected to be storage nodes). Assumes bin/* has
 # been copied to /tmp/bin on each node. Returns 1 on errors.
-# Args: # $@ = list of storage nodes
+# Args: $@ = list of storage nodes.
 function setup_multi_tenancy() {
 
   local nodes="$@"
@@ -247,10 +247,10 @@ function setup_multi_tenancy() {
       out="$(ssh $node /tmp/bin/setup_container_executor.sh)"
       err=$?
       if (( err == 0 )) ; then
-	debug "setup_container_executor: $out"
+	debug "on $node: setup_container_executor: $out"
       else
 	((errcnt++))
-	err "setup_container_executor: $out"
+	err $err "on $node: setup_container_executor: $out"
       fi
   done
 
