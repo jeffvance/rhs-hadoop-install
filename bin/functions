@@ -185,27 +185,6 @@ function gluster_mnt_vol() {
   return $err
 }
 
-# match_port_conf: return 0 (shell true) if the passed-in port and protocol
-# are found in the iptables config file.
-# Args: 1=port number or range, 2=protocol
-function match_port_conf() {
-
-  local conf='/etc/sysconfig/iptables'
-  local port="$1"; local proto="$2"
-
-  grep -qs -e "-p $proto .* $port .*ACCEPT" $conf
-}
-
-# match_port_live: return 0 (shell true) if the passed-in port and protocol
-# are currently open (live).
-# Args: 1=port number or range, 2=protocol
-function match_port_live() {
-
-  local port="$1"; local proto="$2"
-
-  iptables -n -L | grep -qs "^ACCEPT *$proto .*:$port"
-}
-
 # path_avail: given a file or directory name, a list of nodes, and a companion
 # list of path prefixes, return 0 (true) if the full path is available on *all*
 # of the nodes (eg. does not exist on any node). Return false (1) if the full
@@ -251,6 +230,30 @@ function quiet() {
     opt="$1"; shift # assume echo option
   fi
   display $opt "$1" $LOG_QUIET
+}
+
+# setup_firewall: due to random ports (ports opened with port num 0) and
+# possibly RMI ports we cannot open up the firewall only for specific hadoop / 
+# gluster / ambari related ports. The only solution that allows hadoop to work
+# is to open up the entire firewall. If customers want security then they'll 
+# need to establish cluster perimeter security, liklely on a separate, private
+# network. Returns 1 on errors.
+function setup_firewall() {
+
+  local err
+
+  iptables -F		  && \
+    service iptables stop && \
+    service iptables save && \
+    chkconfig iptables off # persist setting
+
+  err=$?
+  (( err != 0 )) && {
+     echo "ERROR $err: iptables";
+     return 1; }
+
+  echo "iptables configured and saved"
+  return 0
 }
 
 # setup_selinux: set selinux on localhost to permissive mode, which seems to be

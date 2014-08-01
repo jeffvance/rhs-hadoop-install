@@ -130,32 +130,6 @@ function check_open_ports() {
   fi
 
   return 1 # potentially hadoop needed ports have rules
-
-  # Code below remains for documentation purposes...
-
-  # there are some iptables rules, verify the required ports are open
-  #local out; local port; local proto
-  #local out; local errcnt=0; local warncnt=0
-  #declare -A PORTS=$($PREFIX/gen_ports.sh)
-
-  #for proto in ${!PORTS[@]}; do
-      #for port in ${PORTS[$proto]}; do
-	  # live check
-	  #if ! match_port_live $port $proto ; then
-	    #echo "ERROR on $NODE: iptables: port(s) $port not open"
-	    #((errcnt++))
-	  #fi
-	  # file check
-	  #if ! match_port_conf $port $proto ; then
-	    #echo "WARN on $NODE: $iptables_conf file: port(s) $port not accepted"
-	    #((warncnt++))
-	  #fi
-      #done
-  #done
-
-  #(( errcnt > 0 )) && return 1
-  #echo "all required ports are open on $NODE with $warncnt warnings"
-  #return 0
 }
 
 # check_ntp: verify that ntp is running and the config file has 1 or more

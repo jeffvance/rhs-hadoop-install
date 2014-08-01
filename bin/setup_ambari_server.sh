@@ -70,7 +70,7 @@ err=$?
   exit 1; }
 
 # turn off iptables
-$PREFIX/setup_firewall.sh
+setup_firewall
 err=$?
 (( err != 0 )) && {
   echo "ERROR $err: disabling iptables";
