@@ -277,7 +277,7 @@ function edit_core_site() {
   [[ -n "$MGMT_PORT" ]] && mgmt_port="--port $MGMT_PORT"
 
   out="$($PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE $mgmt_u $mgmt_p \
-	$mgmt_port --volpath $VOLMNT $VOLNAME)"
+	$mgmt_port --mountpath $VOLMNT $VOLNAME)"
   err=$?
 
   if (( err != 0 )) ; then

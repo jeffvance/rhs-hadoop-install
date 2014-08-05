@@ -29,6 +29,7 @@ function usage () {
   echo "       [-u userId]: Optional user ID to use for authentication. Default is 'admin'."
   echo "       [-p password]: Optional password to use for authentication. Default is 'admin'."
   echo "       [--port port]: Optional port number for Ambari server. Default is '8080'. Provide empty string to not use port."
+  echo "       [--mountpath path]: Required mount path for the volume."
   echo "       [-h ambari_host]: Optional external host name for Ambari server. Default is 'localhost'."
   echo "       VOLNAME: Gluster Volume name."
   exit 1
@@ -39,6 +40,7 @@ function usage () {
 #   AMBARI_HOST
 #   _DEBUG
 #   DEBUG
+#   MOUNTPATH
 #   PASSWD
 #   PORT
 #   USERID
@@ -46,7 +48,7 @@ function usage () {
 function parse_cmd(){
 
   local OPTIONS='u:p:h:'
-  local LONG_OPTS='port:,help,debug'
+  local LONG_OPTS='port:,mountpath:,help,debug'
 
   local args=$(getopt -n "$SCRIPT" -o $OPTIONS --long $LONG_OPTS -- $@)
   (( $? == 0 )) || { echo "$SCRIPT syntax error"; exit -1; }
@@ -66,6 +68,11 @@ function parse_cmd(){
 		fi
 		debug echo "PORT=$2"
 		PARAMS=$PARAMS" -port $2 "
+		shift 2; continue
+	;;
+	--mountpath)
+		MOUNTPATH="$2"
+		debug echo "MOUNTPATH=$MOUNTPATH"
 		shift 2; continue
 	;;
 	--debug)
@@ -96,17 +103,17 @@ function parse_cmd(){
       esac
   done
   
-  #take care of all other arguments
-  if (( $# > 1 )); then
-    echo "Error: Unknown values: \"$@\""; return 1
-  fi
-  if [[ -z "$1" ]]; then
-    echo "Syntax error: VOLNAME is missing: \"$@\""; usage; return 1
-  else
-    VOLNAME="$1"
-  fi
+  # error if more than one arg
+  (( $# > 1 )) && {
+    echo "Error: Unknown values: \"$@\""; usage; return 1; }
 
-  eval set -- "$@" # move arg pointer so $1 points to next arg past last opt
+  VOLNAME="$1"
+  [[ -z "$VOLNAME" ]] && {
+    echo "Syntax error: VOLNAME is missing"; usage; return 1; }
+
+  # error if required options are missing
+  [[ -z "$MOUNTPATH" ]] && {
+    echo "Syntax error: MOUNTPATH is missing"; usage; return 1; }
 
   [[ $DEBUG == true ]] && debug echo "DEBUGGING ON"
 
@@ -237,7 +244,7 @@ $PREFIX/ambari_config_update.sh "$CONFIG_UPDATE_PARAM"
 currentMount
 debug echo "########## GLUSTERMOUNT = "$GLUSTERMOUNT
 
-CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT set $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME /mnt/glusterfs/$VOLNAME"
+CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT set $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME $MOUNTPATH/$VOLNAME"
 debug echo "ambari_config.sh $CONFIG_SET_PARAM"
 $PREFIX/ambari_config.sh $CONFIG_SET_PARAM
 restartService
