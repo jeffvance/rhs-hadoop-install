@@ -237,7 +237,7 @@ $PREFIX/ambari_config_update.sh "$CONFIG_UPDATE_PARAM"
 currentMount
 debug echo "########## GLUSTERMOUNT = "$GLUSTERMOUNT
 
-CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT set $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME $GLUSTERMOUNT/$VOLNAME"
+CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT set $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME /mnt/glusterfs/$VOLNAME"
 debug echo "ambari_config.sh $CONFIG_SET_PARAM"
 $PREFIX/ambari_config.sh $CONFIG_SET_PARAM
 restartService
