@@ -35,7 +35,7 @@ for node in $NODES; do
 
       echo
       echo '---- subscription-manager steps...'
-      subscription-manager register --username jvance@redhat.com --password redhat
+      subscription-manager register --username jvance@redhat.com --password redhat --force
       subscription-manager attach --auto
       subscription-manager repos --disable '*'
       subscription-manager repos --enable=rhel-6-server-rpms --enable=rhs-big-data-3-for-rhel-6-server-rpms --enable=rhs-3-for-rhel-6-server-rpms --enable=rhel-scalefs-for-rhel-6-server-rpms

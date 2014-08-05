@@ -32,7 +32,7 @@ fi
 
 out="$(eval "$ssh 
 	mnt=(\$(grep -w $VOLNAME /proc/mounts)) # array
-	echo \${mnt[1]} # node:/volmnt
+	echo \${mnt[1]} # /vol-mount-path
       $ssh_close
 ")"
 
