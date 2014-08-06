@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# set_glusterfs_uri.sh updates the hadoop core-site.xml file for the ...
+# set_glusterfs_uri.sh updates the hadoop core-site.xml file with the passed-in
+# volume name and volume mount path.
 #
 # Syntax: see usage() function.
 
@@ -13,16 +14,16 @@ PARAMS='' # used only for debugging
 AMBARI_HOST='localhost'
 VOLNAME=''
 CLUSTER_NAME=""
+
 # debug: execute cmd in $1 if _DEBUG is set to 'on'.
 # Uses globals:
 #   _DEBUG
-function debug()
-{
+function debug() {
  [ "$_DEBUG" == "on" ] &&  $@
 }
 
 # usage: echos general usage paragraph.
-function usage () {
+function usage() {
   echo "Usage: set_glusterfs_uri.sh [-u userId] [-p password] [--port port] [-h ambari_host] <VOLNAME>"
   echo ""
   echo "       [-u userId]: Optional user ID to use for authentication. Default is 'admin'."
@@ -44,7 +45,7 @@ function usage () {
 #   PORT
 #   USERID
 #   VOLNAME
-function parse_cmd(){
+function parse_cmd() {
 
   local OPTIONS='u:p:h:'
   local LONG_OPTS='port:,mountpath:,help,debug'
@@ -65,33 +66,28 @@ function parse_cmd(){
 		else
 		  PORT=":$2"
 		fi
-		debug echo "PORT=$2"
-		PARAMS=$PARAMS" -port $2 "
+		PARAMS="$PARAMS -port $2 "
 		shift 2; continue
 	;;
 	--mountpath)
 		MOUNTPATH="$2"
-		debug echo "MOUNTPATH=$MOUNTPATH"
 		shift 2; continue
 	;;
 	--debug)
-		DEBUG=true;_DEBUG="on"; shift; continue
+		DEBUG=true; _DEBUG="on"; shift; continue
 	;;
 	-u)
 		USERID="$2"
-                debug echo "USERID=$USERID"
 		PARAMS="-u $USERID "
 		shift 2; continue
 	;;
 	-p)
 		PASSWD="$2"
-		debug echo "PASSWORD=$PASSWD"
-		PARAMS=$PARAMS" -p $PASSWD "
+		PARAMS="$PARAMS -p $PASSWD "
 		shift 2; continue
 	;;
 	-h)
 		[[ -n "$2" ]] && AMBARI_HOST="$2"
-		debug echo "AMBARI_HOST=$2"
 		shift 2; continue
 	;;
 	--) # no more args to parse
@@ -123,7 +119,7 @@ function parse_cmd(){
 # config file. Returns 1 on errors.
 # Set globals:
 #   CLUSTER_NAME
-function currentClusterName () {
+function currentClusterName() {
 
   local line=`curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/" | grep -E "cluster_name" | sed "s/\"//g"`
   local line1; local propLen; local lastChar
@@ -150,12 +146,12 @@ function currentClusterName () {
 
   value=$(echo "$value" | sed "s/[\"\,\ ]//g")
   debug echo "########## VALUE = "$value
-  if [[ ! -z "$value" ]]; then   
-    CLUSTER_NAME="$value"
-  else
-    echo "ERROR: Cluster not found"
-    return 1
-  fi 
+  [[ -z "$value" ]] && {
+    echo "ERROR: Cluster not found";
+    return 1; }
+
+  CLUSTER_NAME="$value"
+  return 0
 }
 
 function restartService() {
@@ -163,12 +159,12 @@ function restartService() {
 
   local service
 
-  for service in MAPREDUCE2 YARN GLUSTERFS ; do
+  for service in MAPREDUCE2 YARN GLUSTERFS ; do # order matters
       $PREFIX/ambari_service.sh -u $USERID -p $PASSWD --port $PORT \
 	  -h $AMBARI_HOST --action stop $service
   done
   
-  for service in GLUSTERFS MAPREDUCE2 YARN ; do
+  for service in GLUSTERFS MAPREDUCE2 YARN ; do # order matters
       $PREFIX/ambari_service.sh -u $USERID -p $PASSWD --port $PORT \
 	  -h $AMBARI_HOST --action start $service
   done
@@ -184,18 +180,18 @@ SCRIPT=$0
 parse_cmd $@ || exit -1
 
 AMBARIURL="http://$AMBARI_HOST$PORT"
-debug echo "########## AMBARIURL = "$AMBARIURL
+debug echo "########## AMBARIURL = $AMBARIURL"
 
 currentClusterName || exit 1
-debug echo "########## CLUSTER_NAME = "$CLUSTER_NAME
+debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
 
-PARAMS=$PARAMS" add_volume $AMBARI_HOST $CLUSTER_NAME core-site "$VOLNAME
-PARAMS=`echo $PARAMS | sed "s/\"//g"`
-debug echo "########## PARAMS = "$PARAMS
+PARAMS="$PARAMS add_volume $AMBARI_HOST $CLUSTER_NAME core-site $VOLNAME"
+PARAMS="$(echo $PARAMS | sed 's/\"//g')"
+debug echo "########## PARAMS = $PARAMS"
 	
-PORT=$(echo "$PORT" | sed "s/[\"\,\:\ ]//g")
+PORT="$(echo "$PORT" | sed 's/[\"\,\:\ ]//g')"
 CONFIG_UPDATE_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST --config core-site --action add --configkey fs.glusterfs.volumes --configvalue $VOLNAME"
-[[ $DEBUG == true ]] && CONFIG_UPDATE_PARAM=$CONFIG_UPDATE_PARAM" --debug"
+[[ $DEBUG == true ]] && CONFIG_UPDATE_PARAM+=" --debug"
 
 debug echo "ambari_config_update.sh $CONFIG_UPDATE_PARAM" 
 $PREFIX/ambari_config_update.sh "$CONFIG_UPDATE_PARAM" 
