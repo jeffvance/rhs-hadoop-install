@@ -1,8 +1,9 @@
 #!/bin/bash
 #
-# add_dirs.sh adds the required hadoop directories and assigns the correct perms
-# and owners. This only needs to be done once for the pool when -d is specified.
-# It needs to be done per-node if -l is specified.
+# add_dirs.sh adds the required hadoop directories and assigns the correct
+# permissions and owners on this node (localhost). The caller only needs to
+# invoke add_dirs once for the pool when -d (distributed) is specified. It
+# needs to be invoked on each node when -l is specified.
 # Note: the hadoop users and group need to have the same UID and GID across
 #   all nodes in the storage pool and on the mgmt and yarn-master servers; 
 #   however this script does not check nor enforce this requirement.

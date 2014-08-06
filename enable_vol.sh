@@ -5,6 +5,8 @@
 # loads, creates the volume mount on the yarn-master, sets up the storage nodes
 # for multi-tenancy, and updates the Hadoop core-site file to contain the
 # volume. 
+# NOTE: it is expected that the Ambari install wizard steps have been performed
+#  prior to executing this script.
 #
 # See usage() for syntax.
 
