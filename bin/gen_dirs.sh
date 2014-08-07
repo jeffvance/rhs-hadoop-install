@@ -14,7 +14,7 @@ apps_dirs='app-logs:1777:yarn apps:0775:hive apps/webhcat:0775:hcat'
 
 user_dirs='user:0755:yarn user/hcat:0755:hcat user/hive:0755:hive user/mapred:0755:mapred user/yarn:0755:yarn'
 
-misc_dirs='tmp:1777:yarn tmp/logs:1777:yarn job-staging-yarn:0770:yarn '
+misc_dirs='tmp:1777:yarn tmp/logs:1777:yarn job-staging-yarn:0770:yarn'
 
 
 # parse cmd opts
