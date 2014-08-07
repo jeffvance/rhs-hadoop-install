@@ -2,12 +2,15 @@
 #
 # gen_dirs.sh outputs a tuple of "dir:perms:owner" for each of the required
 # hadoop directories.
+# Note: the following users are expected to exist:
+#   ambari-qa, hcat, hive, mapred, tez, yarn, zookeeper
+#
 # Syntax:
-# -a, output all dirs -- distributed and local
-# -d, output only the distributed dirs, skip local dirs
-# -l, output only the local dirs, skip distributed dirs
+# -a, output all dirs as if all options below were passed.
+# -d, output only the distributed dirs.
+# -l, output only the local dirs.
 
-# format: <dir-path>:perms:owner
+# format: <dir-path>:<perms>:<owner>
 mr_dirs='mapred:0770:mapred mapred/system:0755:mapred mr-history:0755:yarn mr-history/tmp:1777:yarn mr-history/done:0770:yarn'
 
 apps_dirs='app-logs:1777:yarn apps:0775:hive apps/webhcat:0775:hcat'

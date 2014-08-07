@@ -11,8 +11,8 @@
 # Syntax:
 #  $1=distributed gluster mount (single) or brick mount(s) (per-node) path 
 #     (required).
-#  -d=output only the distributed dirs, skip local dirs.
-#  -l=output only the local dirs, skip distributed dirs.
+#  -d=output only the distributed dirs,
+#  -l=output only the local dirs.
 
 errcnt=0; cnt=0
 HADOOP_G='hadoop'
@@ -38,9 +38,11 @@ MNT="$@" # typically a single mount but can be a list
   echo "ERROR: mount path(s) required";
   exit -1; }
 
-if [[ -n "$DIST" ]] ; then
-  opt='-d'
-elif [[ -n "$LOCAL" ]] ; then
+[[ -n "$DIST" ]] && opt='-d'
+if [[ -n "$LOCAL" ]] ; then
+  [[ -n "$opt" ]] && {
+    echo "Syntax error: only one of -d or -l can be specified";
+    exit -1; }
   opt='-l'
 else
   echo "Syntax error: -d or -l options are required"
