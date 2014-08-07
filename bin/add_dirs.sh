@@ -13,39 +13,22 @@
 #     (required).
 #  -d=output only the distributed dirs,
 #  -l=output only the local dirs.
+#  -p=output only the post-processing dirs.
 
 errcnt=0; cnt=0
 HADOOP_G='hadoop'
 PREFIX="$(dirname $(readlink -f $0))"
 
-# parse cmd opts
-while getopts ':dl' opt; do
-    case "$opt" in
-      d) # only distributed dirs
-        DIST=true # else, undefined
-        ;;
-      l) # only local dirs
-        LOCAL=true # else, undefined
-        ;;
-      \?) # invalid option
-        ;;
-    esac
-done
-shift $((OPTIND-1))
+opt="$1" # expected to be -d or -l or -p
+shift
 
 MNT="$@" # typically a single mount but can be a list
 [[ -z "$MNT" ]] && {
   echo "ERROR: mount path(s) required";
   exit -1; }
 
-[[ -n "$DIST" ]] && opt='-d'
-if [[ -n "$LOCAL" ]] ; then
-  [[ -n "$opt" ]] && {
-    echo "Syntax error: only one of -d or -l can be specified";
-    exit -1; }
-  opt='-l'
-else
-  echo "Syntax error: -d or -l options are required"
+if [[ "$opt" != '-d' && "$opt" != '-l' && "$opt" != 'p' ]] ; then
+  echo "Syntax error: one of -d, -l, or -p is required"
   exit -1
 fi
 
@@ -55,6 +38,7 @@ for dir in $MNT; do
 	echo "ERROR: $dir is not a directory";
 	exit -1; }
 done
+
 dirs_to_add="$($PREFIX/gen_dirs.sh $opt)"
 
 for dir in $MNT; do # to handle a list of local mounts

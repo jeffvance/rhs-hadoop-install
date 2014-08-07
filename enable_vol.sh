@@ -260,6 +260,35 @@ function setup_multi_tenancy() {
   return 0
 }
 
+# create_post_processing_dirs: create the distributed hadoop directories that
+# need to be added after the Ambari services have been started.# Returns 1 on
+# errors.
+# ASSUMPTION: all bin/* scripts have been copied to /tmp/bin on the RHS_NODE.
+# Uses globals:
+#   RHS_NODE
+#   VOLMNT (includes volname)
+#   VOLNAME
+function create_post_processing_dirs() {
+
+  local err; local ssh; local out
+
+  verbose "--- adding post-processing hadoop directories for $VOLNAME..."
+
+  [[ "$RHS_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $RHS_NODE"
+
+  # add the required post-processing hadoop dirs
+  out="$(eval "$ssh /tmp/bin/add_dirs.sh -p $VOLMNT")"
+  err=$?
+  if (( err != 0 )) ; then
+    err $err "could not add required hadoop dirs: $out"
+    return 1
+  fi
+  debug "add_dirs -p $VOLMNT: $out"
+
+  verbose "--- added post-processing hadoop directories for $VOLNAME..."
+  return 0
+}
+
 # edit_core_site: invoke bin/set_glusterfs_uri to edit the core-site file and
 # restart all ambari services across the cluster. Returns 1 on errors.
 # Uses globals:
@@ -357,6 +386,9 @@ chk_nodes || exit 1
 
 # set up storage nodes for multi-tennancy
 setup_multi_tenancy $NODES || exit 1
+
+# create dirs needed after Ambari services have been started
+create_post_processing_dirs || exit 1
 
 # edit the core-site file to recognize the enabled volume
 edit_core_site || exit 1
