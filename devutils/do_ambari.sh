@@ -37,6 +37,11 @@ for node in $NODES; do
       echo '---- subscription-manager steps...'
       subscription-manager register --username jvance@redhat.com --password redhat --force
       subscription-manager attach --auto
+      (( $? != 0 )) && subscription-manager attach --auto
+      (( $? != 0 )) && subscription-manager attach --auto
+      (( $? != 0 )) && {
+	echo "******ERROR: 3 attempts to attach --auto failed!";
+	exit 1; }
       subscription-manager repos --disable '*'
       subscription-manager repos --enable=rhel-6-server-rpms --enable=rhs-big-data-3-for-rhel-6-server-rpms --enable=rhs-3-for-rhel-6-server-rpms --enable=rhel-scalefs-for-rhel-6-server-rpms
 

@@ -3,10 +3,11 @@
 # enable_vol.sh accepts a volume name, discovers and checks the volume mount on
 # each node spanned by the volume to be sure they are setup for hadoop work-
 # loads, creates the volume mount on the yarn-master, sets up the storage nodes
-# for multi-tenancy, and updates the Hadoop core-site file to contain the
-# volume. 
+# for multi-tenancy, creates additional directories that are needed after 
+# Ambari services are started, and updates the Hadoop core-site file to contain
+# the volume name and mount. 
 # NOTE: it is expected that the Ambari install wizard steps have been performed
-#  prior to executing this script.
+#   prior to executing this script.
 #
 # See usage() for syntax.
 
