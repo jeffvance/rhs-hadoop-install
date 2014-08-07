@@ -45,11 +45,15 @@ for node in $NODES; do
 	echo
 	echo '---- add hadoop users...'
 	groupadd hadoop -g 590
+	useradd -u 590 ambari-qa -g hadoop
 	useradd -u 591 mapred -g hadoop
 	useradd -u 592 yarn -g hadoop
+	useradd -u 593 tez -g hadoop
 	useradd -u 594 hcat -g hadoop
 	useradd -u 595 hive -g hadoop
-	useradd -u 596 ambari-qa -g hadoop
+	useradd -u 596 oozie -g hadoop
+	useradd -u 597 zookeeper -g hadoop
+	useradd -u 598 falcon -g hadoop
       fi
     "
 done

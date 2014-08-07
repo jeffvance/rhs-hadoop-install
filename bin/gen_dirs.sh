@@ -47,7 +47,7 @@ while getopts ':adlp' opt; do
 done
 
 [[ -z "$DIST" && -z "$LOCAL" && -z "$POST" ]] && {
-  echo "Syntax error: -a, -d or -l -p options are required";
+  echo "Syntax error: -a, -d, -l, or -p option required";
   exit -1; }
 
 dirs=''

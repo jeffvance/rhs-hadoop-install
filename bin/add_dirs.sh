@@ -27,7 +27,7 @@ MNT="$@" # typically a single mount but can be a list
   echo "ERROR: mount path(s) required";
   exit -1; }
 
-if [[ "$opt" != '-d' && "$opt" != '-l' && "$opt" != 'p' ]] ; then
+if [[ "$opt" != '-d' && "$opt" != '-l' && "$opt" != '-p' ]] ; then
   echo "Syntax error: one of -d, -l, or -p is required"
   exit -1
 fi
