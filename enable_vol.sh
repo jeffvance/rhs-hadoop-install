@@ -131,46 +131,6 @@ function parse_cmd() {
   return 0
 }
 
-# setup_nodes: setup each node for hadoop workloads by invoking
-# setup_datanodes.sh. Returns 1 on errors. Assumes all nodes have current
-# bin/ scripts in /tmp.
-# NOTE: NOT CURRENTY INVOKED BUT MAY BE LATER...
-# Uses globals:
-#   BLKDEVS
-#   BRKMNTS
-#   MGMT_NODE
-#   NODES
-#   VOLNAME
-#   YARN_NODE
-function setup_nodes() {
-
-  local i=0; local err; local errcnt=0; local out
-  local node; local brkmnt; local blkdev; local ssh
-
-  verbose "--- correcting issues on nodes spanned by $VOLNAME..."
-
-  for node in $NODES; do
-      brkmnt=${BRKMNTS[$i]}
-      blkdev=${BLKDEVS[$i]}
-
-      [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
-
-      out="$(eval "$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
-		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE")"
-      err=$?
-      if (( err != 0 )) ; then
-        err $err "setup_datanode on $node:\n$out"
-        ((errcnt++))
-      fi
-      debug -e "$node: setup_datanode:\n$out"
-      ((i++))
-  done
-
-  (( errcnt > 0 )) && return 1
-  verbose "--- issue(s) corrected"
-  return 0
-}
-
 # yarn_mount: this is the first opportunity to setup the yarn-master server
 # because we need both the yarn-master node and a volume. Invokes setup_yarn.sh
 # script. Returns 1 for errors.
@@ -286,7 +246,7 @@ function create_post_processing_dirs() {
   fi
   debug "add_dirs -p $VOLMNT: $out"
 
-  verbose "--- added post-processing hadoop directories for $VOLNAME..."
+  verbose "--- added post-processing hadoop directories for $VOLNAME"
   return 0
 }
 
