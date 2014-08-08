@@ -22,13 +22,12 @@ ACTION=""
 # debug: execute cmd in $1 if _DEBUG is set to 'on'.
 # Uses globals:
 #   _DEBUG
-function debug()
-{
+function debug() {
  [ "$_DEBUG" == "on" ] &&  $@
 }
 
 # usage: echos general usage paragraph.
-function usage () {
+function usage() {
   echo "Usage: ambari_config_update.sh [-u userId] [-p password] [--port port] [-h ambari_host] [--config config-site] --action add|remove  --configkey CONFIG_KEY --configvalue CONFIG_VALUE"
   echo ""
   echo "       [-u userId]: Optional user ID to use for authentication. Default is 'admin'."
@@ -53,7 +52,7 @@ function usage () {
 #   PROPERTY
 #   CONFIG_KEY 
 #   CONFIG_VALUE
-function parse_cmd(){
+function parse_cmd() {
 
   local OPTIONS='u:p:h:'
   local LONG_OPTS='port:,action:,configkey:,configvalue:,config:,help,debug'
@@ -128,7 +127,7 @@ function parse_cmd(){
   done
 
   
-  #take care of all other arguments
+  # take care of all other arguments
   if [[ -z "$ACTION" ]]; then
     echo "Syntax error: ACTION is missing"; usage ; return 1
   fi
@@ -139,17 +138,13 @@ function parse_cmd(){
     echo "Syntax error: CONFIG_KEY is missing"; usage ; return 1
   fi
 
-  ACTION=$(echo "$ACTION" | sed "s/[\"\,\ ]//g")
-  if [ "$ACTION" == "add" ] || [ "$ACTION" == "remove" ]; then
-   ACTION=$ACTION
-  else
+  if [ "$ACTION" != "add" ] && [ "$ACTION" != "remove" ]; then
     echo "Syntax error: ACTION should be add|remove"; usage ; return 1
   fi
 
   eval set -- "$@" # move arg pointer so $1 points to next arg past last opt
 
   [[ $DEBUG == true ]] && debug echo "DEBUGGING ON"
-
   return 0
 }
 
@@ -157,7 +152,7 @@ function parse_cmd(){
 # config file. Returns 1 on errors.
 # Set globals:
 #   CLUSTER_NAME
-function currentClusterName () {
+function currentClusterName() {
 
   local line=`curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/" | grep -E "cluster_name" | sed "s/\"//g"`
   local line1; local propLen; local lastChar
@@ -167,8 +162,7 @@ function currentClusterName () {
     echo "ERROR: Cluster was not found in server response."
     return 1
   fi
-
-  debug echo "########## LINE = "$line
+  debug echo "########## LINE = $line"
 
   line1="$line"
   propLen=${#line1}
@@ -184,12 +178,13 @@ function currentClusterName () {
 
   value=$(echo "$value" | sed "s/[\"\,\ ]//g")
   debug echo "########## VALUE = "$value
-  if [[ ! -z "$value" ]]; then   
-    CLUSTER_NAME="$value"
-  else
+  if [[ -z "$value" ]]; then   
     echo "ERROR: Cluster not found"
     return 1
   fi 
+
+  CLUSTER_NAME="$value"
+  return 0
 }
 
 
@@ -197,12 +192,14 @@ function currentClusterName () {
 # config file. Returns 1 on errors.
 # Set globals:
 #   SITETAG
-currentSiteTag () {
+function currentSiteTag() {
+
   local currentSiteTag=''
   local found=''
   local line ; local errOutput ;
     
   currentSite=$(curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME?fields=Clusters/desired_configs" | grep -E "$SITE|tag")
+
   for line in $currentSite; do
     if [ $line != "{" -a $line != ":" -a $line != '"tag"' ] ; then
       if [ -n "$found" -a -z "$currentSiteTag" ]; then
@@ -212,7 +209,8 @@ currentSiteTag () {
         found=$SITE; 
       fi
     fi
-  done;
+  done
+
   if [ -z $currentSiteTag ]; then
     errOutput=$(curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME?fields=Clusters/desired_configs")
     echo "[ERROR] \"$SITE\" not found in server response.";
@@ -230,15 +228,15 @@ currentSiteTag () {
 # doUpdate: UPDATES the PROPERTY IN SITETAG
 # Returns 1 on errors.
 # Input : $1 mode ;$2 key ;$3 value
-doUpdate () {
+function doUpdate() {
+
   local mode=$1
   local configkey=$2
   local configvalue=$3
-  local currentSiteTag=''
-  local found=''
-  local line ; local line1 ; local propertiesStarted ; local newProperties; local errOutput ;
-  local newTag ; local finalJson ;local newFile
-  local keyvalue=() ;local old=() ;local new=()
+  local currentSiteTag=''; local found=''
+  local line; local line1; local propertiesStarted; local newProperties
+  local errOutput; local newTag; local finalJson; local newFile
+  local keyvalue=(); local old=(); local new=()
 
   currentSiteTag
   debug echo "########## Performing '$mode' $configkey:$configvalue on (Site:$SITE, Tag:$SITETAG)";
@@ -247,7 +245,7 @@ doUpdate () {
     ## echo ">>> $line";
     if [ "$propertiesStarted" -eq 0 -a "`echo $line | grep "\"properties\""`" ]; then
       propertiesStarted=1
-    fi;
+    fi
     if [ "$propertiesStarted" -eq 1 ]; then
       if [ "$line" == "}" ]; then
         ## Properties ended
@@ -305,8 +303,7 @@ doUpdate () {
         
         
         STR_ARRAY=(`echo $value | tr "," "\n"`)
-        for x in ${STR_ARRAY[@]}
-        do
+        for x in ${STR_ARRAY[@]}; do
           if ([ $x != $configvalue ])
             then
               NEW_STR_ARRAY=( "${NEW_STR_ARRAY[@]}" "$x" ) 
@@ -338,8 +335,7 @@ doUpdate () {
             return 1 
           fi
           NEW_STR_ARRAY_COMMA=""
-          for x in ${NEW_STR_ARRAY[@]}
-          do
+          for x in ${NEW_STR_ARRAY[@]}; do
             NEW_STR_ARRAY_COMMA+=$x","
           done
 
@@ -378,4 +374,3 @@ debug echo "########## "$ACTION $CONFIG_KEY $CONFIG_VALUE
 doUpdate $ACTION $CONFIG_KEY $CONFIG_VALUE || exit 1
 
 exit 0
-

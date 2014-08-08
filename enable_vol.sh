@@ -6,6 +6,11 @@
 # for multi-tenancy, creates additional directories that are needed after 
 # Ambari services are started, and updates the Hadoop core-site file to contain
 # the volume name and mount. 
+# NOTE: the newly enabled volume becomes the *default* hadoop volume used for
+#   all unqualified file URIs. This is a result of the volname being prepended
+#   to the list of volumes, with the first name in the last being the default
+#   volume. If the user does not want this behavior then they must use Ambari->
+#   GlusterFS -> Configs screen to change the order of the volumes. 
 # NOTE: it is expected that the Ambari install wizard steps have been performed
 #   prior to executing this script.
 #

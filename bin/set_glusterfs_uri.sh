@@ -1,7 +1,11 @@
 #!/bin/bash
 #
 # set_glusterfs_uri.sh updates the hadoop core-site.xml file with the passed-in
-# volume name and volume mount path.
+# volume name and volume mount path. The volume name is prepended to the list
+# of volumes specified in the "fs.glusterfs.volumes" property, which makes this
+# volume the *default* volume for unqualfied file references. If this volume
+# is not the desired default volume then the user must manually change the
+# order of the volume names. See Ambari -> GlusterFS -> Configs.
 #
 # Syntax: see usage() function.
 
@@ -70,7 +74,7 @@ function parse_cmd() {
 		shift 2; continue
 	;;
 	--mountpath)
-		MOUNTPATH="$2"
+		MOUNTPATH="$2" # volname is appended to mountpath
 		shift 2; continue
 	;;
 	--debug)
@@ -196,7 +200,7 @@ CONFIG_UPDATE_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST --config
 debug echo "ambari_config_update.sh $CONFIG_UPDATE_PARAM" 
 $PREFIX/ambari_config_update.sh "$CONFIG_UPDATE_PARAM" 
 
-CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT set $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME $MOUNTPATH/$VOLNAME"
+CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT set $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME $MOUNTPATH"
 debug echo "ambari_config.sh $CONFIG_SET_PARAM"
 $PREFIX/ambari_config.sh $CONFIG_SET_PARAM
 restartService
