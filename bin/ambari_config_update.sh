@@ -227,108 +227,116 @@ function currentSiteTag() {
 
 # doUpdate: UPDATES the PROPERTY IN SITETAG
 # Returns 1 on errors.
-# Input : $1 mode ;$2 key ;$3 value
+# Input : $1 mode; $2 key; $3 value
 function doUpdate() {
 
-  local mode=$1
-  local configkey=$2
-  local configvalue=$3
+  local mode=$1; local configkey=$2; local configvalue=$3
   local currentSiteTag=''; local found=''
   local line; local line1; local propertiesStarted; local newProperties
   local errOutput; local newTag; local finalJson; local newFile
   local keyvalue=(); local old=(); local new=()
 
   currentSiteTag
+echo ">>>> SITETAG=$SITETAG"
+
   debug echo "########## Performing '$mode' $configkey:$configvalue on (Site:$SITE, Tag:$SITETAG)";
   propertiesStarted=0;
-  curl -k -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/configurations?type=$SITE&tag=$SITETAG" | while read -r line; do
-    ## echo ">>> $line";
+
+out="$(curl -k -s -u $USERID:$PASSWD \
+       "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/configurations?type=$SITE&tag=$SITETAG" )"
+echo ">>>> curl out = $out"
+  curl -k -s -u $USERID:$PASSWD \
+       "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/configurations?type=$SITE&tag=$SITETAG" | \
+  while read -r line; do
+    ## echo ">>> $line"
+echo ">>>> line=$line"
+echo ">>>> propertiesStarted=$propertiesStarted"
     if [ "$propertiesStarted" -eq 0 -a "`echo $line | grep "\"properties\""`" ]; then
       propertiesStarted=1
     fi
-    if [ "$propertiesStarted" -eq 1 ]; then
-      if [ "$line" == "}" ]; then
+echo "  >>>> propertiesStarted=$propertiesStarted"
+    if (( propertiesStarted == 1 )) ; then
+echo ">>>> properties started..."
+      if [[ "$line" == "}" ]] ; then
+echo ">>>> properties ended..."
         ## Properties ended
         ## Add property
-        [ "$mode" == "add" -o "$mode" == "remove" ] && newProperties="$newProperties, \"$configkey\" : \"$configvalue\" ";
+        [[ "$mode" == "add" || "$mode" == "remove" ]] && \
+	  newProperties="$newProperties, \"$configkey\" : \"$configvalue\" "
 
         newProperties=$newProperties$line
-        propertiesStarted=0;
-        
+        propertiesStarted=0
+
         newTag=$(date "+%s")
         newTag="version${newTag}001"
         finalJson="{ \"Clusters\": { \"desired_config\": {\"type\": \"$SITE\", \"tag\":\"$newTag\", $newProperties}}}"
         newFile="doUpdate_$newTag.json"
         debug echo "########## PUTting json into: $newFile"
+echo ">>>> echo $finalJson > $newFile"
         echo $finalJson > $newFile
-        
+
         check_error="$(eval "curl -k -s -u $USERID:$PASSWD -X PUT -H "X-Requested-By:ambari" "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME" --data @$newFile ")"
         err=$?
         if (( err != 0 )) ; then
-          echo "[ERROR] $check_error.";
+          echo "[ERROR] $check_error."
           return 1
         fi
         check_error=$(echo $check_error | grep "\"status\"")
         if [ "$check_error" ]; then
-          echo "[ERROR] $check_error.";
+          echo "[ERROR] $check_error."
           return 1 
         fi
 
         sleep 4
-        echo  "changed $configkey. New value is [$configvalue]."
+        echo "changed $configkey. New value is [$configvalue]."
         currentSiteTag
         rm -fr $newFile
         debug echo "########## NEW Site:$SITE, Tag:$SITETAG";
+
+      # else, line is not "}"...
       elif [ "`echo $line | grep "\"$configkey\""`" ]; then
+echo ">>>> line contains \"$configkey\"..."
         debug echo "########## Config found. Skipping origin value"
-        
-        #remove comma
-        line1=$line
+        # remove comma
+        line1="$line"
         propLen=${#line1}
-        lastChar=${line1:$propLen-1:1}
-        if [ "$lastChar" == "," ]; then
-          line1=${line1:0:$propLen-1}
-        fi
-        debug echo "########## LINE = "$line1
-        
-        
+        lastChar="${line1:$propLen-1:1}"
+        [[ "$lastChar" == "," ]] && line1="${line1:0:$propLen-1}"
+        debug echo "########## LINE = $line1"
+
         OIFS="$IFS"
         IFS=':'
-        read -a keyvalue <<< "${line1}"
+        read -a keyvalue <<< "$line1"
         IFS="$OIFS"
         key=${keyvalue[0]}
         value=${keyvalue[1]}
         value=$(echo "$value" | sed "s/[\"\ ]//g")
         debug echo "########## current VALUE = "$value
-        
-        
+
         STR_ARRAY=(`echo $value | tr "," "\n"`)
         for x in ${STR_ARRAY[@]}; do
-          if ([ $x != $configvalue ])
-            then
-              NEW_STR_ARRAY=( "${NEW_STR_ARRAY[@]}" "$x" ) 
-          fi
+          [[ $x != $configvalue ]] && NEW_STR_ARRAY=( "${NEW_STR_ARRAY[@]}" "$x" ) 
         done
-        old=${STR_ARRAY[@]};
-        new=${NEW_STR_ARRAY[@]};
+        old=${STR_ARRAY[@]}
+        new=${NEW_STR_ARRAY[@]}
         debug echo "########## old = ["${#STR_ARRAY[@]}"] new = ["${#NEW_STR_ARRAY[@]}"]"
-        
-        if [ "$mode" == "add" ]; then
-          #check if key is already present
-          if [ "$old" != "$new" ] ; then
+
+        if [[ "$mode" == "add" ]] ; then
+          # check if key is already present
+          if [[ "$old" != "$new" ]] ; then
             echo "ERROR!! $configvalue aready present in $configkey."
             #configvalue=$value
             return 1 
           else
-            if [ ${#STR_ARRAY[@]} -eq 0 ]; then
+            if (( ${#STR_ARRAY[@]} == 0 )) ; then
               configvalue=$configvalue
             else
-              configvalue=$value","$configvalue
+              configvalue="$value,$configvalue"
             fi
           fi
-          debug echo "########## add configvalue = "$configvalue  
+          debug echo "########## add configvalue = $configvalue "
         else
-          #check if key is already present
+          # check if key is already present
           if [ "$old" == "$new" ] ; then
             echo "ERROR!! $configvalue not present in $configkey."
             #configvalue=$value
@@ -339,21 +347,21 @@ function doUpdate() {
             NEW_STR_ARRAY_COMMA+=$x","
           done
 
-          #remove comma
-          line1=$NEW_STR_ARRAY_COMMA
+          # remove trailing comma
+          line1="$NEW_STR_ARRAY_COMMA"
           propLen=${#line1}
           lastChar=${line1:$propLen-1:1}
-          if [ "$lastChar" == "," ]; then
-            line1=${line1:0:$propLen-1}
-          fi
-          configvalue=$line1
+          [[ "$lastChar" == "," ]] && line1="${line1:0:$propLen-1}"
+          configvalue="$line1"
           debug echo "########## remove configvalue = "$configvalue  
         fi
+
+      # else, line does not contain configkey
       else
         newProperties=$newProperties$line
       fi
     fi
-  done;
+  done
 }
 
 ## ** main ** ##
