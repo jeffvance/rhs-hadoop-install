@@ -35,7 +35,7 @@ function usage() {
   echo "       [--port port]: Optional port number for Ambari server. Default is '8080'. Provide empty string to not use port."
   echo "       [-h ambari_host]: Optional external host name for Ambari server. Default is 'localhost'."
   echo "       [--config config-site]: core-site | mapred-site | yarn site .default config file is core-site."
-  echo "       --action add|remove : add/remove CONFIG_VALUE"
+  echo "       --action prepend|append|remove: add/remove CONFIG_VALUE"
   echo "       --configkey CONFIG_KEY : property Key in config-site."
   echo "       --configvalue CONFIG_VALUE: property value to be appended with comma."
   exit 1
@@ -128,19 +128,17 @@ function parse_cmd() {
 
   
   # take care of all other arguments
-  if [[ -z "$ACTION" ]]; then
-    echo "Syntax error: ACTION is missing"; usage ; return 1
-  fi
-  if [[ -z "$CONFIG_VALUE" ]]; then
-    echo "Syntax error: CONFIG_VALUE is missing"; usage ; return 1
-  fi
-  if [[ -z "$CONFIG_KEY" ]]; then
-    echo "Syntax error: CONFIG_KEY is missing"; usage ; return 1
-  fi
+  [[ -z "$ACTION" ]] && {
+    echo "Syntax error: ACTION is missing"; usage ; return 1; }
+  [[ "$ACTION" != "prepend" && "$ACTION" != "append" && "$ACTION" != "remove" ]] && {
+    echo "Syntax error: ACTION is expected to be  one of: prepend|append|remove";
+    usage ; return 1; }
 
-  if [ "$ACTION" != "add" ] && [ "$ACTION" != "remove" ]; then
-    echo "Syntax error: ACTION should be add|remove"; usage ; return 1
-  fi
+  [[ -z "$CONFIG_VALUE" ]] && {
+    echo "Syntax error: CONFIG_VALUE is missing"; usage ; return 1; }
+
+  [[ -z "$CONFIG_KEY" ]] && {
+    echo "Syntax error: CONFIG_KEY is missing"; usage ; return 1; }
 
   eval set -- "$@" # move arg pointer so $1 points to next arg past last opt
 
@@ -225,143 +223,77 @@ function currentSiteTag() {
 }
 
 
-# doUpdate: UPDATES the PROPERTY IN SITETAG
-# Returns 1 on errors.
+# doUpdate: UPDATES the PROPERTY IN SITETAG. Returns 1 on errors. Returns 0 for no
+# errors or for warnings.
 # Input : $1 mode; $2 key; $3 value
 function doUpdate() {
 
   local mode=$1; local configkey=$2; local configvalue=$3
-  local currentSiteTag=''; local found=''
-  local line; local line1; local propertiesStarted; local newProperties
-  local errOutput; local newTag; local finalJson; local newFile
-  local keyvalue=(); local old=(); local new=()
+  local tmp_cfg="$(mktemp --suffix .$SITE)"
+  local old_value; local new_value
+  local line; local out; local err
 
   currentSiteTag
-echo ">>>> SITETAG=$SITETAG"
-
   debug echo "########## Performing '$mode' $configkey:$configvalue on (Site:$SITE, Tag:$SITETAG)";
-  propertiesStarted=0;
 
-out="$(curl -k -s -u $USERID:$PASSWD \
-       "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/configurations?type=$SITE&tag=$SITETAG" )"
-echo ">>>> curl out = $out"
-  curl -k -s -u $USERID:$PASSWD \
-       "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/configurations?type=$SITE&tag=$SITETAG" | \
-  while read -r line; do
-    ## echo ">>> $line"
-echo ">>>> line=$line"
-echo ">>>> propertiesStarted=$propertiesStarted"
-    if [ "$propertiesStarted" -eq 0 -a "`echo $line | grep "\"properties\""`" ]; then
-      propertiesStarted=1
+  # write current config(core) json record to tmp config file
+  curl -o $tmp_cfg -k -s -u $USERID:$PASSWD \
+    "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/configurations?type=$SITE&tag=$SITETAG"
+
+  # extract the target properties section and find the key line
+  line="$(sed -n "/\"properties\" :/,/}$/{/$configkey/p}" $tmp_cfg)"
+  line="${line%,}" # remove trailing comma if present
+  debug echo "########## LINE = $line"
+
+  # extract the unquoted value from line
+  old_value="${line#*: }"       # just value portion
+  old_value="${old_value//\"/}" # remove all double-quotes
+  debug echo "########## current VALUE = $old_value"
+
+  if [[ "$mode" == 'append' || "$mode" == 'prepend' ]] ; then
+    # check if key is already present
+    if [[ ",$old_value," =~ ",$configvalue," ]] ; then
+      echo "WARN: $configvalue already present in $configkey; no action needed"
+      return 0
     fi
-echo "  >>>> propertiesStarted=$propertiesStarted"
-    if (( propertiesStarted == 1 )) ; then
-echo ">>>> properties started..."
-      if [[ "$line" == "}" ]] ; then
-echo ">>>> properties ended..."
-        ## Properties ended
-        ## Add property
-        [[ "$mode" == "add" || "$mode" == "remove" ]] && \
-	  newProperties="$newProperties, \"$configkey\" : \"$configvalue\" "
-
-        newProperties=$newProperties$line
-        propertiesStarted=0
-
-        newTag=$(date "+%s")
-        newTag="version${newTag}001"
-        finalJson="{ \"Clusters\": { \"desired_config\": {\"type\": \"$SITE\", \"tag\":\"$newTag\", $newProperties}}}"
-        newFile="doUpdate_$newTag.json"
-        debug echo "########## PUTting json into: $newFile"
-echo ">>>> echo $finalJson > $newFile"
-        echo $finalJson > $newFile
-
-        check_error="$(eval "curl -k -s -u $USERID:$PASSWD -X PUT -H "X-Requested-By:ambari" "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME" --data @$newFile ")"
-        err=$?
-        if (( err != 0 )) ; then
-          echo "[ERROR] $check_error."
-          return 1
-        fi
-        check_error=$(echo $check_error | grep "\"status\"")
-        if [ "$check_error" ]; then
-          echo "[ERROR] $check_error."
-          return 1 
-        fi
-
-        sleep 4
-        echo "changed $configkey. New value is [$configvalue]."
-        currentSiteTag
-        rm -fr $newFile
-        debug echo "########## NEW Site:$SITE, Tag:$SITETAG";
-
-      # else, line is not "}"...
-      elif [ "`echo $line | grep "\"$configkey\""`" ]; then
-echo ">>>> line contains \"$configkey\"..."
-        debug echo "########## Config found. Skipping origin value"
-        # remove comma
-        line1="$line"
-        propLen=${#line1}
-        lastChar="${line1:$propLen-1:1}"
-        [[ "$lastChar" == "," ]] && line1="${line1:0:$propLen-1}"
-        debug echo "########## LINE = $line1"
-
-        OIFS="$IFS"
-        IFS=':'
-        read -a keyvalue <<< "$line1"
-        IFS="$OIFS"
-        key=${keyvalue[0]}
-        value=${keyvalue[1]}
-        value=$(echo "$value" | sed "s/[\"\ ]//g")
-        debug echo "########## current VALUE = "$value
-
-        STR_ARRAY=(`echo $value | tr "," "\n"`)
-        for x in ${STR_ARRAY[@]}; do
-          [[ $x != $configvalue ]] && NEW_STR_ARRAY=( "${NEW_STR_ARRAY[@]}" "$x" ) 
-        done
-        old=${STR_ARRAY[@]}
-        new=${NEW_STR_ARRAY[@]}
-        debug echo "########## old = ["${#STR_ARRAY[@]}"] new = ["${#NEW_STR_ARRAY[@]}"]"
-
-        if [[ "$mode" == "add" ]] ; then
-          # check if key is already present
-          if [[ "$old" != "$new" ]] ; then
-            echo "ERROR!! $configvalue aready present in $configkey."
-            #configvalue=$value
-            return 1 
-          else
-            if (( ${#STR_ARRAY[@]} == 0 )) ; then
-              configvalue=$configvalue
-            else
-              configvalue="$value,$configvalue"
-            fi
-          fi
-          debug echo "########## add configvalue = $configvalue "
-        else
-          # check if key is already present
-          if [ "$old" == "$new" ] ; then
-            echo "ERROR!! $configvalue not present in $configkey."
-            #configvalue=$value
-            return 1 
-          fi
-          NEW_STR_ARRAY_COMMA=""
-          for x in ${NEW_STR_ARRAY[@]}; do
-            NEW_STR_ARRAY_COMMA+=$x","
-          done
-
-          # remove trailing comma
-          line1="$NEW_STR_ARRAY_COMMA"
-          propLen=${#line1}
-          lastChar=${line1:$propLen-1:1}
-          [[ "$lastChar" == "," ]] && line1="${line1:0:$propLen-1}"
-          configvalue="$line1"
-          debug echo "########## remove configvalue = "$configvalue  
-        fi
-
-      # else, line does not contain configkey
-      else
-        newProperties=$newProperties$line
-      fi
+    if [[ "$mode" == 'prepend' ]] ; then
+      new_value="$configvalue,$old_value"
+    else # append
+      new_value="$old_value,$configvalue"
     fi
-  done
+    debug echo "########## new configvalue = $new_value"
+
+  else # mode(action) = remove
+    # check if configvalue exists
+    if [[ ! ",$old_value," =~ ",$configvalue," ]] ; then
+      echo "WARN: $configvalue not present in $configkey; no action needed"
+      return 0 
+    fi
+    new_value="${old_value/$configvalue/}" # remove configvalue
+    new_value="${new_value#,}"    # remove leading comma, if any
+    new_value="${new_value%,}"    # remove trailing comma, if any
+    new_value="${new_value/,,/,}" # fold double commas to single, is any
+    debug echo "########## remove configvalue = $new_value"
+  fi
+
+  # done constructing new property value
+  # update new value in tmp config file
+  sed -i "/\"properties\" :/,/}$/{/$configkey/s/$old_value/$new_value/}" $tmp_cfg
+
+  # PUT update to the real config(core) file
+  out="$(curl -k -s -u $USERID:$PASSWD -X PUT -H 'X-Requested-By:ambari' \
+	 $AMBARIURL/api/v1/clusters/$CLUSTER_NAME --data @$tmp_cfg)"
+  err=$?
+  if (( err != 0 )) || grep -q '"status"' <<<$out ; then
+    echo "ERROR: $out"
+    return 1
+  fi
+  sleep 4
+
+  echo "changed $configkey. New value is [$configvalue]"
+  currentSiteTag
+  debug echo "########## NEW Site:$SITE, Tag:$SITETAG";
+  return 0
 }
 
 ## ** main ** ##
@@ -376,8 +308,8 @@ AMBARIURL="http://$AMBARI_HOST$PORT"
 debug echo "########## AMBARIURL = "$AMBARIURL
 
 currentClusterName || exit 1
-debug echo "########## CLUSTER_NAME = "$CLUSTER_NAME
-debug echo "########## "$ACTION $CONFIG_KEY $CONFIG_VALUE
+debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
+debug echo "########## $ACTION $CONFIG_KEY $CONFIG_VALUE"
 
 doUpdate $ACTION $CONFIG_KEY $CONFIG_VALUE || exit 1
 
