@@ -230,8 +230,10 @@ function doUpdate() {
 
   local mode=$1; local configkey=$2; local configvalue=$3
   local tmp_cfg="$(mktemp --suffix .$SITE)"
-  local old_value; local new_value
+  local old_value; local new_value; local newTag
   local line; local out; local err
+  local json_begin="{ \"Clusters\": { \"desired_config\": {\"type\": \"$SITE\", "
+  local json_end='}}}'
 
   currentSiteTag
   debug echo "########## Performing '$mode' $configkey:$configvalue on (Site:$SITE, Tag:$SITETAG)";
@@ -276,11 +278,16 @@ function doUpdate() {
     debug echo "########## remove configvalue = $new_value"
   fi
 
-  # done constructing new property value
-  # update new value in tmp config file
+  # done constructing new property value; fix up the json file for the PUT below
+  # update new configvalue in place
   sed -i "/\"properties\" :/,/}$/{/$configkey/s/$old_value/$new_value/}" $tmp_cfg
+  # prepend and append "desired_config" json to config file
+  newTag="version$(date '+%s')001"
+  json_begin+="\"tag\":\"$newTag\", "
+  sed -i "1i $json_begin" $tmp_cfg # prepend json to config file
+  echo "$json_end" >>$tmp_cfg
 
-  # PUT update to the real config(core) file
+  # PUT/update the real config(core) file
   out="$(curl -k -s -u $USERID:$PASSWD -X PUT -H 'X-Requested-By:ambari' \
 	 $AMBARIURL/api/v1/clusters/$CLUSTER_NAME --data @$tmp_cfg)"
   err=$?
