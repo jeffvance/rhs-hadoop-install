@@ -238,12 +238,13 @@ function doUpdate() {
   currentSiteTag
   debug echo "########## Performing '$mode' $configkey:$configvalue on (Site:$SITE, Tag:$SITETAG)";
 
-  # write current config(core) json record to tmp config file
-  curl -o $tmp_cfg -k -s -u $USERID:$PASSWD \
-    "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/configurations?type=$SITE&tag=$SITETAG"
+  # extract the properties section and write to tmp config file
+  curl -k -s -u $USERID:$PASSWD \
+   "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/configurations?type=$SITE&tag=$SITETAG"\
+  | sed -n '/\"properties\" :/,/}$/p' >$tmp_cfg # just the "properties" section
 
-  # extract the target properties section and find the key line
-  line="$(sed -n "/\"properties\" :/,/}$/{/$configkey/p}" $tmp_cfg)"
+  # extract the target key line
+  line="$(grep "\"$configkey\"" $tmp_cfg)"
   line="${line%,}" # remove trailing comma if present
   debug echo "########## LINE = $line"
 
@@ -278,14 +279,17 @@ function doUpdate() {
     debug echo "########## remove configvalue = $new_value"
   fi
 
-  # done constructing new property value; fix up the json file for the PUT below
+  # done constructing new property value
+  # fix up the "property" section for the PUT below:
   # update new configvalue in place
-  sed -i "/\"properties\" :/,/}$/{/$configkey/s/$old_value/$new_value/}" $tmp_cfg
+  sed -i "/$configkey/s/$old_value/$new_value/" $tmp_cfg
   # prepend and append "desired_config" json to config file
   newTag="version$(date '+%s')001"
   json_begin+="\"tag\":\"$newTag\", "
   sed -i "1i $json_begin" $tmp_cfg # prepend json to config file
   echo "$json_end" >>$tmp_cfg
+  debug echo "########## new property:"
+  debug echo "$(cat $tmp_cfg)"
 
   # PUT/update the real config(core) file
   out="$(curl -k -s -u $USERID:$PASSWD -X PUT -H 'X-Requested-By:ambari' \
