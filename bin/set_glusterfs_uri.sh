@@ -30,6 +30,7 @@ function debug() {
 function usage() {
   echo "Usage: set_glusterfs_uri.sh [-u userId] [-p password] [--port port] [-h ambari_host] <VOLNAME>"
   echo ""
+  echo "       [--action verb]: Required action/verb to perform to property value: prepdend|append|remove."
   echo "       [-u userId]: Optional user ID to use for authentication. Default is 'admin'."
   echo "       [-p password]: Optional password to use for authentication. Default is 'admin'."
   echo "       [--port port]: Optional port number for Ambari server. Default is '8080'. Provide empty string to not use port."
@@ -52,7 +53,7 @@ function usage() {
 function parse_cmd() {
 
   local OPTIONS='u:p:h:'
-  local LONG_OPTS='port:,mountpath:,help,debug'
+  local LONG_OPTS='port:,mountpath:,action:,help,debug'
 
   local args=$(getopt -n "$SCRIPT" -o $OPTIONS --long $LONG_OPTS -- $@)
   (( $? == 0 )) || { echo "$SCRIPT syntax error"; exit -1; }
@@ -71,6 +72,10 @@ function parse_cmd() {
 		  PORT=":$2"
 		fi
 		PARAMS="$PARAMS -port $2 "
+		shift 2; continue
+	;;
+	--action)
+		ACTION="$2"
 		shift 2; continue
 	;;
 	--mountpath)
@@ -109,6 +114,14 @@ function parse_cmd() {
   VOLNAME="$1"
   [[ -z "$VOLNAME" ]] && {
     echo "Syntax error: VOLNAME is missing"; usage; return 1; }
+
+  # error is unexpected action
+  [[ -z "$ACTION" ]] && {
+    echo "Syntax error: action/verb is missing"; usage; return 1; }
+  [[ "$ACTION != 'prepend' && "$ACTION" != 'append' && \
+	"$ACTION" != 'remove' ]] && {
+    echo "Syntax error: action expected to be: prepend|append|remove";
+    usage; return 1; }
 
   # error if required options are missing
   [[ -z "$MOUNTPATH" ]] && {
@@ -194,14 +207,15 @@ PARAMS="$(echo $PARAMS | sed 's/\"//g')"
 debug echo "########## PARAMS = $PARAMS"
 	
 PORT="$(echo "$PORT" | sed 's/[\"\,\:\ ]//g')"
-CONFIG_UPDATE_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST --config core-site --action prepend --configkey fs.glusterfs.volumes --configvalue $VOLNAME"
+CONFIG_UPDATE_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST --config core-site --action $ACTION --configkey fs.glusterfs.volumes --configvalue $VOLNAME"
 [[ $DEBUG == true ]] && CONFIG_UPDATE_PARAM+=" --debug"
 
 debug echo "ambari_config_update.sh $CONFIG_UPDATE_PARAM" 
 $PREFIX/ambari_config_update.sh "$CONFIG_UPDATE_PARAM" 
-exit #...............
 
-CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT set $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME $MOUNTPATH"
+mode='set'
+[[ "$ACTION" == 'remove' ]] && mode='delete'
+CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT $mode $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME $MOUNTPATH"
 
 debug echo "ambari_config.sh $CONFIG_SET_PARAM"
 $PREFIX/ambari_config.sh $CONFIG_SET_PARAM

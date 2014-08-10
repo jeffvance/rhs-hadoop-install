@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # disable_vol.sh accepts a volume name and removes this volume from the Hadoop
-# core-site on all relevant nodes.
+# core-site file.
 #
 # See usage() for syntax.
 
@@ -137,6 +137,7 @@ function parse_cmd() {
 # Uses globals:
 #   MGMT_*
 #   PREFIX
+#   VOLMNT
 #   VOLNAME
 function edit_core_site() {
 
@@ -150,8 +151,8 @@ function edit_core_site() {
   [[ -n "$MGMT_PASS" ]] && mgmt_p="-p $MGMT_PASS"
   [[ -n "$MGMT_PORT" ]] && mgmt_port="--port $MGMT_PORT"
 
-  out="$($PREFIX/bin/unset_glusterfs_uri.sh $mgmt_node $mgmt_u $mgmt_p \
-	$mgmt_port $VOLNAME)" 
+  out="$($PREFIX/bin/set_glusterfs_uri.sh $mgmt_node $mgmt_u $mgmt_p \
+	$mgmt_port --mountpath $VOLMNT --action remove $VOLNAME --debug)" 
   err=$?
   if (( err != 0 )) ; then
     err -e $err "unset_glusterfs_uri:\n$out"
@@ -200,8 +201,19 @@ if (( $? != 0 )) ; then
 fi
 debug "nodes spanned by $VOLNAME: ${NODES[*]}"
 
+VOLMNT="$($PREFIX/bin/find_volmnt.sh -n $RHS_NODE $VOLNAME)"  #includes volname
+if (( $? != 0 )) ; then
+  err "$VOLMNT" # error from find_volmnt
+  exit 1
+fi
+debug "$VOLNAME mount point is $VOLMNT"
+
 echo
-quiet "*** Nodes    : $(echo ${NODES[*]} | sed 's/ /, /g')"
+quiet "*** Volume            : $VOLNAME"
+quiet "*** Nodes             : $(echo ${NODES[*]} | sed 's/ /, /g')"
+quiet "*** Volume mount      : $VOLMNT"
+quiet "*** Ambari mgmt node  : $MGMT_NODE"
+quiet "*** Yarn-master server: $YARN_NODE"
 echo
 
 force -e "$VOLNAME will be removed from all hadoop config files and thus will not\nbe available for any hadoop workloads."

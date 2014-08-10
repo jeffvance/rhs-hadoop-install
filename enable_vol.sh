@@ -274,7 +274,7 @@ function edit_core_site() {
   [[ -n "$MGMT_PORT" ]] && mgmt_port="--port $MGMT_PORT"
 
   out="$($PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE $mgmt_u $mgmt_p \
-	$mgmt_port --mountpath $VOLMNT $VOLNAME --debug)"
+	$mgmt_port --mountpath $VOLMNT --action prepend $VOLNAME --debug)"
   err=$?
 
   if (( err != 0 )) ; then
@@ -326,14 +326,9 @@ if (( $? != 0 )) ; then
 fi
 debug "$VOLNAME mount point is $VOLMNT"
 
-BRKMNTS=($($PREFIX/bin/find_brick_mnts.sh -xn $RHS_NODE $VOLNAME))
-BLKDEVS=($($PREFIX/bin/find_blocks.sh -xn $RHS_NODE $VOLNAME))
-
 echo
 quiet "*** Volume            : $VOLNAME"
 quiet "*** Nodes             : $(echo $NODES        | sed 's/ /, /g')"
-quiet "*** Brick mounts      : $(echo ${BRKMNTS[*]} | sed 's/ /, /g')"
-quiet "*** Block devices     : $(echo ${BLKDEVS[*]} | sed 's/ /, /g')"
 quiet "*** Volume mount      : $VOLMNT"
 quiet "*** Ambari mgmt node  : $MGMT_NODE"
 quiet "*** Yarn-master server: $YARN_NODE"

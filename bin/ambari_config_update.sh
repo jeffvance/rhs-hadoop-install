@@ -275,7 +275,7 @@ function doUpdate() {
     new_value="${old_value/$configvalue/}" # remove configvalue
     new_value="${new_value#,}"    # remove leading comma, if any
     new_value="${new_value%,}"    # remove trailing comma, if any
-    new_value="${new_value/,,/,}" # fold double commas to single, is any
+    new_value="${new_value/,,/,}" # fold double commas to single, if any
     debug echo "########## remove configvalue = $new_value"
   fi
 
