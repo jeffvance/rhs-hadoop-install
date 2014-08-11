@@ -1,11 +1,17 @@
 #!/bin/bash
 #
 # set_glusterfs_uri.sh updates the hadoop core-site.xml file with the passed-in
-# volume name and volume mount path. The volume name is prepended to the list
-# of volumes specified in the "fs.glusterfs.volumes" property, which makes this
-# volume the *default* volume for unqualfied file references. If this volume
-# is not the desired default volume then the user must manually change the
-# order of the volume names. See Ambari -> GlusterFS -> Configs.
+# volume name and volume mount path (which is required for the prepend and
+# append actions). Depending on the action, the volume name is prepended,
+# appended or deleted to/from the list of volumes specified in the
+# "fs.glusterfs.volumes" property. Additionally, the volume/fuse mount is
+# either created or deleted in core-site.
+#
+# NOTE: the first volume appearing in "fs.glusterfs.volumes" becomes the
+#   default volume and will be used for all unqualified file references.
+#
+# NOTE: currently, set_glusterfs_uri.sh calls this script passing "prepend" as
+#   the action and thus causing the target volume to become the default.
 #
 # Syntax: see usage() function.
 
@@ -34,7 +40,7 @@ function usage() {
   echo "       [-u userId]: Optional user ID to use for authentication. Default is 'admin'."
   echo "       [-p password]: Optional password to use for authentication. Default is 'admin'."
   echo "       [--port port]: Optional port number for Ambari server. Default is '8080'. Provide empty string to not use port."
-  echo "       [--mountpath path]: Required mount path for the volume."
+  echo "       [--mountpath path]: mount path for the volume when the action is prepend or append. Not used for the removee action"
   echo "       [-h ambari_host]: Optional external host name for Ambari server. Default is 'localhost'."
   echo "       VOLNAME: Gluster Volume name."
   exit 1
@@ -124,11 +130,10 @@ function parse_cmd() {
     usage; return 1; }
 
   # error if required options are missing
-  [[ -z "$MOUNTPATH" ]] && {
+  [[ -z "$MOUNTPATH" && "$ACTION" != 'remove' ]] && {
     echo "Syntax error: MOUNTPATH is missing"; usage; return 1; }
 
   [[ $DEBUG == true ]] && debug echo "DEBUGGING ON"
-
   return 0
 }
 
@@ -216,7 +221,7 @@ $PREFIX/ambari_config_update.sh "$CONFIG_UPDATE_PARAM"
 mode='set'
 [[ "$ACTION" == 'remove' ]] && mode='delete'
 CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT $mode $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME"
-[[ "$mode" ==  'set' ]] && CONFIG_SET_PARAM+=" $MOUNTPATH"
+[[ "$mode" == 'set' ]] && CONFIG_SET_PARAM+=" $MOUNTPATH"
 
 debug echo "ambari_config.sh $CONFIG_SET_PARAM"
 $PREFIX/ambari_config.sh $CONFIG_SET_PARAM

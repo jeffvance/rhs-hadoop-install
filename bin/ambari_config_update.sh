@@ -223,7 +223,7 @@ function currentSiteTag() {
 }
 
 
-# doUpdate: UPDATES the PROPERTY IN SITETAG. Returns 1 on errors. Returns 0 for no
+# doUpdate: updates the PROPERTY in SITETAG. Returns 1 on errors. Returns 0 for no
 # errors or for warnings.
 # Input : $1 mode; $2 key; $3 value
 function doUpdate() {
