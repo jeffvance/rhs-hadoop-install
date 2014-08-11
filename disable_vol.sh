@@ -137,7 +137,6 @@ function parse_cmd() {
 # Uses globals:
 #   MGMT_*
 #   PREFIX
-#   VOLMNT
 #   VOLNAME
 function edit_core_site() {
 
@@ -152,7 +151,7 @@ function edit_core_site() {
   [[ -n "$MGMT_PORT" ]] && mgmt_port="--port $MGMT_PORT"
 
   out="$($PREFIX/bin/set_glusterfs_uri.sh $mgmt_node $mgmt_u $mgmt_p \
-	$mgmt_port --mountpath $VOLMNT --action remove $VOLNAME --debug)" 
+	$mgmt_port --action remove $VOLNAME --debug)" 
   err=$?
   if (( err != 0 )) ; then
     err -e $err "unset_glusterfs_uri:\n$out"
@@ -201,17 +200,9 @@ if (( $? != 0 )) ; then
 fi
 debug "nodes spanned by $VOLNAME: ${NODES[*]}"
 
-VOLMNT="$($PREFIX/bin/find_volmnt.sh -n $RHS_NODE $VOLNAME)"  #includes volname
-if (( $? != 0 )) ; then
-  err "$VOLMNT" # error from find_volmnt
-  exit 1
-fi
-debug "$VOLNAME mount point is $VOLMNT"
-
 echo
 quiet "*** Volume            : $VOLNAME"
 quiet "*** Nodes             : $(echo ${NODES[*]} | sed 's/ /, /g')"
-quiet "*** Volume mount      : $VOLMNT"
 quiet "*** Ambari mgmt node  : $MGMT_NODE"
 quiet "*** Yarn-master server: $YARN_NODE"
 echo
