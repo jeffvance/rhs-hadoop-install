@@ -118,8 +118,8 @@ function parse_cmd() {
   # error is unexpected action
   [[ -z "$ACTION" ]] && {
     echo "Syntax error: action/verb is missing"; usage; return 1; }
-  [[ "$ACTION != 'prepend' && "$ACTION" != 'append' && \
-	"$ACTION" != 'remove' ]] && {
+  [[ "$ACTION" != 'prepend' && "$ACTION" != 'append' && \
+     "$ACTION" != 'remove' ]] && {
     echo "Syntax error: action expected to be: prepend|append|remove";
     usage; return 1; }
 
