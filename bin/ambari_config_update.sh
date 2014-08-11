@@ -301,9 +301,6 @@ function doUpdate() {
   fi
   sleep 4
 
-  echo "changed $configkey. New value is [$configvalue]"
-  currentSiteTag
-  debug echo "########## NEW Site:$SITE, Tag:$SITETAG";
   return 0
 }
 

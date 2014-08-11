@@ -28,7 +28,7 @@ function debug() {
 
 # usage: echos general usage paragraph.
 function usage() {
-  echo "Usage: set_glusterfs_uri.sh [-u userId] [-p password] [--port port] [-h ambari_host] <VOLNAME>"
+  echo "Usage: set_glusterfs_uri.sh [-u userId] [-p password] [--port port] [-h ambari_host] --mountpath <path> --action <verb> <VOLNAME>"
   echo ""
   echo "       [--action verb]: Required action/verb to perform to property value: prepdend|append|remove."
   echo "       [-u userId]: Optional user ID to use for authentication. Default is 'admin'."
@@ -215,7 +215,8 @@ $PREFIX/ambari_config_update.sh "$CONFIG_UPDATE_PARAM"
 
 mode='set'
 [[ "$ACTION" == 'remove' ]] && mode='delete'
-CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT $mode $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME $MOUNTPATH"
+CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT $mode $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME"
+[[ "$mode" ==  'set' ]] && CONFIG_SET_PARAM+=" $MOUNTPATH"
 
 debug echo "ambari_config.sh $CONFIG_SET_PARAM"
 $PREFIX/ambari_config.sh $CONFIG_SET_PARAM
