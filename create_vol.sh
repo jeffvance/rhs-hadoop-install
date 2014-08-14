@@ -31,17 +31,17 @@ SYNTAX:
 $ME --version | --help
 
 $ME [-y] [--quiet | --verbose | --debug] \\
-           <volname> <vol-mnt-prefix> <node-spec-list>
+           <volname> <vol-mnt-prefix> <nodes-spec-list>
 
 where:
 
-<node-spec-list>: a list of two or more <node-spec's>.
+<nodes-spec-list>: a list of two or more <node-spec's>.
 <node-spec>     : a storage node followed by a ':', followed by a brick mount
                   path.  Eg:
                      <node1><:brickmnt1>  <node2>[:<brickmnt2>] ...
                   A volume does not need to span all nodes in the cluster. Only
                   the brick mount path associated with the first node is
-                  required. If omitted from the other <node-spec-list> members
+                  required. If omitted from the other <nodes-spec-list> members
                   then each node assumes the value of the first node for the
                   brick mount path.
 <volname>       : name of the new volume.

@@ -56,14 +56,14 @@ where:
                   path.
                   Eg: <node1><:brickmnt1>:<blkdev1> <node2>[:<brickmnt2>]
                       [:<blkdev2>] [<node3>] ...
-                  It is recommended that each node is be separate from the mgmt
-                  and yarn-master nodes. Only the brick mount path and the block
+                  It is recommended that each node is separate from the mgmt and
+                  yarn-master nodes. Only the brick mount path and the block
                   device path associated with the first node are required. If
-                  omitted from the other <node-spec-list> members then each node
-                  assumes the values of the first node for brick mount path and
-                  block device path. If a brick mount path is omitted but a
-                  block device path is specified then the block device path is
-                  proceded by two ':'s, eg. "<nodeN>::<blkdevN>"
+                  omitted from the other <nodes-spec-list> members then each
+                  node assumes the values of the first node for brick mount
+                  path and block device path. If a brick mount path is omitted
+                  but a block device path is specified then the block device
+                  path is proceded by two ':'s, eg. "<nodeN>::<blkdevN>"
 --yarn-master   : (optional) hostname or ip of the yarn-master server which is
                   expected to be outside of the storage pool. Default is
                   localhost.
@@ -340,6 +340,39 @@ function copy_bin() {
   done
 
   (( errcnt > 0 )) && return 1
+  return 0
+}
+
+# prep_rhel_nodes: perform the tasks, if any, for the rhel nodes. Typically,
+# these would be the mgmt and yarn nodes. Returns 1 on errors.
+# Currently, the only special prep for rhel nodes is upgrading openssl.
+# Args: $@=list of potential rhel nodes.
+function prep_rhel_nodes() {
+
+  local rhel_nodes="$@"
+  local node; local ssh; local rhel
+  local err; local errcnt=0; local out
+
+  verbose "--- prepping rhel nodes..."
+
+  for node in $rhel_nodes; do
+      [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
+      out="$(eval "$ssh [[ ! -f /etc/redhat-storage-release ]] && echo rhel")"
+      (( $? == 0 )) && rhel=1 || rhel=0
+      if (( rhel )) ; then
+	out="$(eval "$ssh yum -y upgrade openssl")"
+	err=$?
+	if (( err != 0 )) ; then
+	  err $err "yum upgrade openssl on $node: $out"
+	  (( errcnt++ ))
+	else
+	  debug "yum upgrade openssl on $node: $out"
+	fi
+      fi
+  done
+
+  (( errcnt > 0 )) && return 1
+  verbose "--- done prepping rhel nodes"
   return 0
 }
 
@@ -740,6 +773,9 @@ echo
 echo "*** begin cluster setup... this may take some time..."
 (( VERBOSE > LOG_DEBUG )) && echo "    see $LOGFILE to view progress..."
 echo
+
+# do any special steps needed for rhel-only nodes, not needed for rhs nodes
+prep_rhel_nodes $YARN_NODE $MGMT_NODE || exit 1
 
 # setup each node for hadoop workloads
 setup_nodes || exit 1
