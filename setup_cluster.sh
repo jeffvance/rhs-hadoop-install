@@ -360,7 +360,7 @@ function prep_rhel_nodes() {
       out="$(eval "$ssh [[ ! -f /etc/redhat-storage-release ]] && echo rhel")"
       (( $? == 0 )) && rhel=1 || rhel=0
       if (( rhel )) ; then
-	out="$(eval "$ssh yum -y upgrade openssl")"
+	out="$(eval "$ssh yum -y upgrade openssl 2>&1")"
 	err=$?
 	if (( err != 0 )) ; then
 	  err $err "yum upgrade openssl on $node: $out"
@@ -775,7 +775,7 @@ echo "*** begin cluster setup... this may take some time..."
 echo
 
 # do any special steps needed for rhel-only nodes, not needed for rhs nodes
-prep_rhel_nodes $YARN_NODE $MGMT_NODE || exit 1
+prep_rhel_nodes $(uniq_nodes $YARN_NODE $MGMT_NODE) || exit 1
 
 # setup each node for hadoop workloads
 setup_nodes || exit 1
