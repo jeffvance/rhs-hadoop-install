@@ -213,7 +213,9 @@ function path_avail() {
 				      { ssh="ssh $node '"; ssh_close="'"; }
       eval "$ssh
 	for mnt in ${BRKMNTS[$node]}; do # typically a single mnt
-	    [[ -e \$mnt/$VOLNAME ]] && exit 1
+	    [[ -e \$mnt/$VOLNAME ]] && {
+	      echo \"ERROR: mount path exists for \$mnt/$VOLNAME on $node\";
+	      exit 1; }
 	done
 	exit 0
 	$ssh_close "
@@ -221,7 +223,8 @@ function path_avail() {
       ((cnt++))
   done
 
-  (( cnt < ${#nodes[@]} )) && return 1
+  (( cnt < ${#nodes[@]} )) && return 1 # mnt path exists somewhere...
+  debug "No nodes contain $VOLNAME as an existing mount path"
   return 0
 }
 
