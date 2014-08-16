@@ -6,7 +6,8 @@
 # open, ambari agent running, selinux not enabled, hadoop users and local hadoop
 # directories exist.
 # Syntax:
-#  $1= xfs brick mount directory path including the volume name (required).
+#  $@= required list of xfs brick mount directory paths, each includes the
+#      volume name. Typically the list is a single mount.
 
 PREFIX="$(dirname $(readlink -f $0))"
 
@@ -37,28 +38,30 @@ function check_ambari_agent() {
   return 0
 }
 
-# check_brick_mount: use xfs_info to verify the brick mnt is xfs and the isize
-# is 512. Returns 1 for errors.
+# check_brick_mount: use xfs_info to verify each brick mnt is xfs and that the
+# isize is 512. Returns 1 for errors.
 function check_brick_mount() {
 
-  local out; local isize=512; local errcnt=0; local warncnt=0
+  local out; local isize=512; local mnt
+  local err; local errcnt=0; local warncnt=0
 
-  [[ ! -d $BRICKMNT ]] && {
-    echo "ERROR: directory $BRICKMNT missing on $NODE";
-    return 1; }
-
-  out="$(xfs_info $BRICKMNT 2>&1)"
-  err=$?
-  if (( err != 0 )) ; then
-    echo "ERROR $err: xfs_info on $BRICKMNT: $out"
-    ((errcnt++))
-  else
-    out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
-    if (( out != isize )) ; then
-      echo "WARN: xfs size on $BRICKMNT expected to be $isize; found $out"
-      ((warncnt++))
-    fi
-  fi
+  for mnt in $BRICKMNT; do # can be list but typically just one mnt
+      [[ ! -d $mnt ]] && {
+	echo "ERROR: directory $mnt missing on $NODE";
+	return 1; }
+      out="$(xfs_info $mnt 2>&1)"
+      err=$?
+      if (( err != 0 )) ; then
+	echo "ERROR $err: xfs_info on $mnt: $out"
+	((errcnt++))
+      else
+        out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
+ 	if (( out != isize )) ; then
+	  echo "WARN: xfs size on $mnt expected to be $isize; found $out"
+	  ((warncnt++))
+	fi
+      fi
+  done
 
   (( errcnt > 0 )) && return 1
   echo "xfs brick mount setup correctly on $NODE with $warncnt warnings"
@@ -197,9 +200,9 @@ function check_users() {
 
 errcnt=0
 NODE="$HOSTNAME"
-BRICKMNT="$1" # includes the vol name in path
+BRICKMNT="$@" # includes the vol name in path in each mount path
 [[ -z "$BRICKMNT" ]] && {
-  echo "Syntax error: xfs brick mount path is required";
+  echo "Syntax error: xfs brick mount path(s) is required";
   exit -1; }
 
 check_brick_mount  || ((errcnt++))

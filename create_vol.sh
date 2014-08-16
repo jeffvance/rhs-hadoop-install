@@ -117,64 +117,53 @@ function parse_cmd() {
   return 0
 }
 
-# parse_nodes: set the global VOL_NODES array from NODE_SPEC.
-# Uses globals:
-#   NODE_SPEC
-# Sets globals:
-#   VOL_NODES
-function parse_nodes() {
-
-  local node_spec
-
-  # parse out list of nodes, format: "node:brick-mnt"
-  for node_spec in ${NODE_SPEC[@]}; do
-      VOL_NODES+=(${node_spec%%:*})
-  done
-}
-
-# parse_brkmnts: extracts the brick mounts from the global NODE_SPEC array.
-# Fills in default brkmnts based on the values included on the first node
-# (required). Returns 1 on syntax errors.
+# parse_nodes_brkmnts: extracts the nodes and brick mounts from the global
+# NODE_SPEC array. Fills in default brkmnts based on the values included for
+# the first node (required). Returns 1 on syntax errors.
 # Uses globals:
 #   NODE_SPEC
 #   REPLICA_CNT
 # Sets globals:
-#   BRKMNTS
-function parse_brkmnts() {
+#   BRKMNTS (assoc array)
+#   VOL_NODES()
+function parse_nodes_brkmnts() {
 
-  local brkmnts; local node_spec; local i
-  # extract the required brick-mnt from the 1st node-spec entry
-  local brkmnt=${NODE_SPEC[0]#*:}
+  local node_spec=(${NODE_SPEC[0]//:/ }) # split after subst ":" with space
+  local def_brkmnt=${node_spec[1]} # default
+  local node; local all_mnts=()
 
-  if [[ -z "$brkmnt" ]] ; then
+  if [[ -z "$def_brkmnt" ]] ; then
     echo "Syntax error: expect a brick mount, preceded by a \":\", to immediately follow the first node"
     return 1
   fi
 
-  BRKMNTS+=($brkmnt) # set global
-
   # fill in missing brk-mnts
-  for (( i=1; i<${#NODE_SPEC[@]}; i++ )); do # starting at 2nd entry
-      node_spec=${NODE_SPEC[$i]}
+  for node_spec in ${NODE_SPEC[@]}; do
+      node=${node_spec%:*}
       case "$(grep -o ':' <<<"$node_spec" | wc -l)" in # num of ":"s
 	  0) # brkmnt omitted
-	     BRKMNTS+=($brkmnt) # default
+	     BRKMNTS[$node]+="$def_brkmnt "
           ;;
 	  1) # brkmnt specified
-	     BRKMNTS+=(${node_spec#*:})
+	     BRKMNTS[$node]+="${node_spec#*:} "
           ;;
           *) 
-	     echo "Syntax error: improperly specified node-list"
+	     echo "Syntax error: improperly specified nodes-spec-list"
 	     return 1
 	  ;;
       esac
   done
 
   # verify that the number of bricks is a multiple of the replica count
-  if (( ${#BRKMNTS[@]} % REPLICA_CNT != 0 )) ; then
+  all_mnts=(${BRKMNTS[@]})
+  if (( ${#all_mnts[@]} % REPLICA_CNT != 0 )) ; then
     err "the number of bricks must be a multiple of the replica, which is $REPLICA_CNT"
     return 1
   fi
+
+  # assign unique volume nodes
+  VOL_NODES=($(printf '%s\n' "${!BRKMNTS[@]}" | sort))
+
   return 0
 }
 
@@ -208,22 +197,50 @@ function set_non_vol_nodes() {
   return 0
 }
 
+# path_avail: return 0 (true) if the full path is available on *all* nodes (eg.
+# does not exist on any node). Return false (1) if the full path is not
+# available on *all* nodes (eg. false if it exists on any node).
+# Uses globals:
+#   BRKMNTS()
+#   VOLNAME
+function path_avail() {
+
+  local node; local ssh; local ssh_close; local cnt=0
+  local nodes=(${!BRKMNTS[@]})
+
+  for node in ${nodes[@]}; do
+      [[ "$node" == "$HOSTNAME" ]] && { ssh='('; ssh_close=')'; } || \
+				      { ssh="ssh $node '"; ssh_close="'"; }
+      eval "$ssh
+	for mnt in ${BRKMNTS[$node]}; do # typically a single mnt
+	    [[ -e \$mnt/$VOLNAME ]] && exit 1
+	done
+	exit 0
+	$ssh_close "
+      (( $? == 1 )) && break # mnt path exists on node
+      ((cnt++))
+  done
+
+  (( cnt < ${#nodes[@]} )) && return 1
+  return 0
+}
+
 # chk_nodes: verify that each node that will be spanned by the new volume is 
 # prepped for hadoop workloads by invoking bin/check_node.sh. Also, verify that
 # the hadoop GID and user UIDs are consistent across the nodes. Returns 1 on
 # errors. Assumes all nodes have current bin/ scripts in /tmp.
 # Uses globals:
-#   BRKMNTS
+#   BRKMNTS()
 #   EXTRA_NODES
 #   LOGFILE
 #   VOL_NODES
 #   VOLNAME
 function chk_nodes() {
 
-  local i=0; local node; local err; local errcnt=0; local out; local ssh
+  local node; local err; local errcnt=0; local out; local ssh
 
   verify_gid_uids ${VOL_NODES[*]} ${EXTRA_NODES[*]}
-  (( $? != 0 )) && ((errcnt+))
+  (( $? != 0 )) && ((errcnt++))
 
   verbose "--- checking all nodes spanned by $VOLNAME..."
 
@@ -231,7 +248,7 @@ function chk_nodes() {
   for node in ${VOL_NODES[@]}; do
       [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
 
-      out="$(eval "$ssh /tmp/bin/check_node.sh ${BRKMNTS[$i]}")"
+      out="$(eval "$ssh /tmp/bin/check_node.sh ${BRKMNTS[$node]}")"
       err=$?
       if (( err != 0 )) ; then
 	err -e $err "check_node on $node:\n$out"
@@ -239,7 +256,6 @@ function chk_nodes() {
       else
 	debug -e "check_node on $node:\n$out"
       fi
-      ((i++))
   done
 
   (( errcnt > 0 )) && return 1
@@ -317,20 +333,21 @@ function add_distributed_dirs() {
 # create_vol: gluster vol create VOLNAME with a hard-coded replica 2 and set
 # its performance settings. Returns 1 on errors.
 # Uses globals:
-#   BRKMNTS
+#   BRKMNTS()
 #   FIRST_NODE
 #   REPLICA_CNT
-#   VOL_NODES
 #   VOLNAME
 function create_vol() {
 
-  local bricks=''; local err; local i; local out
+  local bricks=''; local err; local out; local node; local mnt
 
   verbose "--- creating the new $VOLNAME volume..."
 
   # create the gluster volume, replica 2 is hard-coded for now
-  for (( i=0; i<${#VOL_NODES[@]}; i++ )); do
-      bricks+="${VOL_NODES[$i]}:${BRKMNTS[$i]}/$VOLNAME "
+  for node in ${!BRKMNTS[@]}; do
+      for mnt in ${BRKMNTS[$node]}; do
+	  bricks+="$node:$mnt/$VOLNAME "
+      done
   done
   debug "bricks: $bricks"
 
@@ -389,7 +406,8 @@ function start_vol() {
 
 ME="$(basename $0 .sh)"
 AUTO_YES=0 # assume false
-BRKMNTS=(); VOL_NODES=()
+VOL_NODES=()
+declare -A BRKMNTS=() # assco array, node=key list of 1 or more mnt=value
 REPLICA_CNT=2  # hard-coded for now
 VERBOSE=$LOG_QUIET # default
 errcnt=0
@@ -401,7 +419,7 @@ debug "date: $(date)"
 
 parse_cmd $@ || exit -1
 
-parse_nodes
+parse_nodes_brkmnts || exit -1
 FIRST_NODE=${VOL_NODES[0]} # use this storage node for all gluster cli cmds
 
 # make sure the volume doesn't already exist
@@ -409,13 +427,11 @@ vol_exists $VOLNAME $FIRST_NODE && {
   err "volume \"$VOLNAME\" already exists";
   exit 1; }
 
-parse_brkmnts || exit -1
-
 # check for passwordless ssh connectivity to storage nodes
 check_ssh ${VOL_NODES[*]} || exit 1
 
 # volume name can't conflict with other names under the brick mnts
-path_avail "$VOLNAME" VOL_NODES[@] BRKMNTS[@] || {
+path_avail || {
   err "\"$VOLNAME\" exists under one of the brick mounts and thus cannot be created";
   exit 1; }
 
@@ -432,7 +448,12 @@ quiet "*** Nodes         : $(echo ${VOL_NODES[*]} | sed 's/ /, /g')"
   quiet "*** Nodes not spanned by vol: $(echo ${EXTRA_NODES[*]} | \
 	sed 's/ /, /g')"; }
 quiet "*** Volume mount  : $VOLMNT"
-quiet "*** Brick mounts  : $(echo ${BRKMNTS[*]} | sed 's/ /, /g' )"
+quiet "*** Brick mounts"
+for node in ${VOL_NODES[@]}; do
+    let fill=(11-${#node}) # to left-justify node
+    fmt_node="$node $(printf ' %.0s' $(seq $fill))"
+    quiet "      $fmt_node: ${BRKMNTS[$node]}"
+done
 echo
 
 # verify that each node is prepped for hadoop workloads
