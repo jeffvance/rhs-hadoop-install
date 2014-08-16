@@ -202,28 +202,26 @@ function set_non_vol_nodes() {
 # available on *all* nodes (eg. false if it exists on any node).
 # Uses globals:
 #   BRKMNTS()
+#   VOL_NODES()
 #   VOLNAME
 function path_avail() {
 
-  local node; local ssh; local ssh_close; local cnt=0
-  local nodes=(${!BRKMNTS[@]})
+  local node; local cnt=0; local out
 
-  for node in ${nodes[@]}; do
-      [[ "$node" == "$HOSTNAME" ]] && { ssh='('; ssh_close=')'; } || \
-				      { ssh="ssh $node '"; ssh_close="'"; }
-      eval "$ssh
+  for node in ${VOL_NODES[@]}; do
+      out="$(ssh $node "
 	for mnt in ${BRKMNTS[$node]}; do # typically a single mnt
 	    [[ -e \$mnt/$VOLNAME ]] && {
-	      echo \"ERROR: mount path exists for \$mnt/$VOLNAME on $node\";
+	      echo \"mount path exists for \$mnt/$VOLNAME on $node\";
 	      exit 1; }
 	done
-	exit 0
-	$ssh_close "
-      (( $? == 1 )) && break # mnt path exists on node
+	exit 0 ")"
+      (( $? == 1 )) && { # mnt path exists on node
+	err "$out"; break; }
       ((cnt++))
   done
 
-  (( cnt < ${#nodes[@]} )) && return 1 # mnt path exists somewhere...
+  (( cnt < ${#VOL_NODES[@]} )) && return 1 # mnt path exists somewhere...
   debug "No nodes contain $VOLNAME as an existing mount path"
   return 0
 }
@@ -434,9 +432,7 @@ vol_exists $VOLNAME $FIRST_NODE && {
 check_ssh ${VOL_NODES[*]} || exit 1
 
 # volume name can't conflict with other names under the brick mnts
-path_avail || {
-  err "\"$VOLNAME\" exists under one of the brick mounts and thus cannot be created";
-  exit 1; }
+path_avail || exit 1
 
 # find the nodes in the pool but not spanned by the new volume
 set_non_vol_nodes || exit 1 # sets EXTRA_NODES array (can be empty)
