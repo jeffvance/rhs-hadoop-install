@@ -215,7 +215,8 @@ function path_avail() {
 	      echo \"mount path exists for \$mnt/$VOLNAME on $node\";
 	      exit 1; }
 	done
-	exit 0 ")"
+	exit 0
+	")"
       (( $? == 1 )) && { # mnt path exists on node
 	err "$out"; break; }
       ((cnt++))
@@ -456,7 +457,7 @@ done
 echo
 
 # verify that each node is prepped for hadoop workloads
-chk_nodes  || exit 1
+chk_nodes || exit 1
 
 # prompt to continue before any changes are made...
 (( ! AUTO_YES )) && \
@@ -464,10 +465,10 @@ chk_nodes  || exit 1
 
 # create and start the replica 2 volume and set perf settings
 create_vol || exit 1
-start_vol  || exit 1
+start_vol || exit 1
 
 # create gluster-fuse mount, per node
-mk_volmnt  || exit 1
+mk_volmnt || exit 1
 
 # add the distributed hadoop dirs
 add_distributed_dirs || exit 1
