@@ -31,18 +31,18 @@ SYNTAX:
 $ME --version | --help
 
 $ME [-y] [--quiet | --verbose | --debug] \\
-           <volname> <volume-mnt-prefix> <node-list-spec>
+           <volname> <vol-mnt-prefix> <nodes-spec_list>
 
 where:
 
-<node-spec-list>: a list of two or more <node-spec>s.
+<nodes-spec-list>: a list of two or more <node-spec>s.
 <node-spec>     : a storage node followed by a ':', followed by a brick mount
                   path.  Eg:
                      <node1><:brickmnt1>  <node2>[:<brickmnt2>] ...
                   Each node is expected to be separate from the management and
                   yarn-master nodes. Only the brick mount path associated with
                   the first node is required. If omitted from the other
-                  <node-spec-list> members then each node assumes the value of
+                  <nodes-spec-list> members then each node assumes the value of
                   the first node for the brick mount path.
 <volname>       : name of the new volume.
 <vol-mnt-prefix>: path of the glusterfs-fuse mount point, eg. /mnt/glusterfs.
@@ -164,7 +164,7 @@ function parse_brkmnts() {
 	     BRKMNTS+=(${node_spec#*:})
           ;;
           *) 
-	     echo "Syntax error: improperly specified node-list"
+	     echo "Syntax error: improperly specified nodes-spec-list"
 	     return 1
 	  ;;
       esac
