@@ -342,14 +342,15 @@ function add_distributed_dirs() {
 #   VOL_NODES
 function create_vol() {
 
-  local bricks=''; local err; local out; local node; local mnt; local i
+  local bricks=''; local err; local out; local node; local i 
+  local mnt; local mnts_per_node
   local mnts=(${BRKMNTS[@]}) # array of all mnts across all nodes
   let mnts_per_node=(${#mnts[@]} / ${#VOL_NODES[@]})
 
   verbose "--- creating the new $VOLNAME volume..."
 
   # define the brick list -- order matters for replica!
-  # note; round-robin the mnts so that the original command nodes-spec list
+  # note: round-robin the mnts so that the original command nodes-spec list
   #   order is preserved
   for (( i=0; i<mnts_per_node; i++ )) ; do # typically 1 mnt per node
       for node in ${VOL_NODES[@]}; do
