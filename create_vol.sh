@@ -344,7 +344,8 @@ function create_vol() {
 
   local bricks=''; local err; local out; local node
   local mnt; local mnts; local i
-  let mnts_per_node=(${#BRKMNTS[@]} / ${#VOL_NODES[@]})
+  local mnts=(${BRKMNTS[@]}) # array of all mnts across all nodes
+  let mnts_per_node=(${#mnts[@]} / ${#VOL_NODES[@]})
 
   verbose "--- creating the new $VOLNAME volume..."
 
