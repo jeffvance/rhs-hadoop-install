@@ -339,20 +339,28 @@ function add_distributed_dirs() {
 #   FIRST_NODE
 #   REPLICA_CNT
 #   VOLNAME
+#   VOL_NODES
 function create_vol() {
 
-  local bricks=''; local err; local out; local node; local mnt
+  local bricks=''; local err; local out; local node
+  local mnt; local mnts; local i
+  let mnts_per_node=(${#BRKMNTS[@]} / ${#VOL_NODES[@]})
 
   verbose "--- creating the new $VOLNAME volume..."
 
-  # create the gluster volume, replica 2 is hard-coded for now
-  for node in ${!BRKMNTS[@]}; do
-      for mnt in ${BRKMNTS[$node]}; do
+  # define the brick list -- order matters for replica!
+  # note; round-robin the mnts so that the original command nodes-spec list
+  #   order is preserved
+  for (( i=0; i<mnts_per_node; i++ )) ; do # typically 1 mnt per node
+      for node in ${VOL_NODES[@]}; do
+	  mnts=(${BRKMNTS[$node]}) # array, typically 1 mnt entry
+	  mnt=${mnts[$i]}
 	  bricks+="$node:$mnt/$VOLNAME "
       done
   done
   debug "bricks: $bricks"
 
+  # create the gluster volume, replica 2 is hard-coded for now
   out="$(ssh $FIRST_NODE "
 	    gluster volume create $VOLNAME replica $REPLICA_CNT $bricks 2>&1")"
   err=$?
