@@ -320,23 +320,20 @@ function show_todo() {
 function copy_bin() {
 
   local node; local err; local errcnt=0; local out; local cmd
-  local nodes_seen='' # don't duplicate the copy
 
   verbose "--- copying bin/ to /tmp on all nodes..."
 
   for node in $@; do
-      [[ "$nodes_seen" =~ " $node " ]] && continue # dup node
-      nodes_seen+=" $node " # frame with spaces
-
       [[ "$node" == "$HOSTNAME" ]] && cmd="cp -fr $PREFIX/bin /tmp" \
 				   || cmd="scp -qr $PREFIX/bin $node:/tmp"
       out="$(eval "$cmd")"
       err=$?
       if (( err != 0 )) ; then
+	err $err "could not copy bin/* to /tmp on $node: $out"
 	((errcnt++))
-	err -e $err "could not copy bin/* to /tmp on $node:\n$out"
+      else
+	debug "copy bin/ to /tmp on $node: $out"
       fi
-      debug "copy bin/ to /tmp on $node: $out"
   done
 
   (( errcnt > 0 )) && return 1
@@ -755,8 +752,8 @@ check_ssh ${UNIQ_NODES[*]} || exit 1
 # check that the block devs are (likely to be) block devices
 check_blkdevs || exit 1
 
-# copy bin/* files to /tmp/ on all nodes including mgmt- and yarn-nodes
-copy_bin ${UNIQ_NODES[*]} $HOSTNAME || exit 1
+# copy bin/* files to /tmp/bin on all nodes including mgmt, yarn and localhost
+copy_bin $(uniq_nodes ${UNIQ_NODES[*]} $HOSTNAME) || exit 1
 
 # verify user UID and group GID consistency across the cluster
 verify_gid_uids ${NODES[*]} $YARN_NODE || exit 1 
