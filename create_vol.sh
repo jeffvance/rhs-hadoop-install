@@ -342,8 +342,7 @@ function add_distributed_dirs() {
 #   VOL_NODES
 function create_vol() {
 
-  local bricks=''; local err; local out; local node
-  local mnt; local mnts; local i
+  local bricks=''; local err; local out; local node; local mnt; local i
   local mnts=(${BRKMNTS[@]}) # array of all mnts across all nodes
   let mnts_per_node=(${#mnts[@]} / ${#VOL_NODES[@]})
 
