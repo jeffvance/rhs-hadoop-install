@@ -620,34 +620,12 @@ function ambari_server() {
 # Uses globals:
 #   YARN_INSIDE
 #   YARN_NODE
-#
-# NOTE: the code below is now GA ready. If it needs to be set back to pre-GA
-#   state then uncomment the call to pre_GA_update.
 function update_yarn() {
 
   local out; local err
   local major; local minor; local fix
   local channel='rhel-x86_64-server-rhsclient-6'
   local gluster_rpms='glusterfs glusterfs-api glusterfs-fuse glusterfs-libs'
-
-  # this nested function exists soley to bridge the gap between pre- and post-GA
-  # so that Dev and QE can use the installer before the rhel6.5 glusterfs 3.6
-  # client bits are yum install-able.
-  function pre_GA_update() {
-
-    local repo_file='rhs3.0-client-el6.repo'
-
-    # create repo file for rhel 6.5 that points to the gluster 3.6 client bits
-    cat <<EOF >/tmp/$repo_file
-[3.0-client-el6]
-name=rhs3.0-client-el6
-baseurl=http://rhsqe-repo.lab.eng.blr.redhat.com/rhs3.0-client-latest-el6
-enabled=1
-gpgcheck=0
-EOF
-    # copy repo file to yarn-node
-    scp -q /tmp/$repo_file $YARN_NODE:/etc/yum.repos.d/
-  }
 
   # nested function that extracts the glusterfs major, minor, and fix level
   # from the passed-in long version string. Sets these variables.
@@ -697,10 +675,6 @@ EOF
   fi
 
   verbose "--- updating yarn-master ($YARN_NODE) to gluster client ${major}.${minor}.$fix ..."
-
-  ### NOTE: the pre_GA_update call below is temporary until we GA, after-which
-  ###   it needs to be commented out.
-  #pre_GA_update
 
   out="$(ssh $YARN_NODE "yum -y install $gluster_rpms 2>&1")"
   err=$?
