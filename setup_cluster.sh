@@ -479,7 +479,7 @@ function pool_exists() {
     return 0 # pool exists
   }
 
-  # nested function which extracts a the node used in a glusterfs-fuse mount
+  # nested function which extracts the node used in a glusterfs-fuse mount
   # from /etc/fstab on the yarn-node. Sets FIRST_NODE to this node if found.
   # Returns 1 if a glusterfs-fuse mount exists, else returns 0.
   function node_from_yarn_mnt() {
