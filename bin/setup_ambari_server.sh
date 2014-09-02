@@ -3,15 +3,17 @@
 # setup_ambari_server.sh installs and starts the ambari-server on this node 
 # (localhost), and the active flag is set to true in the meta info xml file,
 # which makes ambari aware of alternative HCFS file systems, like RHS/glusterfs.
-# SELinux is set to permissive mode. iptables is turned off.
+# SELinux is set to permissive mode. iptables is turned off. Some service
+# related directories are remove for unsupported services.
 
 PREFIX="$(dirname $(readlink -f $0))"
 warncnt=0
 AMBARI_SERVER_PID='/var/run/ambari-server/ambari-server.pid'
-#METAINFO_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.0.6.GlusterFS/metainfo.xml' # hdp 2.0
 METAINFO_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.1.GlusterFS/metainfo.xml' # hdp 2.1
 ACTIVE_FALSE='<active>false<'; ACTIVE_TRUE='<active>true<'
 SERVER_ALREADY_INSTALLED=0 # false
+SERVICE_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.1.GlusterFS/services'
+RM_SERVICE_DIRS='FALCON STORM' # dirs to be deleted
 
 ## functions ##
 source $PREFIX/functions
@@ -21,41 +23,59 @@ source $PREFIX/functions
 
 # stop ambari-server if running
 if (( SERVER_ALREADY_INSTALLED )) ; then
-  out="$(ambari-server stop 2>&1)"
+  ambari-server stop 2>&1
   err=$?
   (( err != 0 )) && {
-    echo "WARN $err: couldn't stop ambari server: $out";
+    echo "WARN $err: couldn't stop ambari server";
     ((warncnt++)); }
-
-else
-  # wget the ambari repo
-  get_ambari_repo
-  # install the ambari server
-  yum -y install ambari-server 2>&1
-  err=$?
-  (( err != 0 )) && {
-    echo "ERROR $err: ambari server install: $out";
-    exit 1; }
-  # setup the ambari-server. note: -s accepts all defaults with no prompting
-  out="$(ambari-server setup -s 2>&1)"
-  err=$?
-  (( err != 0 )) && {
-    echo "ERROR $err: ambari server setup: $out";
-    exit 1; }
 fi
 
-# set the active=true flag in the meta info xml file
+# wget the ambari repo
+get_ambari_repo
+err=$?
+(( err != 0 )) && {
+  echo "ERROR $err: can't wget ambari repo";
+  exit 1; }
+
+# install the ambari server
+yum -y install ambari-server 2>&1
+err=$?
+(( err != 0 )) && {
+  echo "ERROR $err: ambari server install";
+  exit 1; }
+
+# delete un-needed service related directories
+# note: must be done after the yum install and before the setup step
+for dir in $RM_SERVICE_DIRS; do
+    if [[ -f $SERVICE_PATH/$dir ]] ; then
+      rm -rf $SERVICE_PATH/$dir
+      err=$?
+      (( err != 0 )) && {
+	echo "WARN $err: deleting $SERVICE_PATH/$dir directory";
+	((warncnt++)); }
+    fi
+done
+
+# setup the ambari-server
+# note: -s accepts all defaults with no prompting
+ambari-server setup -s 2>&1
+err=$?
+(( err != 0 )) && {
+  echo "ERROR $err: ambari server setup";
+  exit 1; }
+
+# set the active=true flag in the meta info xml file so that ambari is
 # aware of alternative HCFS file systems, like RHS/glusterfs.
 sed -i -e "s/$ACTIVE_FALSE/$ACTIVE_TRUE/" $METAINFO_PATH
 
-# start the server now
+# start the ambari server
 ambari-server start 2>&1
 err=$?
 (( err != 0 )) && {
   echo "ERROR $err: ambari-server start";
   exit 1; }
 
-# restart the server after a reboot
+# ensure restart of the server after a reboot
 chkconfig ambari-server on 2>&1
 err=$?
 (( err != 0 )) && {

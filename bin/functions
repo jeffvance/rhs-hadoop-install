@@ -118,12 +118,13 @@ function force() {
 }
 
 # get_ambari_repo: wget the ambari repo file in the correct location.
+# Returns 1 on errors.
 function get_ambari_repo(){
  
   local REPO_DIR='/etc/yum.repos.d'; local REPO_FILE='ambari.repo'
   #local REPO_URL='http://public-repo-1.hortonworks.com/ambari/centos6/1.x/updates/1.4.4.23/ambari.repo' # hdp 2.0
   local REPO_URL='http://public-repo-1.hortonworks.com/ambari/centos6/1.x/updates/1.6.1/ambari.repo' # hdp 2.1
-  local out; local err; local errcnt=0
+  local out; local err
 
   [[ -d $REPO_DIR ]] || mkdir -p $REPO_DIR
 
@@ -132,10 +133,9 @@ function get_ambari_repo(){
   err=$?
   if (( err != 0 )) ; then
     echo "ERROR $err: ambari repo wget: $out"
-    ((errcnt++))
+    return 1
   fi
 
-  (( errcnt > 0 )) && return 1
   return 0
 }
 

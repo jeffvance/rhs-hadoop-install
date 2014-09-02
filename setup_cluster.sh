@@ -589,8 +589,10 @@ function create_pool() {
   return 0
 }
 
-# ambari_server: install and start the ambari server on the MGMT_NODE. Returns
-# 1 on errors.
+# ambari_server: install and start the ambari server on the MGMT_NODE. This
+# includes installation and starting of ambari-server, setting selinux to
+# permissive mode, and disabling the firewall on the ambari-server. Returns 1
+# on errors.
 # ASSUMPTION: bin/* has been copied to /tmp on all nodes.
 # Uses globals:
 #   MGMT_NODE
