@@ -347,24 +347,28 @@ function check_bin_dir() {
 function prep_rhel_nodes() {
 
   local rhel_nodes="$@"
-  local node; local ssh; local rhel
+  local node; local ssh; local ssh_close
   local err; local errcnt=0; local out
 
   verbose "--- prepping rhel nodes..."
 
   for node in $rhel_nodes; do
-      [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
-      out="$(eval "$ssh [[ ! -f /etc/redhat-storage-release ]] && echo rhel")"
-      (( $? == 0 )) && rhel=1 || rhel=0
-      if (( rhel )) ; then
-	out="$(eval "$ssh yum -y upgrade openssl 2>&1")"
-	err=$?
-	if (( err != 0 )) ; then
-	  err $err "yum upgrade openssl on $node: $out"
-	  (( errcnt++ ))
-	else
-	  debug "yum upgrade openssl on $node: $out"
-	fi
+      [[ "$node" == "$HOSTNAME" ]] && { ssh=''; ssh_close=''; } \
+				   || { ssh="ssh $node '"; ssh_close="'" 
+      out="$(eval "$ssh 
+	     if [[ -f /etc/redhat-storage-release ]] ; then
+	       echo \"RHS node: no openssl upgrade needed...\"
+	     else
+	       echo \"RHEL node...\"
+	       yum -y upgrade openssl 2>&1
+	     fi
+	     $ssh_close "
+	  )"
+      err=$?
+      debug "yum upgrade openssl on $node: $out"
+      if (( err != 0 )) ; then
+	err $err "yum upgrade openssl on $node"
+	(( errcnt++ ))
       fi
   done
 
