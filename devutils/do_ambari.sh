@@ -53,12 +53,13 @@ for node in $NODES; do
 	useradd -u 590 ambari-qa -g hadoop
 	useradd -u 591 mapred -g hadoop
 	useradd -u 592 yarn -g hadoop
-	useradd -u 593 tez -g hadoop
+	useradd -u 593 hbase -g hadoop
 	useradd -u 594 hcat -g hadoop
 	useradd -u 595 hive -g hadoop
 	useradd -u 596 oozie -g hadoop
 	useradd -u 597 zookeeper -g hadoop
 	useradd -u 598 falcon -g hadoop
+	useradd -u 599 tez -g hadoop
       fi
     "
 done
