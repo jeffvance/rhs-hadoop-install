@@ -34,7 +34,7 @@ function set_yarn() {
 	  if ! rpm -ql $fuse_rpm >& /dev/null ; then
 	    yum -y install $fuse_rpm 2>&1
 	  fi
-	  source /tmp/bin/functions # for function call below
+	  source $PREFIX/functions # for function call below
 	  gluster_mnt_vol $RHS_NODE $VOLNAME $VOLMNT
 	$ssh_close
        "

@@ -153,12 +153,13 @@ function gluster_mnt_vol() {
   local node=$1; local vol=$2; local mnt=$3; local mntopts=$4
   local owner="yarn:hadoop" # assumes both have been created!
   local perms=0755 # rwxr-xr-x
-  local err=0
+  local prefix; local err=0
 
   # append to fstab if not present
   if ! grep -qs $mnt /etc/fstab ; then # mnt not present in fstab
     if [[ -z "$mntopts" ]] ; then # set default mount opts
-      mntopts="$(/tmp/bin/gen_vol_mnt_options.sh)" # required mnt opts
+      prefix="$(dirname $BASH_SOURCE)" # sourced functions file dir
+      mntopts="$($prefix/gen_vol_mnt_options.sh)" # required mnt opts
     fi
     mntopts+=',_netdev' # always append _netdev
     # persist mnt in fstab
@@ -307,15 +308,16 @@ function verbose() {
 
 # verify_gid_uids: checks that the UIDs and GIDs for the hadoop users and hadoop
 # group are the same numeric value across all of the passed-in nodes. Returns 1
-# on inconsistency errors. Assumes utility scripts are in /tmp/bin.
+# on inconsistency errors.
 function verify_gid_uids() {
 
   local nodes="$@"
   local errcnt=0; local out; local err
+  local prefix="$(dirname $BASH_SOURCE)" # sourced functions file dir
 
   verbose "--- verifying consistent hadoop UIDs and GIDs across nodes..."
 
-  out="$(/tmp/bin/check_gids.sh $nodes)"
+  out="$($prefix/check_gids.sh $nodes)"
   err=$?
   debug "check_gids: $out"
   if (( err != 0 )) ; then
@@ -323,7 +325,7 @@ function verify_gid_uids() {
     err -e "inconsistent GIDs:\n$out"
   fi
 
-  out="$(/tmp/bin/check_uids.sh $nodes)"
+  out="$($prefix/check_uids.sh $nodes)"
   err=$?
   debug "check_uids: $out"
   if (( err != 0 )) ; then

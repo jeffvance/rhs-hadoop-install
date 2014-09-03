@@ -230,11 +230,12 @@ function path_avail() {
 # chk_nodes: verify that each node that will be spanned by the new volume is 
 # prepped for hadoop workloads by invoking bin/check_node.sh. Also, verify that
 # the hadoop GID and user UIDs are consistent across the nodes. Returns 1 on
-# errors. Assumes all nodes have current bin/ scripts in /tmp.
+# errors.
 # Uses globals:
 #   BRKMNTS()
 #   EXTRA_NODES
 #   LOGFILE
+#   PREFIX
 #   VOL_NODES
 #   VOLNAME
 function chk_nodes() {
@@ -250,7 +251,7 @@ function chk_nodes() {
   for node in ${VOL_NODES[@]}; do
       [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
 
-      out="$(eval "$ssh /tmp/bin/check_node.sh ${BRKMNTS[$node]}")"
+      out="$(eval "$ssh $PREFIX/bin/check_node.sh ${BRKMNTS[$node]}")"
       err=$?
       if (( err != 0 )) ; then
 	err -e $err "check_node on $node:\n$out"
@@ -269,10 +270,10 @@ function chk_nodes() {
 # options, permissions and owner. The volume mount is the VOLMNT prefix with
 # VOLNAME appended. The mount is persisted in /etc/fstab. Returns 1 on errors.
 # Assumptions:
-#   1) the bin scripts have been copied to each node in /tmp/bin,
-#   2) the required hadoop group and hadoop users have been created.
+#   1) the required hadoop group and hadoop users have been created.
 # Uses globals:
 #   EXTRA_NODES (can be empty)
+#   PREFIX
 #   VOL_NODES
 #   VOLMNT
 #   VOLNAME
@@ -285,7 +286,7 @@ function mk_volmnt() {
 
   for node in ${VOL_NODES[*]} ${EXTRA_NODES[*]}; do
       out="$(ssh $node "
-	  source /tmp/bin/functions
+	  source $PREFIX/bin/functions
           gluster_mnt_vol $node $VOLNAME $volmnt
       ")"
       err=$?
@@ -306,9 +307,9 @@ function mk_volmnt() {
 # errors.
 # Note: the gluster-fuse mount, by convention, is the VOLMNT prefix with the
 #   volume name appended.
-# ASSUMPTION: all bin/* scripts have been copied to /tmp/bin on the FIRST_NODE.
 # Uses globals:
 #   FIRST_NODE
+#   PREFIX
 #   VOLMNT
 #   VOLNAME
 function add_distributed_dirs() {
@@ -320,7 +321,7 @@ function add_distributed_dirs() {
   [[ "$FIRST_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $FIRST_NODE"
 
   # add the required distributed hadoop dirs
-  out="$(eval "$ssh /tmp/bin/add_dirs.sh -d $VOLMNT/$VOLNAME")"
+  out="$(eval "$ssh $PREFIX/bin/add_dirs.sh -d $VOLMNT/$VOLNAME")"
   err=$?
   if (( err != 0 )) ; then
     err $err "could not add required hadoop dirs: $out"

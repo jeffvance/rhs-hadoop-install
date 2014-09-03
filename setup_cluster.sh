@@ -313,30 +313,30 @@ function show_todo() {
   echo
 }
 
-# copy_bin: copies all bin/* files to /tmp/ on the passed-in nodes. Returns 1
-# on errors.
+# check_bin_dir: checks that the bin/ dir exists in the expected location on
+# all passed-in nodes. Returns 1 on errors.
 # Uses globals:
 #   PREFIX
-function copy_bin() {
+function check_bin_dir() {
 
-  local node; local err; local errcnt=0; local out; local cmd
+  local node; local errcnt=0; local ssh
+  local bin_path="$PREFIX/bin"
 
-  verbose "--- copying bin/ to /tmp on all nodes..."
+  verbose "--- checking that $bin_path/ exists on all nodes..."
 
   for node in $@; do
-      [[ "$node" == "$HOSTNAME" ]] && cmd="cp -fr $PREFIX/bin /tmp" \
-				   || cmd="scp -qr $PREFIX/bin $node:/tmp"
-      out="$(eval "$cmd")"
-      err=$?
-      if (( err != 0 )) ; then
-	err $err "could not copy bin/* to /tmp on $node: $out"
+      [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
+      eval "$ssh [[ -d $bin_path ]]"
+      if (( $? != 0 )) ; then
+	err "$bin_path/ not found on $node"
 	((errcnt++))
       else
-	debug "copy bin/ to /tmp on $node: $out"
+	debug "$bin_path/ found on $node"
       fi
   done
 
   (( errcnt > 0 )) && return 1
+  verbose "--- done checking that $bin_path/ exists on all nodes"
   return 0
 }
 
@@ -381,6 +381,7 @@ function prep_rhel_nodes() {
 #   NODES
 #   NODE_BLKDEVS
 #   NODE_BRKMNTS
+#   PREFIX
 #   YARN_INSIDE
 #   YARN_NODE
 function setup_nodes() {
@@ -402,7 +403,7 @@ function setup_nodes() {
     verbose "+++"
     verbose "+++ begin node $node"
     out="$(eval "
-	$ssh /tmp/bin/setup_datanode.sh --blkdev $blkdev \
+	$ssh $PREFIX/bin/setup_datanode.sh --blkdev $blkdev \
 		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE
  	")"
     err=$?
@@ -593,9 +594,9 @@ function create_pool() {
 # includes installation and starting of ambari-server, setting selinux to
 # permissive mode, and disabling the firewall on the ambari-server. Returns 1
 # on errors.
-# ASSUMPTION: bin/* has been copied to /tmp on all nodes.
 # Uses globals:
 #   MGMT_NODE
+#   PREFIX
 function ambari_server() {
 
   local err; local out; local ssh
@@ -604,7 +605,7 @@ function ambari_server() {
 
   [[ "$MGMT_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $MGMT_NODE"
 
-  out="$(eval "$ssh /tmp/bin/setup_ambari_server.sh")"
+  out="$(eval "$ssh $PREFIX/bin/setup_ambari_server.sh")"
   err=$?
   if (( err != 0 )) ; then
     err -e $err "setting up ambari-sever on $MGMT_NODE:\n$out"
@@ -728,8 +729,8 @@ check_ssh ${UNIQ_NODES[*]} || exit 1
 # check that the block devs are (likely to be) block devices
 check_blkdevs || exit 1
 
-# copy bin/* files to /tmp/bin on all nodes including mgmt, yarn and localhost
-copy_bin $(uniq_nodes ${UNIQ_NODES[*]} $HOSTNAME) || exit 1
+# ensure bin/ dir is found on all nodes including mgmt, yarn and localhost
+check_bin_dir $(uniq_nodes ${UNIQ_NODES[*]} $HOSTNAME) || exit 1
 
 # verify user UID and group GID consistency across the cluster
 verify_gid_uids ${NODES[*]} $YARN_NODE || exit 1 

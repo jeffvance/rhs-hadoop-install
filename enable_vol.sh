@@ -203,16 +203,17 @@ function chk_nodes() {
 }
 
 # setup_multi_tenancy: invoke bin/setup_container_executor.sh on each of the 
-# passed in nodes (which are expected to be storage nodes). Assumes bin/* has
-# been copied to /tmp/bin on each node. Returns 1 on errors.
+# passed in nodes (which are expected to be storage nodes).
 # Args: $@ = list of storage nodes.
+# Uses globals:
+#   PREFIX
 function setup_multi_tenancy() {
 
   local nodes="$@"
   local node; local out; local err; local errcnt=0
 
   for node in $nodes; do
-      out="$(ssh $node /tmp/bin/setup_container_executor.sh)"
+      out="$(ssh $node $PREFIX/bin/setup_container_executor.sh)"
       err=$?
       if (( err == 0 )) ; then
 	debug "on $node: setup_container_executor: $out"
@@ -229,8 +230,8 @@ function setup_multi_tenancy() {
 # create_post_processing_dirs: create the distributed hadoop directories that
 # need to be added after the Ambari services have been started.# Returns 1 on
 # errors.
-# ASSUMPTION: all bin/* scripts have been copied to /tmp/bin on the RHS_NODE.
 # Uses globals:
+#   PREFIX
 #   RHS_NODE
 #   VOLMNT (includes volname)
 #   VOLNAME
@@ -243,7 +244,7 @@ function create_post_processing_dirs() {
   [[ "$RHS_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $RHS_NODE"
 
   # add the required post-processing hadoop dirs
-  out="$(eval "$ssh /tmp/bin/add_dirs.sh -p $VOLMNT")"
+  out="$(eval "$ssh $PREFIX/bin/add_dirs.sh -p $VOLMNT")"
   err=$?
   if (( err != 0 )) ; then
     err $err "could not add required hadoop dirs: $out"
