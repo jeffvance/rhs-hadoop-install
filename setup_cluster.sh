@@ -354,7 +354,7 @@ function prep_rhel_nodes() {
 
   for node in $rhel_nodes; do
       [[ "$node" == "$HOSTNAME" ]] && { ssh=''; ssh_close=''; } \
-				   || { ssh="ssh $node '"; ssh_close="'" 
+				   || { ssh="ssh $node '"; ssh_close="'"; }
       out="$(eval "$ssh 
 	     if [[ -f /etc/redhat-storage-release ]] ; then
 	       echo \"RHS node: no openssl upgrade needed...\"
