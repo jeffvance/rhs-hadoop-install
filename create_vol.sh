@@ -210,8 +210,8 @@ function set_non_vol_nodes() {
 
 # chk_nodes: verify that each node that will be spanned by the new volume is 
 # prepped for hadoop workloads by invoking bin/check_node.sh. Also, verify that
-# the hadoop GID and user UIDs are consistent across the nodes. Returns 1 on
-# errors. Assumes all nodes have current bin/ scripts in /tmp.
+# the required hadoop users exist on each node. Returns 1 on errors. Assumes
+# all nodes have current bin/ scripts in /tmp.
 # Uses globals:
 #   BRKMNTS
 #   EXTRA_NODES
