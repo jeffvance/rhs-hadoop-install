@@ -37,7 +37,7 @@ for brick in $($PREFIX/find_brick_mnts.sh $rhs_node $VOLNAME); do
     node=${brick%:*}; NODES+="$node "
     brkmnt=${brick#*:}
     [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
-    eval "$ssh /tmp/bin/check_node.sh $brkmnt" || ((errcnt++))
+    eval "$ssh $PREFIX/check_node.sh $brkmnt" || ((errcnt++))
 done
 
 $PREFIX/check_vol_mount.sh $rhs_node $VOLNAME $NODES || ((errcnt++))
