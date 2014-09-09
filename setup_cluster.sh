@@ -14,10 +14,11 @@
 # pool, and not to be the same server; however these recommendations are not
 # enforced by the script.
 #
-# On each node the blk-device is setup as an xfs file system and mounted to the
-# brick mount dir, ntp config is verified, iptables is disabled, selinux is set
-# to permissive, and the required hadoop local directories are created (note:
-# the required Hadoop distributed dirs are not created here).
+# On each rhs node the blk-device is setup as an xfs file system and mounted to
+# the brick mount dir, ntp config is verified, iptables is disabled, selinux is
+# set to permissive, and the required hadoop local directories are created (note
+# the required Hadoop distributed dirs are not created here), and the rhs-high-
+# throughput profile is enabled.
 #
 # Also, on all passed-in nodes (assumed to be storage nodes) and on the yarn-
 # master server node, the ambari agent is installed (updated if present) and
