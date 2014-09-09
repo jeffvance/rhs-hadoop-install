@@ -2,8 +2,9 @@
 #
 # add_dirs.sh adds the required hadoop directories and assigns the correct
 # permissions and owners on this node (localhost). The caller only needs to
-# invoke add_dirs once for the pool when -d (distributed) is specified. It
-# needs to be invoked on each node when -l is specified.
+# invoke add_dirs once for the pool when -d (distributed) or -p (post-
+# processing) are specified. It needs to be invoked on each node when -l is
+# specified.
 # Note: the hadoop users and group need to have the same UID and GID across
 #   all nodes in the storage pool and on the mgmt and yarn-master servers; 
 #   however this script does not check nor enforce this requirement.
@@ -11,9 +12,9 @@
 # Syntax:
 #  $1=distributed gluster mount (single) or brick mount(s) (per-node) path 
 #     (required).
-#  -d=output only the distributed dirs,
-#  -l=output only the local dirs.
-#  -p=output only the post-processing dirs.
+#  -d=create only the distributed, non-post-processing, dirs
+#  -l=create only the local dirs
+#  -p=create only the post-processing, distributed dirs.
 
 errcnt=0; cnt=0
 HADOOP_G='hadoop'

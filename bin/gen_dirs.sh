@@ -3,7 +3,8 @@
 # gen_dirs.sh outputs a tuple of "dir:perms:owner" for each of the required
 # hadoop directories.
 # Note: the following users are expected to exist:
-#   ambari-qa, falcon, hcat, hive, mapred, oozie, tez, yarn, zookeeper
+#   ambari-qa, falcon, hbase, hcat, hive, mapred, oozie,
+#   tez, yarn, zookeeper
 #
 # Syntax:
 # -a, output all dirs as if all options below were passed.
@@ -15,6 +16,7 @@
 # format: <dir-path>:<perms>:<owner>
 local_dirs='mapredlocal:0755:root'
 
+# the remaining dirs are distributed:
 mr_dirs='mapred:0770:mapred mapred/system:0755:mapred mr-history:0755:yarn mr-history/tmp:1777:yarn mr-history/done:0770:yarn'
 
 apps_dirs='app-logs:1777:yarn apps:0775:hive apps/webhcat:0775:hcat'
@@ -23,6 +25,7 @@ user_dirs='user:0755:yarn user/hcat:0755:hcat user/hive:0755:hive user/mapred:07
 
 misc_dirs='tmp:1777:yarn tmp/logs:1777:yarn job-staging-yarn:0770:yarn'
 
+# these dirs are created after ambari services have been started
 post_processing_dirs='apps/hbase:0755:hbase apps/hbase/staging:0755:hbase apps/hive:0755:hive apps/hive/warehouse:0755:hive apps/falcon:0755:falcon apps/tez:0755:tez hbase:0755:hbase user/ambari-qa:0755:ambari-qa user/oozie:0755:oozie user/oozie/share:0755:oozie zookeeper:0755:zookeeper'
 
 
