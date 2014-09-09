@@ -60,8 +60,9 @@ function parse_cmd() {
   return 0
 }
 
-# mount_blkdev: create the brick-mnt dir(s) if needed, append the xfs brick
-# mount to /etc/fstab, and then mount it. Returns 1 on errors.
+# mount_blkdev: on this storage node, create the brick-mnt dir(s) if needed,
+# append the xfs brick mount to /etc/fstab, and then mount it. Returns 1 on
+# errors.
 function mount_blkdev() {
 
   local err; local errcnt=0
@@ -69,6 +70,7 @@ function mount_blkdev() {
   local mntopts="noatime,inode64"
 
   [[ -z "$BLKDEV" || -z "$BRICKMNT" ]] && return 0 # need both to mount bricks
+  (( STORAGE_NODE )) || return 0 # nothing to do
 
   for brkmnt in ${BRICKMNT[@]}; do
       blkdev=${BLKDEV[$i]}
@@ -217,13 +219,15 @@ function setup_selinux() {
   fi
 }
 
-# setup_xfs: mkfs.xfs on the block device. Returns 1 on error.
+# setup_xfs: on this storage node, mkfs.xfs on the block device. Returns 1 on
+# errors.
 function setup_xfs() {
 
   local blkdev; local err; local errcnt=0
   local isize=512
 
   [[ -z "$BLKDEV" ]] && return 0 # nothing to do...
+  (( STORAGE_NODE )) || return 0 # nothing to do...`
 
   for blkdev in ${BLKDEV[@]}; do
       if ! xfs_info $blkdev >& /dev/null ; then
@@ -250,10 +254,34 @@ function add_local_dirs() {
   $PREFIX/add_dirs.sh -l ${BRICKMNT[0]} # return add_dir's rnt-code
 }
 
+# setup_profile: apply the rhs-high-throughput tune-adm profile to this storage
+# node. Returns 1 on errors.
+function setup_profile() {
+
+  local profile='rhs-high-throughput'
+  local tuned_path="/etc/tune-profiles/$profile"
+  local err
+
+  (( STORAGE_NODE )) || return 0 # nothing to do...
+
+  [[ -d $tuned_path ]] || {
+    echo "ERROR: $tuned_path directory is missing, can't set $profile profile";
+    return 1; }
+
+  tuned-adm profile $profile 2>&1
+  err=$?
+  (( err != 0 )) && {
+    echo "ERROR $err: tuned-adm profile";
+    return 1; }
+
+  return 0
+}
+
 
 ## main ##
 
 errcnt=0; q=''
+STORAGE_NODE=$([[ -f /etc/redhat-storage-release ]] && echo 1 || echo 0)
 
 parse_cmd $@ || exit -1
 
@@ -263,6 +291,7 @@ setup_selinux      || ((errcnt++))
 setup_ntp          || ((errcnt++))
 setup_ambari_agent || ((errcnt++))
 add_local_dirs     || ((errcnt++))
+setup_profile      || ((errcnt++))
 $PREFIX/setup_firewall.sh || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
