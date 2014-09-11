@@ -48,7 +48,8 @@ SYNTAX:
 $ME --version | --help
 
 $ME [-y] [--hadoop-mgmt-node <node>] [--yarn-master <node>] \\
-              [--quiet | --verbose | --debug]  <nodes-spec-list>
+              [--profile <profile>] [--quiet | --verbose | --debug] \\
+              <nodes-spec-list>
 where:
 
 <nodes-spec-list>: a list of two or more <node-spec's>.
@@ -71,6 +72,8 @@ where:
 --hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server which
                   is expected to be outside of the storage pool. Default is
                   localhost.
+--profile       : (optional) the name of a supported rhs/kernel profile, eg.
+                  "rhs-high-throughput". Default is not set a profile.
 -y              : (optional) auto answer "yes" to all prompts. Default is to 
                   answer a confirmation prompt.
 --quiet         : (optional) output only basic progress/step messages. Default.
@@ -88,6 +91,7 @@ EOF
 #   AUTO_YES
 #   MGMT_NODE
 #   NODE_SPEC
+#   PROFILE
 #   VERBOSE
 #   YARN_NODE
 function parse_cmd() {
@@ -95,7 +99,7 @@ function parse_cmd() {
   local opts='y'
   local verbose_opts='verbose,quiet,debug'   # default= --quiet
   local node_opts='hadoop-mgmt-node:,yarn-master:'
-  local long_opts="help,version,$node_opts,$verbose_opts"
+  local long_opts="help,version,profile:,$node_opts,$verbose_opts"
   local errcnt=0
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
@@ -125,6 +129,9 @@ function parse_cmd() {
 	;;
 	--hadoop-mgmt-node)
 	  MGMT_NODE="$2"; shift 2; continue
+	;;
+	--profile)
+	  PROFILE="$2"; shift 2; continue
 	;;
 	--)
 	  shift; break
@@ -387,6 +394,7 @@ function prep_rhel_nodes() {
 #   NODE_BLKDEVS
 #   NODE_BRKMNTS
 #   PREFIX
+#   PROFILE
 #   YARN_INSIDE
 #   YARN_NODE
 function setup_nodes() {
@@ -408,8 +416,8 @@ function setup_nodes() {
     verbose "+++"
     verbose "+++ begin node $node"
     out="$(eval "
-	$ssh $PREFIX/bin/setup_datanode.sh --blkdev $blkdev \
-		--brkmnt $brkmnt --hadoop-mgmt-node $MGMT_NODE
+	$ssh $PREFIX/bin/setup_datanode.sh --blkdev $blkdev --brkmnt $brkmnt \
+		--profile $PROFILE --hadoop-mgmt-node $MGMT_NODE
  	")"
     err=$?
     if (( err != 0 )) ; then

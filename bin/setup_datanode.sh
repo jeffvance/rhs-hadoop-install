@@ -7,6 +7,7 @@
 # Syntax:
 #  --blkdev: (optional) block dev path(s), skip xfs and blk-mnts if missing.
 #  --brkmnt: (optional) brick mnt path(s), skip xfs and blk-mnts if missing.
+#  --profile: (optional) rhs/kernel profile, won't set a profile if missing.
 #  --hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server 
 #       (expected to be outside of the storage pool). Default=localhost.
 #
@@ -23,9 +24,10 @@ source $PREFIX/functions
 #   BLKDEV()
 #   BRICKMNT()
 #   MGMT_NODE
+#   PROFILE
 function parse_cmd() {
 
-  local long_opts='blkdev:,brkmnt:,hadoop-mgmt-node:'
+  local long_opts='blkdev:,brkmnt:,profile:,hadoop-mgmt-node:'
 
   eval set -- "$(getopt -o '' --long $long_opts -- $@)"
 
@@ -41,6 +43,11 @@ function parse_cmd() {
 	  [[ "${1:0:2}" == '--' ]] && continue # missing option value
           BRICKMNT="$1"; shift; continue
         ;;
+        --profile) # optional
+	  shift
+	  [[ "${1:0:2}" == '--' ]] && continue # missing option value
+          PROFILE="$1"; shift; continue
+        ;;
         --hadoop-mgmt-node)
           MGMT_NODE="$2"; shift 2; continue
         ;;
@@ -50,7 +57,7 @@ function parse_cmd() {
       esac
   done
 
-  # check required args
+  # fill in any defaults
   [[ -z "$MGMT_NODE" ]] && MGMT_NODE="$HOSTNAME"
 
   # convert list of 1 or more blkdevs and brkmnts to arrays
@@ -227,21 +234,21 @@ function add_local_dirs() {
   $PREFIX/add_dirs.sh -l ${BRICKMNT[0]} # return add_dir's rnt-code
 }
 
-# setup_profile: apply the rhs-high-throughput tune-adm profile to this storage
-# node. Returns 1 on errors.
+# setup_profile: apply the PROFILE tune-adm profile to this storage node.
+# Returns 1 on errors.
 function setup_profile() {
 
-  local profile='rhs-high-throughput'
-  local tuned_path="/etc/tune-profiles/$profile"
+  local tuned_path="/etc/tune-profiles/$PROFILE"
   local err
 
-  (( STORAGE_NODE )) || return 0 # nothing to do...
+  (( STORAGE_NODE ))  || return 0 # nothing to do...
+  [[ -z "$PROFILE" ]] && return 0 # leave default profile set
 
   [[ -d $tuned_path ]] || {
-    echo "ERROR: $tuned_path directory is missing, can't set $profile profile";
+    echo "ERROR: $tuned_path directory is missing, can't set $PROFILE profile";
     return 1; }
 
-  tuned-adm profile $profile 2>&1
+  tuned-adm profile $PROFILE 2>&1
   err=$?
   (( err != 0 )) && {
     echo "ERROR $err: tuned-adm profile";
