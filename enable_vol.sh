@@ -179,31 +179,6 @@ function show_todo() {
 
 }
 
-# get_default_volume: finds the default volume for the current cluster, if any,
-# and sets the global DEFAULT_VOL variable.
-# Uses globals:
-#   RHS_NODE
-# Sets globals:
-#   DEFAULT_VOL
-function get_default_volume() {
-
-  local vol;
-  local core_site='/etc/hadoop/conf/core-site.xml'
-  local prop='fs.glusterfs.volumes' # list of 1 or more vols, 1st is default
-
-  vol="$(ssh $RHS_NODE "sed -n '/$prop/{n;p}' $core_site")" # value is next line
-  [[ -z "$vol" ]] && {
-    warn "$RHS_NODE: $prop missing from $core_site"; 
-    return 0; }
-
-  vol=${vol#*>} # delete leading <value>
-  vol=${vol%<*} # delete training </value>, could be empty
-  vol=${vol%,*} # extract 1st or only volname, can be ""
-
-  DEFAULT_VOL="$vol"
-  return 0
-}
-
 # yarn_mount: this is the first opportunity to setup the yarn-master server
 # because we need both the yarn-master node and a volume. Invokes setup_yarn.sh
 # script. Returns 1 for errors.
@@ -396,7 +371,7 @@ if (( $? != 0 )) ; then
 fi
 debug "$VOLNAME mount point is $VOLMNT"
 
-get_default_volume # sets DEFAULT_VOL
+DEFAULT_VOL="$($PREFIX/bin/find_default_vol.sh -n $RHS_NODE)"
 debug "Default volume: $DEFAULT_VOL"
 
 show_todo

@@ -23,9 +23,6 @@ AMBARI_HOST='localhost'
 VOLNAME=''
 CLUSTER_NAME=""
 
-## functions ## 
-
-source $PREFIX/functions
 
 # debug: execute cmd in $1 if _DEBUG is set to 'on'.
 # Uses globals:
@@ -168,7 +165,8 @@ parse_cmd $@ || exit -1
 AMBARIURL="http://$AMBARI_HOST$PORT"
 debug echo "########## AMBARIURL = $AMBARIURL"
 
-CLUSTER_NAME="$(currentClusterName $AMBARIURL "$USERID" "$PASSWD")" || {
+CLUSTER_NAME="$(
+	$PREFIX/find_cluster_name.sh $AMBARIURL "$USERID" "$PASSWD")" || {
   echo "$CLUSTER_NAME"; # contains error msg
   exit 1; }
 debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"

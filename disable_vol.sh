@@ -132,7 +132,7 @@ function parse_cmd() {
   return 0
 }
 
-# edit_core_site: invoke bin/unset_glusterfs_uri to edit the core-site file and
+# edit_core_site: invoke bin/set_glusterfs_uri to edit the core-site file and
 # restart all ambari services across the cluster. Returns 1 on errors.
 # Uses globals:
 #   MGMT_*
@@ -200,14 +200,21 @@ if (( $? != 0 )) ; then
 fi
 debug "nodes spanned by $VOLNAME: ${NODES[*]}"
 
+DEFAULT_VOL="$($PREFIX/bin/find_default_vol.sh -n $RHS_NODE)"
+debug "Default volume: $DEFAULT_VOL"
+
 echo
 quiet "*** Volume            : $VOLNAME"
+quiet "*** Default volume    : $DEFAULT_VOL"
 quiet "*** Nodes             : $(echo ${NODES[*]} | sed 's/ /, /g')"
 quiet "*** Ambari mgmt node  : $MGMT_NODE"
 quiet "*** Yarn-master server: $YARN_NODE"
 echo
 
-force -e "$VOLNAME will be removed from all hadoop config files and thus will not\nbe available for any hadoop workloads."
+msg=''
+[[ "$VOLNAME" == "$DEFAULT_VOL" ]] && msg=', which is the DEFAULT volume,'
+
+force -e "$VOLNAME$msg will be removed from the core-site config file and thus\n  will not be available for any hadoop workloads."
 if (( AUTO_YES )) || yesno "  Continue? [y|N] " ; then
   edit_core_site || exit 1
 fi
