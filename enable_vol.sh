@@ -33,7 +33,7 @@ SYNTAX:
 
 $ME --version | --help
 
-$ME [-y] [--quiet | --verbose | --debug] \\
+$ME [-y] [--quiet | --verbose | --debug] [--make-default] \\
            [--user <ambari-admin-user>] [--pass <ambari-admin-password>] \\
            [--port <port-num>] [--hadoop-mgmt-node <node>] \\
            [--rhs-node <node>] [--yarn-master <node>] \\
@@ -48,6 +48,9 @@ where:
                which, must have gluster cli access.
 --hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server which is
                expected to be outside of the storage pool. Default is localhost.
+--make-default: if specified then the volume is set to be the default volume
+               used when hadoop job URIs are unqualified. Default is to NOT 
+               make this volume the default volume.
 -y           : (optional) auto answer "yes" to all prompts. Default is to answer
                a confirmation prompt.
 --quiet      : (optional) output only basic progress/step messages. Default.
@@ -65,6 +68,7 @@ EOF
 
 # parse_cmd: simple positional parsing. Returns 1 on errors.
 # Sets globals:
+#   ACTION (append or prepend volname to volumes list core-site property)
 #   AUTO_YES
 #   MGMT_NODE
 #   MGMT_PASS
@@ -77,7 +81,7 @@ EOF
 function parse_cmd() {
 
   local opts='y'
-  local long_opts='version,help,yarn-master:,rhs-node:,hadoop-mgmt-node:,user:,pass:,port:,verbose,quiet,debug'
+  local long_opts='version,help,make-default,yarn-master:,rhs-node:,hadoop-mgmt-node:,user:,pass:,port:,verbose,quiet,debug'
   local errcnt=0
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
@@ -101,6 +105,9 @@ function parse_cmd() {
         ;;
         -y)
           AUTO_YES=1; shift; continue # true
+        ;;
+        --make-default) # the volname will be prepended to the volumes property
+          ACTION='prepend'; shift; continue
         ;;
         --yarn-master)
           YARN_NODE="$2"; shift 2; continue
@@ -133,6 +140,67 @@ function parse_cmd() {
     echo "Syntax error: volume name is required";
     ((errcnt++)); }
 
+  # fill in default options
+  [[ -z "$ACTION" ]] && ACTION='append' # default: volname is not the default
+
+  return 0
+}
+
+# show_todo: display values set by the user and discovered by enable_vol.
+# Uses globals:
+#   ACTION
+#   DEFAULT_VOL
+#   MGMT_NODE
+#   NODES
+#   VOLMNT
+#   VOLNAME
+#   YARN_NODE
+function show_todo() {
+
+   local msg
+
+  if [[ -z "$DEFAULT_VOL" || "$ACTION" == 'prepend' ]] ; then
+    msg="will become the DEFAULT volume"
+  elif [[ "$DEFAULT_VOL" == "$VOLNAME" ]] ; then
+    msg="will remain the default volume"
+  else
+    msg="will not be the default volume"
+  fi
+
+  echo
+  quiet "*** Volume             : $VOLNAME ($msg)"
+  [[ -n "$DEFAULT_VOL" ]] && \
+    quiet "*** Current default vol: $DEFAULT_VOL"
+  quiet "*** Nodes              : $(echo $NODES | sed 's/ /, /g')"
+  quiet "*** Volume mount       : $VOLMNT"
+  quiet "*** Ambari mgmt node   : $MGMT_NODE"
+  quiet "*** Yarn-master server : $YARN_NODE"
+  echo
+
+}
+
+# get_default_volume: finds the default volume for the current cluster, if any,
+# and sets the global DEFAULT_VOL variable. Returns 1 on errors
+# Uses globals:
+#   RHS_NODE
+# Sets globals:
+#   DEFAULT_VOL
+function get_default_volume() {
+
+  local vol;
+  local core_site='/etc/hadoop/conf/core-site.xml'
+  local prop='fs.glusterfs.volumes' # list of 1 or more vols, 1st is default
+
+  vol="$(ssh $RHS_NODE "grep -A1 "$prop" $core_site | grep '<value>'")"
+  [[ -z "$vol" ]] && {
+    err "$RHS_NODE: $prop missing from $core_site"; 
+    return 1; }
+
+  vol=${vol#*>} # delete leading <value>
+  vol=${vol%<*} # delete training </value>, could be empty
+  vol=${vol%,*} # extract 1st or only volname, can be ""
+
+  DEFAULT_VOL="$vol"
   return 0
 }
 
@@ -259,6 +327,7 @@ function create_post_processing_dirs() {
 # edit_core_site: invoke bin/set_glusterfs_uri to edit the core-site file and
 # restart all ambari services across the cluster. Returns 1 on errors.
 # Uses globals:
+#   ACTION (append, prepend, or remove volname in core-site)
 #   MGMT_*
 #   PREFIX
 #   VOLMNT
@@ -275,7 +344,7 @@ function edit_core_site() {
   [[ -n "$MGMT_PORT" ]] && mgmt_port="--port $MGMT_PORT"
 
   out="$($PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE $mgmt_u $mgmt_p \
-	$mgmt_port --mountpath $VOLMNT --action prepend $VOLNAME --debug)"
+	$mgmt_port --mountpath $VOLMNT --action $ACTION $VOLNAME --debug)"
   err=$?
 
   if (( err != 0 )) ; then
@@ -315,25 +384,22 @@ vol_exists $VOLNAME $RHS_NODE || {
 
 NODES="$($PREFIX/bin/find_nodes.sh -n $RHS_NODE $VOLNAME)" # spanned by vol
 if (( $? != 0 )) ; then
-  err "$NODES" # error from find_nodes
+  err "cannot find nodes spanned by $VOLNAME. $NODES"
   exit 1
 fi
 debug "nodes spanned by $VOLNAME: $NODES"
 
 VOLMNT="$($PREFIX/bin/find_volmnt.sh -n $RHS_NODE $VOLNAME)"  #includes volname
 if (( $? != 0 )) ; then
-  err "$VOLMNT" # error from find_volmnt
+  err "$VOLNAME may not be mounted. $VOLMNT"
   exit 1
 fi
 debug "$VOLNAME mount point is $VOLMNT"
 
-echo
-quiet "*** Volume            : $VOLNAME"
-quiet "*** Nodes             : $(echo $NODES        | sed 's/ /, /g')"
-quiet "*** Volume mount      : $VOLMNT"
-quiet "*** Ambari mgmt node  : $MGMT_NODE"
-quiet "*** Yarn-master server: $YARN_NODE"
-echo
+get_default_volume || exit 1 # sets DEFAULT_VOL
+debug "Default volume: $DEFAULT_VOL"
+
+show_todo
 
 # prompt to continue before any changes are made...
 (( ! AUTO_YES )) && ! yesno "Enabling volume $VOLNAME. Continue? [y|N] " && \

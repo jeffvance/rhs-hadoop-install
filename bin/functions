@@ -33,6 +33,28 @@ function check_ssh() {
   return 0
 }
 
+# currentClusterName: returns the name of the current ambari cluster. Returns
+# 1 on errors. 
+# Args: $1=ambari server hostname (including :port),
+#       $2=ambari admin username,
+#       $3=ambari user password.
+function currentClusterName() {
+
+  local url="$1"; local user="$2"; local pass="$3"
+  local name
+
+  name="$(curl -s -u $user:$pass "$url/api/v1/clusters/" | grep cluster_name)"
+  name="${name%,}"    # remove trailing comma if present
+  name="${name#*: }"  # extract cluster name value
+  name="${name//\"/}" # remove double-quotes
+
+  [[ -z "$name" ]] && {
+    echo "ERROR: cluster name not found"; return 1; }
+
+  echo "$name"
+  return 0
+}
+
 # debug: call display() using LOG_DEBUG. $1 can be an echo option or the msg.
 # "DEBUG" is prepended to the msg.
 function debug() {

@@ -10,12 +10,10 @@
 # NOTE: the first volume appearing in "fs.glusterfs.volumes" becomes the
 #   default volume and will be used for all unqualified file references.
 #
-# NOTE: currently, set_glusterfs_uri.sh calls this script passing "prepend" as
-#   the action and thus causing the target volume to become the default.
-#
 # Syntax: see usage() function.
 
 PREFIX="$(dirname $(readlink -f $0))"
+
 _DEBUG="off"
 USERID="admin"
 PASSWD="admin"
@@ -24,6 +22,10 @@ PARAMS='' # used only for debugging
 AMBARI_HOST='localhost'
 VOLNAME=''
 CLUSTER_NAME=""
+
+## functions ## 
+
+source $PREFIX/functions
 
 # debug: execute cmd in $1 if _DEBUG is set to 'on'.
 # Uses globals:
@@ -48,6 +50,7 @@ function usage() {
 
 # parse_cmd: parses the command line via getopt. Returns 1 on errors. Sets the
 # following globals:
+#   ACTION
 #   AMBARI_HOST
 #   _DEBUG
 #   DEBUG
@@ -137,45 +140,6 @@ function parse_cmd() {
   return 0
 }
 
-# currentClusterName: sets the CLUSTER_NAME based on the value in the ambari
-# config file. Returns 1 on errors.
-# Set globals:
-#   CLUSTER_NAME
-function currentClusterName() {
-
-  local line=`curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/" | grep -E "cluster_name" | sed "s/\"//g"`
-  local line1; local propLen; local lastChar
-  local key; local value; local keyvalue=()
-
-  if [[ -z "$line" ]]; then
-    echo "ERROR: Cluster was not found in server response."
-    return 1
-  fi
-
-  debug echo "########## LINE = "$line
-
-  line1="$line"
-  propLen=${#line1}
-  lastChar=${line1:$propLen-1:1}
-  [[ "$lastChar" == "," ]] && line1=${line1:0:$propLen-1}
-
-  OIFS="$IFS"
-  IFS=':'
-  read -a keyvalue <<< "$line1"
-  IFS="$OIFS"
-  key=${keyvalue[0]}
-  value="${keyvalue[1]}"
-
-  value=$(echo "$value" | sed "s/[\"\,\ ]//g")
-  debug echo "########## VALUE = "$value
-  [[ -z "$value" ]] && {
-    echo "ERROR: Cluster not found";
-    return 1; }
-
-  CLUSTER_NAME="$value"
-  return 0
-}
-
 function restartService() {
 # Note: the order of the services in both for loops below matters.
 
@@ -204,7 +168,9 @@ parse_cmd $@ || exit -1
 AMBARIURL="http://$AMBARI_HOST$PORT"
 debug echo "########## AMBARIURL = $AMBARIURL"
 
-currentClusterName || exit 1
+CLUSTER_NAME="$(currentClusterName $AMBARIURL "$USERID" "$PASSWD")" || {
+  echo "$CLUSTER_NAME"; # contains error msg
+  exit 1; }
 debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
 
 PARAMS="$PARAMS add_volume $AMBARI_HOST $CLUSTER_NAME core-site $VOLNAME"

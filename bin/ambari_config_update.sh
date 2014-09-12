@@ -4,6 +4,8 @@
 #
 # Syntax: see usage() function.
 
+PREFIX="$(dirname $(readlink -f $0))"
+
 _DEBUG="off"
 USERID="admin"
 PASSWD="admin"
@@ -18,6 +20,9 @@ CONFIG_KEY=''
 CONFIG_VALUE=''
 ACTION=""
 
+## functions ##
+
+source $PREFIX/functions
 
 # debug: execute cmd in $1 if _DEBUG is set to 'on'.
 # Uses globals:
@@ -145,46 +150,6 @@ function parse_cmd() {
   [[ $DEBUG == true ]] && debug echo "DEBUGGING ON"
   return 0
 }
-
-# currentClusterName: sets the CLUSTER_NAME based on the value in the ambari
-# config file. Returns 1 on errors.
-# Set globals:
-#   CLUSTER_NAME
-function currentClusterName() {
-
-  local line=`curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/" | grep -E "cluster_name" | sed "s/\"//g"`
-  local line1; local propLen; local lastChar
-  local key; local value; local keyvalue=()
-
-  if [[ -z "$line" ]]; then
-    echo "ERROR: Cluster was not found in server response."
-    return 1
-  fi
-  debug echo "########## LINE = $line"
-
-  line1="$line"
-  propLen=${#line1}
-  lastChar=${line1:$propLen-1:1}
-  [[ "$lastChar" == "," ]] && line1=${line1:0:$propLen-1}
-
-  OIFS="$IFS"
-  IFS=':'
-  read -a keyvalue <<< "$line1"
-  IFS="$OIFS"
-  key=${keyvalue[0]}
-  value="${keyvalue[1]}"
-
-  value=$(echo "$value" | sed "s/[\"\,\ ]//g")
-  debug echo "########## VALUE = "$value
-  if [[ -z "$value" ]]; then   
-    echo "ERROR: Cluster not found"
-    return 1
-  fi 
-
-  CLUSTER_NAME="$value"
-  return 0
-}
-
 
 # currentSiteTag: sets the SITETAG based on the value in the ambari
 # config file. Returns 1 on errors.
@@ -315,7 +280,9 @@ parse_cmd $@ || exit -1
 AMBARIURL="http://$AMBARI_HOST$PORT"
 debug echo "########## AMBARIURL = "$AMBARIURL
 
-currentClusterName || exit 1
+CLUSTER_NAME="$(currentClusterName $AMBARIURL "$USERID" "$PASSWD")" || {
+  echo "$CLUSTER_NAME"; # contains error msg
+  exit 1; }
 debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
 debug echo "########## $ACTION $CONFIG_KEY $CONFIG_VALUE"
 
