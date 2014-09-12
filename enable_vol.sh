@@ -396,7 +396,7 @@ if (( $? != 0 )) ; then
 fi
 debug "$VOLNAME mount point is $VOLMNT"
 
-get_default_volume || exit 1 # sets DEFAULT_VOL
+get_default_volume # sets DEFAULT_VOL
 debug "Default volume: $DEFAULT_VOL"
 
 show_todo
