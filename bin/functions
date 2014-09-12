@@ -33,9 +33,9 @@ function check_ssh() {
   return 0
 }
 
-# currentClusterName: returns the name of the current ambari cluster. Returns
-# 1 on errors. 
-# Args: $1=ambari server hostname (including :port),
+# currentClusterName: outputs the name of the current ambari cluster.
+# Returns 1 on errors. 
+# Args: $1=ambari server url (including :port),
 #       $2=ambari admin username,
 #       $3=ambari user password.
 function currentClusterName() {
