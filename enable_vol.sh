@@ -180,7 +180,7 @@ function show_todo() {
 }
 
 # get_default_volume: finds the default volume for the current cluster, if any,
-# and sets the global DEFAULT_VOL variable. Returns 1 on errors
+# and sets the global DEFAULT_VOL variable.
 # Uses globals:
 #   RHS_NODE
 # Sets globals:
@@ -191,10 +191,10 @@ function get_default_volume() {
   local core_site='/etc/hadoop/conf/core-site.xml'
   local prop='fs.glusterfs.volumes' # list of 1 or more vols, 1st is default
 
-  vol="$(ssh $RHS_NODE "grep -A1 "$prop" $core_site | grep '<value>'")"
+  vol="$(ssh $RHS_NODE "sed -n '/$prop/{n;p}' $core_site")" # value is next line
   [[ -z "$vol" ]] && {
-    err "$RHS_NODE: $prop missing from $core_site"; 
-    return 1; }
+    warn "$RHS_NODE: $prop missing from $core_site"; 
+    return 0; }
 
   vol=${vol#*>} # delete leading <value>
   vol=${vol%<*} # delete training </value>, could be empty
