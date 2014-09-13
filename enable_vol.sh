@@ -135,13 +135,15 @@ function parse_cmd() {
 
   VOLNAME="$1"
 
+  # fill in default options
+  [[ -z "$ACTION" ]] && ACTION='append' # default: volname is not the default
+
   # check for required args and options
   [[ -z "$VOLNAME" ]] && {
     echo "Syntax error: volume name is required";
     ((errcnt++)); }
 
-  # fill in default options
-  [[ -z "$ACTION" ]] && ACTION='append' # default: volname is not the default
+  (( errcnt > 0 )) && return 1
 
   return 0
 }
@@ -340,10 +342,7 @@ errcnt=0
 AUTO_YES=0 # false
 VERBOSE=$LOG_QUIET # default
 
-quiet '***'
-quiet "*** $ME: version $(cat $PREFIX/VERSION)"
-quiet '***'
-debug "date: $(date)"
+report_version $ME $PREFIX
 
 parse_cmd $@ || exit -1
 

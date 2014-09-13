@@ -716,10 +716,7 @@ AUTO_YES=0		# assume false
 VERBOSE=$LOG_QUIET	# default
 errnodes=''; errcnt=0
 
-quiet '***'
-quiet "*** $ME: version $(cat $PREFIX/VERSION)"
-quiet '***'
-debug "date: $(date)"
+report_version $ME $PREFIX
 
 parse_cmd $@ || exit -1
 

@@ -124,10 +124,6 @@ function parse_cmd() {
     echo "Syntax error: volume name is required";
     ((errcnt++)); }
 
-  [[ -z "$YARN_NODE" ]] && {
-    echo "Syntax error: the yarn-master node is required";
-    ((errcnt++)); }
-
   (( errcnt > 0 )) && return 1
   return 0
 }
@@ -171,23 +167,15 @@ errcnt=0
 AUTO_YES=0 # false
 VERBOSE=$LOG_QUIET # default
 
-quiet '***'
-quiet "*** $ME: version $(cat $PREFIX/VERSION)"
-quiet '***'
-debug "date: $(date)"
+report_version $ME $PREFIX
 
 parse_cmd $@ || exit -1
 
-if [[ -z "$MGMT_NODE" ]] ; then # omitted
-  warn "no management node specified therefore the localhost ($HOSTNAME) is assumed"
-  (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && exit -1
-  MGMT_NODE="$HOSTNAME"
-fi
-if [[ -z "$RHS_NODE" ]] ; then # omitted
-  warn "no RHS storage node specified therefore the localhost ($HOSTNAME) is assumed"
-  (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && exit -1
-  RHS_NODE="$HOSTNAME"
-fi
+default_nodes MGMT_NODE 'management' YARN_NODE 'yarn-master' \
+        RHS_NODE 'RHS storage' || exit -1
+
+# check for passwordless ssh connectivity to nodes
+check_ssh $(uniq_nodes $MGMT_NODE $YARN_NODE $RHS_NODE) || exit 1
 
 vol_exists $VOLNAME $RHS_NODE || {
   err "volume $VOLNAME does not exist";

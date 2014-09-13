@@ -424,10 +424,7 @@ REPLICA_CNT=2  # hard-coded for now
 VERBOSE=$LOG_QUIET # default
 errcnt=0
 
-quiet '***'
-quiet "*** $ME: version $(cat $PREFIX/VERSION)"
-quiet '***'
-debug "date: $(date)"
+report_version $ME $PREFIX
 
 parse_cmd $@ || exit -1
 

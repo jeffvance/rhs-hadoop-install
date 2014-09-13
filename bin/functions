@@ -195,6 +195,25 @@ function quiet() {
   display $opt "$1" $LOG_QUIET
 }
 
+# report_version: output and log the calling scritp's name and version id,
+# and the current date.
+# Args: 1=simple script name (minus .sh),
+#       2=(optional) dirname prefix of calling script
+function report_version() {
+
+  local me="$1"; local prefix="$2"
+
+  [[ -z "$prefix" ]] && {
+    prefix="$(dirname $(readlink -f $BASH_SOURCE))";
+    prefix="$(dirname $prefix)"; } # parent of bin/
+
+  quiet '***'
+  quiet "*** $me: version $(cat $prefix/VERSION)"
+  quiet '***'
+
+  debug "date: $(date)"
+}
+
 # setup_firewall: due to random ports (ports opened with port num 0) and
 # possibly RMI ports we cannot open up the firewall only for specific hadoop / 
 # gluster / ambari related ports. The only solution that allows hadoop to work
