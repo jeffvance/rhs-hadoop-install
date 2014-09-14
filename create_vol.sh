@@ -197,6 +197,34 @@ function set_non_vol_nodes() {
   return 0
 }
 
+# show_todo: echo and log the user-provided and derived values that will be
+# used to create the new volume.
+# Uses globals:
+#   BRKMNTS
+#   EXTRA_NODES
+#   VOLMNT
+#   VOLNAME
+#   VOL_NODES
+function show_todo() {
+
+  local node; local fmt_node; local fill
+
+  echo
+  quiet "*** Volume        : $VOLNAME"
+  quiet "*** Nodes         : $(echo ${VOL_NODES[*]} | sed 's/ /, /g')"
+  [[ -n "$EXTRA_NODES" ]] && {
+    quiet "*** Nodes not spanned by vol: $(echo ${EXTRA_NODES[*]} | \
+	sed 's/ /, /g')"; }
+  quiet "*** Volume mount  : $VOLMNT"
+  quiet "*** Brick mounts"
+  for node in ${VOL_NODES[@]}; do
+      let fill=(11-${#node}) # to left-justify node
+      fmt_node="$node $(printf ' %.0s' $(seq $fill))"
+      quiet "      $fmt_node: ${BRKMNTS[$node]}"
+  done
+  echo
+}
+
 # path_avail: return 0 (true) if the full path is available on *all* nodes (eg.
 # does not exist on any node). Return false (1) if the full path is not
 # available on *all* nodes (eg. false if it exists on any node).
@@ -448,20 +476,7 @@ set_non_vol_nodes || exit 1 # sets EXTRA_NODES array (can be empty)
 # check for passwordless ssh connectivity to extra nodes
 check_ssh ${EXTRA_NODES[*]} || exit 1
 
-echo
-quiet "*** Volume        : $VOLNAME"
-quiet "*** Nodes         : $(echo ${VOL_NODES[*]} | sed 's/ /, /g')"
-[[ -n "$EXTRA_NODES" ]] && {
-  quiet "*** Nodes not spanned by vol: $(echo ${EXTRA_NODES[*]} | \
-	sed 's/ /, /g')"; }
-quiet "*** Volume mount  : $VOLMNT"
-quiet "*** Brick mounts"
-for node in ${VOL_NODES[@]}; do
-    let fill=(11-${#node}) # to left-justify node
-    fmt_node="$node $(printf ' %.0s' $(seq $fill))"
-    quiet "      $fmt_node: ${BRKMNTS[$node]}"
-done
-echo
+show_todo
 
 # verify that each node is prepped for hadoop workloads
 chk_nodes || exit 1
@@ -470,12 +485,10 @@ chk_nodes || exit 1
 (( ! AUTO_YES )) && \
   ! yesno "Creating new volume $VOLNAME. Continue? [y|N] " && exit 0
 
-# create and start the replica 2 volume and set perf settings
+# create and start the volume, set perf settings, mount it
 create_vol || exit 1
-start_vol || exit 1
-
-# create gluster-fuse mount, per node
-mk_volmnt || exit 1
+start_vol  || exit 1
+mk_volmnt  || exit 1 # create gluster-fuse mount, per node
 
 # add the distributed hadoop dirs
 add_distributed_dirs || exit 1
