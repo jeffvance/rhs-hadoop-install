@@ -1,24 +1,28 @@
 #!/bin/bash
 #
 # TODO:
-# 1) verify brick xfs mount options, eg noatime
+# 1) verify brick xfs mount options, eg. noatime
 # 2) wait for nodes to join trusted pool
 #
 # setup_cluster.sh accepts a list of nodes:brick-mnts:block-devs, along with
-# the name of the yarn-master and hadoop-mgmt servers, and creates a trusted
-# pool with each node in the node-list setup as a storage/data node. If the pool
-# already exists then the supplied nodes are checked (actually setup anyway) as
-# a verification step.
+# the name of the yarn-master and hadoop-mgmt servers, and does one of three
+# things:
+#  - creates a new trusted storage pool if none exists, or
+#  - if a pool already exists then adds the supplied nodes to the storage pool,
+#    (referred to as "scaling up"),  or
+#  - if a pool already exists and the supplied nodes are in that pool then re-
+#    validate the supplied nodes. Re-validating consists of redoing the steps
+#    to setup the desired environment, and these steps are idempotent.
 #
 # The yarn and mgmt nodes are expected to be rhel 6.5 servers outside of the
-# pool, and not to be the same server; however these recommendations are not
+# pool, and not to be the same server; however, these recommendations are not
 # enforced by the script.
 #
 # On each rhs node the blk-device is setup as an xfs file system and mounted to
-# the brick mount dir, ntp config is verified, iptables is disabled, selinux is
-# set to permissive, and the required hadoop local directories are created (note
-# the required Hadoop distributed dirs are not created here), and the rhs-high-
-# throughput profile is enabled.
+# the brick mount dir, ntp config is verified, iptables are disabled, selinux
+# is set to permissive, and the required hadoop local directories are created
+# (note: the required Hadoop distributed dirs are not created here). If a
+# profile is specified then that profile will be set by tuned-adm.
 #
 # Also, on all passed-in nodes (assumed to be storage nodes) and on the yarn-
 # master server node, the ambari agent is installed (updated if present) and
@@ -26,7 +30,7 @@
 # will not have the agent installed. Last, the ambari-server is installed and
 # started on the mgmt-node.
 #
-# Tasks related to volumes and/or ambari setup are not done here.
+# Tasks related to volumes are not done here.
 #
 # See usage() for syntax.
 
@@ -58,14 +62,15 @@ where:
                   path.
                   Eg: <node1><:brickmnt1>:<blkdev1> <node2>[:<brickmnt2>]
                       [:<blkdev2>] [<node3>] ...
-                  It is recommended that each node is separate from the mgmt and
-                  yarn-master nodes. Only the brick mount path and the block
-                  device path associated with the first node are required. If
-                  omitted from the other <nodes-spec-list> members then each
-                  node assumes the values of the first node for brick mount
-                  path and block device path. If a brick mount path is omitted
-                  but a block device path is specified then the block device
-                  path is proceded by two ':'s, eg. "<nodeN>::<blkdevN>"
+                  Only the brick mount path and the block device path associated
+                  with the first node are required. If omitted from the other
+                  <nodes-spec-list>'s then each node assumes the values of the
+                  first node for brick mount path and block device path. If a
+                  brick mount path is omitted but a block device path is
+                  specified then the block device path is proceded by two ':'s,
+                  e.g., "<nodeN>::<blkdevN>". It is recommended that the mgmt
+                  and yarn-master nodes are not also storage nodes and are not
+                  the same server.
 --yarn-master   : (optional) hostname or ip of the yarn-master server which is
                   expected to be outside of the storage pool. Default is
                   localhost.

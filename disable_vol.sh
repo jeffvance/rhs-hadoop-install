@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # disable_vol.sh accepts a volume name and removes this volume from the Hadoop
-# core-site file.
+# core-site file's "fs.glusterfs.volumes" property value.
 #
 # See usage() for syntax.
 
@@ -33,9 +33,9 @@ where:
 <volname>    : the RHS volume to be disabled for hadoop workloads.
 --yarn-master: hostname or ip of the yarn-master server which is expected to
                be outside of the storage pool.
---rhs-node   : (optional) hostname of any of the storage nodes. This is needed in
-               order to access the gluster command. Default is localhost which,
-               must have gluster cli access.
+--rhs-node   : (optional) hostname of any of the storage nodes. This is needed
+               in order to access the gluster command. Default is localhost
+               which, must have gluster cli access.
 --hadoop-mgmt-node : (optional) hostname or ip of the hadoop mgmt server which
                is expected to be outside of the storage pool. Default is
                localhost.

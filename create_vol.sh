@@ -2,13 +2,14 @@
 #
 # create_vol.sh accepts a volume name, volume mount path prefix, and a list of
 # two or more "node:brick_mnt" pairs, and creates a new volume, spanning the
-# supplied nodes, with the appropriate performance settings set. Each node
+# supplied nodes, and with the appropriate performance settings set. Each node
 # spanned by the new volume is checked to make sure it is setup for hadoop
 # workloads. The new volume is started and the volume is mounted with the
 # correct glusterfs-fuse mount options. Lastly, the distributed hadoop-specific
 # directories are created.
-# Note: nodes that are not spanned by the new volume will still have the volume
-#   mounted so that hadoop jobs running on these nodes have access to the data.
+# Note: nodes in the pool that are not spanned by the new volume, and the yarn-
+#   master node, will still have the volume mounted so that hadoop jobs running
+#   on these nodes have access to the data.
 #
 # See useage() for syntax.
 
@@ -41,9 +42,9 @@ where:
                      <node1><:brickmnt1>  <node2>[:<brickmnt2>] ...
                   A volume does not need to span all nodes in the cluster. Only
                   the brick mount path associated with the first node is
-                  required. If omitted from the other <nodes-spec-list> members
-                  then each node assumes the value of the first node for the
-                  brick mount path.
+                  required. If omitted from the other <nodes-spec-list>'s then
+                  each node assumes the value of the first node for the brick
+                  mount path.
 <volname>       : name of the new volume.
 <vol-mnt-prefix>: path of the glusterfs-fuse mount point, eg. /mnt/glusterfs.
                   Note: the volume name will be appended to this mount point.
