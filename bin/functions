@@ -26,6 +26,8 @@ function check_ssh() {
       if (( err != 0 )) ; then
         echo "ERROR: cannot passwordless ssh to node $node from $HOSTNAME"
         ((errcnt++))
+      else
+	debug "passwordless ssh check for \"$node\" passed"
       fi
   done
 

@@ -261,7 +261,7 @@ function check_blkdevs() {
 
   local node; local blkdev; local err; local errcnt=0; local out
 
-  debug "---checking block devices..."
+  verbose "--- checking block devices..."
 
   for node in ${NODES[@]}; do
       out="$(ssh $node "
@@ -289,7 +289,7 @@ function check_blkdevs() {
       fi
   done
 
-  debug "done checking block devices"
+  verbose "--- done checking block devices"
   (( errcnt > 0 )) && return 1
   return 0
 }
