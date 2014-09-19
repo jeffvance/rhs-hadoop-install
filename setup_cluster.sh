@@ -167,16 +167,11 @@ function parse_cmd() {
 # reported and the user is prompted to continue. Returns 1 on errors and if the
 # user answers no.
 # Uses globals:
-#   AUTO_YES
 #   NODE_SPEC
-#   YARN_NODE
-#   MGMT_NODE
 # Sets globals:
-#   MGMT_INSIDE
-#   NODES (*unique* storage nodes)
+#   NODES() *unique* storage nodes
 #   NODE_BLKDEVS
 #   NODE_BRKMNTS
-#   YARN_INSIDE
 function parse_nodes_brkmnts_blkdevs() {
 
   local node_spec=(${NODE_SPEC[0]//:/ }) # split after subst ":" with space
@@ -217,9 +212,6 @@ function parse_nodes_brkmnts_blkdevs() {
              return 1
           ;;
       esac
-      # detect if yarn-master or mgmt node are inside storage pool
-      [[ "$node" == "$YARN_NODE" ]] && YARN_INSIDE=1 # true
-      [[ "$node" == "$MGMT_NODE" ]] && MGMT_INSIDE=1 # true
   done
 
   # assign unique storage nodes
@@ -229,6 +221,35 @@ function parse_nodes_brkmnts_blkdevs() {
   for node in ${NODES[@]}; do
       NODE_BRKMNTS[$node]=${NODE_BRKMNTS[$node]%*,}
       NODE_BLKDEVS[$node]=${NODE_BLKDEVS[$node]%*,}
+  done
+
+  return 0
+}
+
+# check_yarn_ambari_nodes: check if the management node and/or yarn-master node
+# is inside the storage pool and/or are the same node, and if so a warning is
+# reported and the user is prompted to continue. Returns 1 if the user answers
+# no.
+# Uses globals:
+#   AUTO_YES
+#   YARN_NODE
+#   MGMT_NODE
+#   NODES()
+#   NODE_IPS()
+# Sets globals:
+#   MGMT_INSIDE
+#   YARN_INSIDE
+function check_yarn_ambari_nodes() {
+
+  local node; local ip
+  local mgmt_ip="${NODE_IPS[$MGMT_NODE]}" # ip addr
+  local yarn_ip="${NODE_IPS[$YARN_NODE]}" # ip addr
+
+  # detect if yarn-master or mgmt node are inside storage pool
+  for node in ${NODES[@]}; do
+      ip="${NODE_IPS[$node]}"
+      [[ "$ip" == "$yarn_ip" ]] && YARN_INSIDE=1 # true
+      [[ "$ip" == "$mgmt_ip" ]] && MGMT_INSIDE=1 # true
   done
 
   # warning if mgmt or yarn-master nodes are inside the storage pool
@@ -244,7 +265,7 @@ function parse_nodes_brkmnts_blkdevs() {
   fi
 
   # warning if yarn-master == mgmt node
-  if [[ "$YARN_NODE" == "$MGMT_NODE" ]] ; then
+  if [[ "$yarn_ip" == "$mgmt_ip" ]] ; then
     warn "the yarn-master and hadoop-mgmt-nodes are the same which is sub-optimal."
     (( ! AUTO_YES )) && ! yesno  "  Continue? [y|N] " && return 1
   fi
@@ -353,36 +374,23 @@ function check_bin_dir() {
   return 0
 }
 
-# prep_localhost: install bind-utils so that we can use dig to convert a host
-# name to an ip, if needed later in the script. This will be needed to
-# "normalize" nodes in the case where a mix of ips and host names are output by
-# gluster command and/or input by the user. Returns 1 on errors.
-function prep_localhost() {
+# nodes_to_ips: output the value for an assoc array as a string that contains 
+# the the passed-in node as the key and its ip address as the value. Typically
+# each node is a hostname # rather than an ip address. If the passed-in node is
+# already an ip address it is still added to the NODE_IPS array.
+# Assumption: the list of passed-in nodes is *unique*, that way the output has
+#   only 1 ip-addr as the value of each node.
+function nodes_to_ips() {
 
-  local out; local err
+  local nodes="$@"
+  local node; local out=''
 
-  if ! rpm --quiet -q bind-utils ; then
-    verbose "--- installing bind-utils on localhost..."
-    out="$(yum -y install bind-utils)"
-    err=$?
-    (( err != 0 )) && {
-      err $err "bind-utils yum install failed: $out"; return 1; }
-  fi
-
-  return 0
-}
-
-# normalize_nodes: if any of the mgmt-node, yarn-node, or rhs-nodes are mixed,
-# meaning there is a mix of host names and ip addresses, then covert all host
-# names to ips.
-# Uses globals:
-#   MGMT_NODE
-#   NODES()
-#   YARN_NODE
-function normalize_nodes() {
-
-  local have_ip=0; local have_host=0
-
+  for node in $nodes; do
+      out+="[$node]='$(hostname_to_ip $node)' "
+      (( $? != 0 )) && 
+ 	warn "$node could not be converted to an ip address"
+  done
+  echo "($out)"
 }
 
 # prep_rhel_nodes: perform the tasks, if any, for the rhel nodes. Typically,
@@ -568,13 +576,14 @@ function pool_exists() {
 # Uses globals:
 #   AUTO_YES
 #   FIRST_NODE
+#   NODE_IPS()
 #   PREFIX
 # Sets globals:
-#   POOL
+#   POOL() # ip addresses for all storage nodes
 function define_pool() {
 
   local nodes=($@)
-  local node; local uniq=()
+  local i; local node; local uniq=()
 
   verbose "--- defining storage pool..."
 
@@ -583,11 +592,15 @@ function define_pool() {
 
     # find all nodes in trusted pool
     POOL=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE -u))
-    debug "existing pool nodes: ${POOL[*]}"
+    # convert entire pool array to ip addresses
+    for (( i=0; i<${#POOL[*]}; i++ )); do
+	POOL[$i]=$(hostname_to_ip ${POOL[$i]})
+    done
+    debug "existing pool nodes (converted to ip's): ${POOL[*]}"
 
     # find nodes in pool that are not supplied $nodes (ie. unique)
     for node in ${nodes[@]}; do
-	[[ "${POOL[*]}" =~ $node ]] && continue
+	[[ "${POOL[*]}" =~ ${NODE_IPS[$node]} ]] && continue
 	uniq+=($node)
     done
 
@@ -745,7 +758,6 @@ function update_yarn() {
 ## main ##
 
 ME="$(basename $0 .sh)"
-MY_IP="$(getent hosts $HOSTNAME)"
 NODES=()
 declare -A NODE_BRKMNTS; declare -A NODE_BLKDEVS
 MGMT_INSIDE=0		# assume false
@@ -760,22 +772,23 @@ parse_cmd $@ || exit -1
 
 default_nodes MGMT_NODE 'management' YARN_NODE 'yarn-master' || exit -1
 
-# setup localhost (= deploy-from node) for dns lookup
-prep_localhost || exit 1
-
 # extract nodes, brick mnts and blk devs arrays from NODE_SPEC
 parse_nodes_brkmnts_blkdevs || exit -1
-
-# "normalize" all nodes provided by the user if mixed ip+hostnames
-normalize_nodes
-
-# use the first storage node for all gluster cli cmds
-FIRST_NODE=${NODES[0]}
 
 # for cases where storage nodes are repeated and/or the mgmt and/or yarn nodes
 # are inside the pool, there is some improved efficiency in reducing the nodes
 # to just the unique nodes
 UNIQ_NODES=($(uniq_nodes ${NODES[*]} $YARN_NODE $MGMT_NODE))
+
+# create a mirrored nodes list containing the ip address for all nodes
+# provided by the user
+declare -A NODE_IPS=$(nodes_to_ips ${UNIQ_NODES[*]}) # assoc array
+
+# check if the yarn and/or mgmt nodes are the same and/or in the storage pool
+check_yarn_ambari_nodes || exit -1
+
+# use the first storage node for all gluster cli cmds
+FIRST_NODE=${NODES[0]}
 
 # check for passwordless ssh connectivity to nodes
 check_ssh ${UNIQ_NODES[*]} || exit 1

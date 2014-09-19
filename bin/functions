@@ -187,6 +187,42 @@ function gluster_mnt_vol() {
   return $err
 }
 
+# hostname_to_ip: convert the passed-in node to its ip address. If the node is
+# already an ip addr then leave it as is. Output the ip addr. Returns 1 if 
+# getent cannot convert a hostname to an ip and outputs the node in its
+# original host format.
+function hostname_to_ip() {
+
+  local node="$1"
+  local ip; local err
+
+  if is_ip_addr $node ; then
+    echo "$node"
+  else
+    ip="$(getent hosts $node)" # uses dns or /etc/hosts
+    err=$?
+    if (( err != 0 )) || [[ -z "$ip" ]] ; then
+      echo "$node"
+    else
+      echo "${ip%% *}" # ip addr
+    fi
+  fi
+
+  (( err != 0 )) && return 1
+  return 0
+}
+
+# is_ip_addr: returns 0 (true) if the passed-in node appears to be an ipv4
+# address, else 1 is returned.
+function is_ip_addr() {
+
+  local octet='(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])' # cannot exceed 255
+  local ipv4="^$octet\.$octet\.$octet\.$octet$"
+
+  [[ "$1" =~ $ipv4 ]] && return 0 # true
+  return 1 # false
+}
+
 # quiet: call display() using LOG_QUIET. $1 can be an echo option or the msg.
 function quiet() {
 
