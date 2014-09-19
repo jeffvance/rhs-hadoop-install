@@ -353,6 +353,38 @@ function check_bin_dir() {
   return 0
 }
 
+# prep_localhost: install bind-utils so that we can use dig to convert a host
+# name to an ip, if needed later in the script. This will be needed to
+# "normalize" nodes in the case where a mix of ips and host names are output by
+# gluster command and/or input by the user. Returns 1 on errors.
+function prep_localhost() {
+
+  local out; local err
+
+  if ! rpm --quiet -q bind-utils ; then
+    verbose "--- installing bind-utils on localhost..."
+    out="$(yum -y install bind-utils)"
+    err=$?
+    (( err != 0 )) && {
+      err $err "bind-utils yum install failed: $out"; return 1; }
+  fi
+
+  return 0
+}
+
+# normalize_nodes: if any of the mgmt-node, yarn-node, or rhs-nodes are mixed,
+# meaning there is a mix of host names and ip addresses, then covert all host
+# names to ips.
+# Uses globals:
+#   MGMT_NODE
+#   NODES()
+#   YARN_NODE
+function normalize_nodes() {
+
+  local have_ip=0; local have_host=0
+
+}
+
 # prep_rhel_nodes: perform the tasks, if any, for the rhel nodes. Typically,
 # these would be the mgmt and yarn nodes. Returns 1 on errors.
 # Currently, the only special prep for rhel nodes is upgrading openssl.
@@ -713,6 +745,7 @@ function update_yarn() {
 ## main ##
 
 ME="$(basename $0 .sh)"
+MY_IP="$(getent hosts $HOSTNAME)"
 NODES=()
 declare -A NODE_BRKMNTS; declare -A NODE_BLKDEVS
 MGMT_INSIDE=0		# assume false
@@ -727,8 +760,14 @@ parse_cmd $@ || exit -1
 
 default_nodes MGMT_NODE 'management' YARN_NODE 'yarn-master' || exit -1
 
+# setup localhost (= deploy-from node) for dns lookup
+prep_localhost || exit 1
+
 # extract nodes, brick mnts and blk devs arrays from NODE_SPEC
 parse_nodes_brkmnts_blkdevs || exit -1
+
+# "normalize" all nodes provided by the user if mixed ip+hostnames
+normalize_nodes
 
 # use the first storage node for all gluster cli cmds
 FIRST_NODE=${NODES[0]}
