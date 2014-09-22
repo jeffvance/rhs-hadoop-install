@@ -275,7 +275,7 @@ function setup_multi_tenancy() {
 }
 
 # create_post_processing_dirs: create the distributed hadoop directories that
-# need to be added after the Ambari services have been started.# Returns 1 on
+# need to be added after the Ambari services have been started. Returns 1 on
 # errors.
 # Uses globals:
 #   PREFIX
