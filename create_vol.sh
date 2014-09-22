@@ -99,7 +99,7 @@ function parse_cmd() {
   done
 
   VOLNAME="$1"; shift
-  VOLMNT="$1"; shift
+  VOLMNT="$1" ; shift
   NODE_SPEC=($@) # array of nodes:brick-mnts.
 
   # check required args
@@ -177,7 +177,7 @@ function parse_nodes_brkmnts() {
 #   EXTRA_NODES
 function set_non_vol_nodes() {
 
-  local node; local pool; local err
+  local node; local pool; local err; local i
   EXTRA_NODES=() # set global var, can be empty
 
   pool=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE -u)) # uniq nodes in pool
@@ -185,16 +185,20 @@ function set_non_vol_nodes() {
   (( err != 0 )) && {
     err $err "cannot find storage pool nodes: ${pool[*]}";
     return 1; }
-
-  debug "all nodes in storage pool: ${pool[*]}"
+  debug "all nodes in pool: ${pool[*]}"
+  # convert entire pool array to ip addresses
+  for (( i=0; i<${#pool[*]}; i++ )); do
+      pool[$i]=$(hostname_to_ip ${pool[$i]})
+  done
+  debug "all nodes in pool after converted to ip's: ${pool[*]}"
 
   # find nodes in pool that are not spanned by volume
-  for node in ${pool[@]}; do
-      [[ "${VOL_NODES[*]}" =~ $node ]] && continue
+  for node in ${VOL_NODES[@]}; do
+      [[ "${pool[*]}" =~ $(hostname_to_ip $node) ]] && continue
       EXTRA_NODES+=($node)
   done
-
   debug "nodes *not* spanned by new volume: ${EXTRA_NODES[*]}"
+
   return 0
 }
 

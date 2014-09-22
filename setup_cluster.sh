@@ -765,7 +765,7 @@ UNIQ_NODES=($(uniq_nodes ${NODES[*]} $YARN_NODE $MGMT_NODE))
 # provided by the user
 declare -A NODE_IPS=$(nodes_to_ips ${UNIQ_NODES[*]}) # assoc array
 (( $? != 0 )) &&
-  debug "Note: one or more hosts could not be converted to an ip address"
+  warn "one or more hosts could not be converted to an ip address"
 debug "ips for nodes (${!NODE_IPS[*]}): (${NODE_IPS[*]})"
 
 # check if the yarn and/or mgmt nodes are the same and/or in the storage pool
@@ -789,7 +789,7 @@ verify_gid_uids ${NODES[*]} $YARN_NODE || exit 1
 show_todo
 
 # figure out which nodes, if any, will be added to the storage pool
-define_pool ${NODES[*]} || exit 1
+define_pool ${NODES[*]} || exit 1  # sets POOL() global
 
 # prompt to continue before any changes are made...
 (( ! AUTO_YES )) && ! yesno "  Continue? [y|N] " && exit 0
