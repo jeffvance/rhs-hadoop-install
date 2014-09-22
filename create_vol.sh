@@ -172,6 +172,7 @@ function parse_nodes_brkmnts() {
 # the new volume. Returns 1 on errors.
 # Uses globals:
 #   FIRST_NODE
+#   VOLNAME
 #   VOL_NODES
 # Sets globals:
 #   EXTRA_NODES
@@ -179,6 +180,8 @@ function set_non_vol_nodes() {
 
   local node; local pool; local err; local i
   EXTRA_NODES=() # set global var, can be empty
+
+  verbose "--- determining if $VOLNAME spans entire storage pool..."
 
   pool=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE -u)) # uniq nodes in pool
   err=$?
@@ -199,6 +202,7 @@ function set_non_vol_nodes() {
   done
   debug "nodes *not* spanned by new volume: ${EXTRA_NODES[*]}"
 
+  verbose "--- done determining if $VOLNAME spans entire storage pool
   return 0
 }
 
