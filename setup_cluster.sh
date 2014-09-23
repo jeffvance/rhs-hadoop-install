@@ -374,23 +374,26 @@ function check_bin_dir() {
   return 0
 }
 
-# nodes_to_ips: output the value for an assoc array as a string that contains 
-# the the passed-in node as the key and its ip address as the value. Typically
-# each node is a hostname # rather than an ip address. If the passed-in node is
-# already an ip address it is still added to the NODE_IPS array.
+# nodes_to_ips: set the global NODE_IPS variable which contains the ip address
+# for all nodes specified by the user, eg. rhs storage nodes, yarn-master node,
+# and ambari mgmt node. Typically each node is a hostname rather than an ip
+# address. If the passed-in node is already an ip address it is still added to
+# the NODE_IPS array.
 # Assumption: the list of passed-in nodes is *unique*, that way the output has
 #   only 1 ip-addr as the value of each node.
+# Sets globals:
+#   NODE_IPS() # assoc array: key=hostname, value=ip-addr
 function nodes_to_ips() {
 
   local nodes="$@"
-  local node; local out=''
+  local node
 
   for node in $nodes; do
-      out+="[$node]='$(hostname_to_ip $node)' "
-      (( $? != 0 )) && 
-       warn "$node could not be converted to an ip address"
+      NODE_IPS[$node]="$(hostname_to_ip $node)"
+      (( $? != 0 )) && warn "$node could not be converted to an ip address"
   done
-  echo "($out)"
+
+  return 0
 }
 
 # prep_rhel_nodes: perform the tasks, if any, for the rhel nodes. Typically,
@@ -762,7 +765,7 @@ function update_yarn() {
 
 ME="$(basename $0 .sh)"
 NODES=()
-declare -A NODE_BRKMNTS; declare -A NODE_BLKDEVS
+declare -A NODE_IPS; declare -A NODE_BRKMNTS; declare -A NODE_BLKDEVS
 MGMT_INSIDE=0		# assume false
 YARN_INSIDE=0		# assume false
 AUTO_YES=0		# assume false
@@ -783,11 +786,9 @@ parse_nodes_brkmnts_blkdevs || exit -1
 # to just the unique nodes
 UNIQ_NODES=($(uniq_nodes ${NODES[*]} $YARN_NODE $MGMT_NODE))
 
-# create a mirrored nodes list containing the ip address for all nodes
-# provided by the user
-declare -A NODE_IPS=$(nodes_to_ips ${UNIQ_NODES[*]}) # assoc array
-(( $? != 0 )) &&
-  warn "one or more hosts could not be converted to an ip address"
+# create the NODE_IPS global assoc array, which contains the ip address for all
+# nodes provided by the user
+nodes_to_ips ${UNIQ_NODES[*]}
 debug "ips for nodes (${!NODE_IPS[*]}): (${NODE_IPS[*]})"
 
 # check if the yarn and/or mgmt nodes are the same and/or in the storage pool
