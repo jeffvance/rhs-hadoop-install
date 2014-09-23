@@ -564,7 +564,7 @@ function pool_exists() {
 function define_pool() {
 
   local nodes=($@)
-  local i; local node; local uniq=()
+  local i; local node; local uniq=(); local msg='(none)'
 
   verbose "--- defining storage pool..."
 
@@ -573,11 +573,13 @@ function define_pool() {
 
     # find all nodes in trusted pool
     POOL=($($PREFIX/bin/find_nodes.sh -n $FIRST_NODE -u))
+    debug "existing pool nodes: ${POOL[*]}"
+
     # convert entire pool array to ip addresses
     for (( i=0; i<${#POOL[*]}; i++ )); do
 	POOL[$i]=$(hostname_to_ip ${POOL[$i]})
     done
-    debug "existing pool nodes (converted to ip's): ${POOL[*]}"
+    debug "existing pool nodes after converted to ip's: ${POOL[*]}"
 
     # find nodes in pool that are not supplied $nodes (ie. unique)
     for node in ${nodes[@]}; do
@@ -587,7 +589,8 @@ function define_pool() {
 
     # are we adding nodes, or just checking existing nodes?
     POOL=(${uniq[@]}) # nodes to potentially add to existing pool, can be 0
-    debug "unique nodes to add to pool: ${POOL[*]}"
+    (( ${#POOL[*]} > 0 )) && msg="${POOL[*]}"
+    debug "unique nodes to add to pool: $msg"
 
     if (( ${#uniq[@]} > 0 )) ; then # we have nodes not in pool
       force -e "The following nodes are not in the existing storage pool:\n  ${uniq[*]}"

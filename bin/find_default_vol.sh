@@ -26,9 +26,9 @@ done
 [[ "$rhs_node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $rhs_node"
 
 vol="$(eval "
-	$ssh \"sed -n '/$prop/{n;p}' $core_site\"")" # value line is after prop
-[[ -z "$vol" ]] && {
-  echo "$rhs_node: $prop missing from $core_site"; 
+	$ssh \"sed -n '/$prop/{n;p}' $core_site 2>&1\"")" # val line after prop
+(( $? != 0 )) || [[ -z "$vol" ]] && {
+  echo "$rhs_node: $prop missing from $core_site: $vol"; 
   exit 1; }
 
 vol=${vol#*>} # delete leading <value>

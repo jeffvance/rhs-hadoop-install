@@ -178,7 +178,7 @@ function parse_nodes_brkmnts() {
 #   EXTRA_NODES
 function set_non_vol_nodes() {
 
-  local node; local pool; local err; local i
+  local node; local pool; local err; local i; local msg='(none)'
   EXTRA_NODES=() # set global var, can be empty
 
   verbose "--- determining if $VOLNAME spans entire storage pool..."
@@ -200,9 +200,10 @@ function set_non_vol_nodes() {
       [[ "${pool[*]}" =~ $(hostname_to_ip $node) ]] && continue
       EXTRA_NODES+=($node)
   done
-  debug "nodes *not* spanned by new volume: ${EXTRA_NODES[*]}"
+  (( ${#EXTRA_NODE[*]} > 0 )) && msg="${EXTRA_NODES[*]}"
+  debug "nodes *not* spanned by new volume: $msg"
 
-  verbose "--- done determining if $VOLNAME spans entire storage pool
+  verbose "--- done determining if $VOLNAME spans entire storage pool"
   return 0
 }
 

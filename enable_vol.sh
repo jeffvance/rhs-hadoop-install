@@ -373,6 +373,9 @@ fi
 debug "$VOLNAME mount point is $VOLMNT"
 
 DEFAULT_VOL="$($PREFIX/bin/find_default_vol.sh -n $RHS_NODE)"
+(( $? != 0 )) && {
+  warn "Cannot find configured default volume on node: $DEFAULT_VOL";
+  DEFAULT_VOL=''; }
 debug "Default volume: $DEFAULT_VOL"
 
 show_todo

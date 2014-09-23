@@ -27,24 +27,24 @@ source $PREFIX/functions
 #   PROFILE
 function parse_cmd() {
 
-  local long_opts='blkdev:,brkmnt:,profile:,hadoop-mgmt-node:'
+  local long_opts='blkdev::,brkmnt::,profile::,hadoop-mgmt-node:'
 
-  eval set -- "$(getopt -o '' --long $long_opts -- $@)"
+  eval set -- "$(getopt -o'-' --long $long_opts -- $@)"
 
   while true; do
       case "$1" in
         --blkdev) # optional
-	  shift
+	  shift 2
 	  [[ "${1:0:2}" == '--' ]] && continue # missing option value
           BLKDEV="$1"; shift; continue
         ;;
         --brkmnt) # optional
-	  shift
+	  shift 2
 	  [[ "${1:0:2}" == '--' ]] && continue # missing option value
           BRICKMNT="$1"; shift; continue
         ;;
         --profile) # optional
-	  shift
+	  shift 2
 	  [[ "${1:0:2}" == '--' ]] && continue # missing option value
           PROFILE="$1"; shift; continue
         ;;
@@ -111,6 +111,8 @@ function setup_ambari_agent() {
   local AMBARI_INI='/etc/ambari-agent/conf/ambari-agent.ini'
   local AMBARI_AGENT_PID='/var/run/ambari-agent/ambari-agent.pid'
 
+  echo "setting up the ambari agent..."
+
   get_ambari_repo
 
   # stop agent if running
@@ -125,7 +127,7 @@ function setup_ambari_agent() {
   # install agent
   yum -y install ambari-agent 2>&1
   err=$?
-  if (( err != 0 && err != 1 )) ; then # 1--> nothing-to-do
+  if (( err != 0 )) ; then
     echo "ERROR $err: ambari-agent install"
     return 1
   fi
@@ -154,6 +156,7 @@ function setup_ambari_agent() {
     return 1
   fi
 
+  echo "done setting up the ambari agent"
   return 0
 }
 
@@ -275,5 +278,5 @@ setup_firewall     || ((errcnt++))
 setup_profile      || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
-echo "Node $(hostname) successfully setup"
+echo "Node $HOSTNAME successfully setup"
 exit 0
