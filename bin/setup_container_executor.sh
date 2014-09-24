@@ -33,12 +33,19 @@ EOF
 ## main ##
 
 # get the md5 of the current container-executor file
-curr_md5="$(md5sum $task_cfg)" # "hash filename"
-curr_md5="${curr_md5%% *}"     # just hash
-if [[ "$curr_md5" != "$MD5SUM" ]] ; then
-  echo "$HOSTNAME: $task_cfg has been previously modified and will not be over-written"
-  echo "  current md5 hash: $curr_md5, original md5: $MD5SUM"
-  exit 0
+if [[ -f $task_cfg ]] ; then
+  echo "$HOSTNAME: $task_cfg exists..."
+  curr_md5="$(md5sum $task_cfg)" # "hash filename"
+  curr_md5="${curr_md5%% *}"     # just hash
+  if [[ "$curr_md5" != "$MD5SUM" ]] ; then
+    echo "$task_cfg has been previously modified and will not be over-written"
+    echo "  current md5 hash: $curr_md5, original md5: $MD5SUM"
+    exit 0
+  else
+    echo "$task_cfg file will be over-written..."
+  fi
+else
+  echo "$HOSTNAME: $task_cfg file does not exist, it will be created..."
 fi
 
 echo "$HOSTNAME: configuring the Linux Container Executor for Hadoop"
