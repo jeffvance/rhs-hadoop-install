@@ -28,7 +28,7 @@ done
 vol="$(eval "
      $ssh \"sed -n '/$prop/,/<\/property>/{/<value>/p}' $core_site 2>&1\"")" 
 (( $? != 0 )) || [[ -z "$vol" ]] && {
-  echo "$rhs_node: $prop missing from $core_site: $vol"; 
+  echo "$rhs_node: \"$prop\" property value is missing from $core_site"; 
   exit 1; }
 
 vol=${vol#*>} # delete leading <value>
