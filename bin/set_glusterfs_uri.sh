@@ -3,12 +3,12 @@
 # set_glusterfs_uri.sh updates the hadoop core-site.xml file with the passed-in
 # volume name and volume mount path (which is required for the prepend and
 # append actions). Depending on the action, the volume name is prepended,
-# appended or deleted to/from the list of volumes specified in the
-# "fs.glusterfs.volumes" property. Additionally, the volume/fuse mount is
-# either created or deleted in core-site.
+# appended, or deleted to/from the list of volumes specified in the
+# "fs.glusterfs.volumes" property. Additionally, the volume/fuse mount property
+# is either created or deleted in core-site.
 #
 # NOTE: the first volume appearing in "fs.glusterfs.volumes" becomes the
-#   default volume and will be used for all unqualified file references.
+#   default volume and will be used for all unqualified URI/file references.
 #
 # Syntax: see usage() function.
 
