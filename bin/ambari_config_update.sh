@@ -15,11 +15,9 @@ AMBARI_HOST='localhost'
 PROPERTY=''
 CLUSTER_NAME=""
 SITE="core-site"
-SITETAG=''
 CONFIG_KEY=''
 CONFIG_VALUE=''
 ACTION=""
-
 
 # debug: execute cmd in $1 if _DEBUG is set to 'on'.
 # Uses globals:
@@ -148,43 +146,6 @@ function parse_cmd() {
   return 0
 }
 
-# currentSiteTag: sets the SITETAG based on the value in the ambari
-# config file. Returns 1 on errors.
-# Set globals:
-#   SITETAG
-function currentSiteTag() {
-
-  local currentSiteTag=''
-  local found=''
-  local line ; local errOutput ;
-    
-  currentSite=$(curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME?fields=Clusters/desired_configs" | grep -E "$SITE|tag")
-
-  for line in $currentSite; do
-    if [ $line != "{" -a $line != ":" -a $line != '"tag"' ] ; then
-      if [ -n "$found" -a -z "$currentSiteTag" ]; then
-        currentSiteTag=$line;
-      fi
-      if [ $line == "\"$SITE\"" ]; then
-        found=$SITE; 
-      fi
-    fi
-  done
-
-  if [ -z $currentSiteTag ]; then
-    errOutput=$(curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME?fields=Clusters/desired_configs")
-    echo "[ERROR] \"$SITE\" not found in server response.";
-    echo "[ERROR] Output of \`curl -s -u $USERID:$PASSWD \"$AMBARIURL/api/v1/clusters/$CLUSTER_NAME?fields=Clusters/desired_configs\"\` is:";
-    echo $errOutput | while read -r line; do
-      echo "[ERROR] $line";
-    done;
-    return 1;
-  fi
-  currentSiteTag=$(echo $currentSiteTag|cut -d \" -f 2)
-  SITETAG="$currentSiteTag" 
-}
-
-
 # doUpdate: updates the PROPERTY in SITETAG. Returns 1 on errors. Returns 0 for no
 # errors or for warnings.
 # Input : $1 mode; $2 key; $3 value
@@ -197,7 +158,6 @@ function doUpdate() {
   local json_begin="{ \"Clusters\": { \"desired_config\": {\"type\": \"$SITE\", "
   local json_end='}}}'
 
-  currentSiteTag
   debug echo "########## Performing '$mode' $configkey:$configvalue on (Site:$SITE, Tag:$SITETAG)";
 
   # extract the properties section and write to tmp config file
@@ -278,10 +238,18 @@ AMBARIURL="http://$AMBARI_HOST$PORT"
 debug echo "########## AMBARIURL = "$AMBARIURL
 
 CLUSTER_NAME="$(
-	$PREFIX/find_cluster_name.sh $AMBARIURL "$USERID" "$PASSWD")" || {
-  echo "$CLUSTER_NAME"; # contains error msg
+	$PREFIX/find_cluster_name.sh $AMBARIURL "$USERID:$PASSWD")" || {
+  echo "ERROR: cannot get cluster name: $CLUSTER_NAME";
   exit 1; }
+
+SITETAG="$(
+	$PREFIX/find_coresite_tag.sh "$AMBARIURL" "$USERID:$PASSWD" \
+	    "$CLUSTER_NAME")" || {
+  echo "ERROR: Cannot get current core-site tag: $SITETAG";
+  exit 1; }
+
 debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
+debug echo "########## SITETAG = $SITETAG"
 debug echo "########## $ACTION $CONFIG_KEY $CONFIG_VALUE"
 
 doUpdate $ACTION $CONFIG_KEY $CONFIG_VALUE || exit 1

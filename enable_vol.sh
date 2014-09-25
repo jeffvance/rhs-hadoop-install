@@ -163,10 +163,10 @@ function show_todo() {
 
    local msg
 
-  if [[ -z "$DEFAULT_VOL" || "$ACTION" == 'prepend' ]] ; then
-    msg="will become the DEFAULT volume"
-  elif [[ "$DEFAULT_VOL" == "$VOLNAME" ]] ; then
+  if [[ "$DEFAULT_VOL" == "$VOLNAME" ]] ; then
     msg="will remain the default volume"
+  elif [[ -z "$DEFAULT_VOL" || "$ACTION" == 'prepend' ]] ; then
+    msg="will become the DEFAULT volume"
   else
     msg="will not be the default volume"
   fi

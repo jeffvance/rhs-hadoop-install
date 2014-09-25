@@ -61,50 +61,38 @@ if [ "$1" == "-port" ] ; then
   echo "PORT=$PORT";
 fi
 
+PREFIX="$(dirname $(readlink -f $0))"
+
 AMBARIURL="http://$2$PORT"
 CLUSTER=$3
 SITE=$4
-SITETAG=''
 CONFIGKEY=$5
 CONFIGVALUE=$6
-
-###################
-## currentSiteTag()
-###################
-currentSiteTag () {
-  currentSiteTag=''
-  found=''
-    
-  #currentSite=`cat ds.json | grep -E "$SITE|tag"`; 
-  currentSite=`curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER?fields=Clusters/desired_configs" 2>&1 | grep -E "$SITE|tag" 2>&1`;
-  for line in $currentSite; do
-    if [ $line != "{" -a $line != ":" -a $line != '"tag"' ] ; then
-      if [ -n "$found" -a -z "$currentSiteTag" ]; then
-        currentSiteTag=$line;
-      fi
-      if [ $line == "\"$SITE\"" ]; then
-        found=$SITE; 
-      fi
-    fi
-  done;
-  if [ -z $currentSiteTag ]; then
-    errOutput=`curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER?fields=Clusters/desired_configs" 2>&1`;
-    echo "[ERROR] \"$SITE\" not found in server response.";
-    echo "[ERROR] Output of \`curl -s -u $USERID:$PASSWD \"$AMBARIURL/api/v1/clusters/$CLUSTER?fields=Clusters/desired_configs\" 2>&1\` is:";
-    echo $errOutput | while read -r line; do
-      echo "[ERROR] $line";
-    done;
-    exit 1;
-  fi
-  currentSiteTag=`echo $currentSiteTag|cut -d \" -f 2`
-  SITETAG=$currentSiteTag;
-}
-
-
 _DEBUG="off"
+
+
 function DEBUG()
 {
  [ "$_DEBUG" == "on" ] &&  $@
+}
+
+#############################################
+## currentSiteTag() 
+## Outputs the current core-site tag.
+## Exits if tag cannot be retrieved.
+#############################################
+function currentSiteTag() {
+
+  local tag
+
+  tag="$($PREFIX/find_coresite_tag.sh $AMBARIURL "$USERID:$PASSWD" "$CLUSTER")"
+  if (( $? != 0 )) || [[ -z "$tag" ]] ; then
+    echo "ERROR: Cannot get current core-site tag: $tag"
+    exit 1
+  fi
+
+  echo "$tag"
+  return 0
 }
 
 #############################################
@@ -113,7 +101,7 @@ function DEBUG()
 #############################################
 doConfigUpdate1 () {
   MODE=$1
-  currentSiteTag
+  SITETAG="$(currentSiteTag)"
   DEBUG echo "########## Performing '$MODE' $CONFIGKEY:$CONFIGVALUE on (Site:$SITE, Tag:$SITETAG)";
   propertiesStarted=0;
   curl -k -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/configurations?type=$SITE&tag=$SITETAG" 2>&1 | while read -r line; do
@@ -158,7 +146,7 @@ doConfigUpdate1 () {
 #############################################
 doConfigUpdate () {
   MODE=$1
-  currentSiteTag
+  SITETAG="$(currentSiteTag)"
   echo "########## Performing '$MODE' $CONFIGKEY:$CONFIGVALUE on (Site:$SITE, Tag:$SITETAG)";
   propertiesStarted=0;
   curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/configurations?type=$SITE&tag=$SITETAG" 2>&1 | while read -r line; do
@@ -190,7 +178,7 @@ doConfigUpdate () {
         echo "########## PUTting json into: $newFile"
         echo $finalJson > $newFile
         curl -u $USERID:$PASSWD -X PUT -H "X-Requested-By: ambari" "$AMBARIURL/api/v1/clusters/$CLUSTER" --data @$newFile 2>&1
-        currentSiteTag
+        SITETAG="$(currentSiteTag)"
         rm -fr $newFile
         echo "########## NEW Site:$SITE, Tag:$SITETAG";
       elif [ "`echo $line | grep "\"$CONFIGKEY\""`" ]; then
@@ -218,7 +206,7 @@ doConfigFileUpdate () {
       echo $finalJson>$newFile
       echo "########## PUTting file:\"$FILENAME\" into config(type:\"$SITE\", tag:$newTag) via $newFile"
       curl -u $USERID:$PASSWD -X PUT -H "X-Requested-By: ambari" "$AMBARIURL/api/v1/clusters/$CLUSTER" --data @$newFile 2>&1
-      currentSiteTag
+      SITETAG="$(currentSiteTag)"
       rm -fr $newFile
       echo "########## NEW Site:$SITE, Tag:$SITETAG";
     else
@@ -245,7 +233,7 @@ doGet () {
   if [ -n $FILENAME -a -f $FILENAME ]; then
     rm -f $FILENAME;
   fi
-  currentSiteTag
+  SITETAG="$(currentSiteTag)"
   echo "########## Performing 'GET' on (Site:$SITE, Tag:$SITETAG)";
   propertiesStarted=0;
   curl -s -u $USERID:$PASSWD "$AMBARIURL/api/v1/clusters/$CLUSTER/configurations?type=$SITE&tag=$SITETAG" 2>&1 | while read -r line; do

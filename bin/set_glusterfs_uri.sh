@@ -166,7 +166,7 @@ AMBARIURL="http://$AMBARI_HOST$PORT"
 debug echo "########## AMBARIURL = $AMBARIURL"
 
 CLUSTER_NAME="$(
-	$PREFIX/find_cluster_name.sh $AMBARIURL "$USERID" "$PASSWD")" || {
+	$PREFIX/find_cluster_name.sh $AMBARIURL "$USERID:$PASSWD")" || {
   echo "$CLUSTER_NAME"; # contains error msg
   exit 1; }
 debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
