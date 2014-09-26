@@ -151,16 +151,16 @@ function parse_cmd() {
       add|append|delete|remove|replace|prepend) # valid
       ;;
       *)
-	echo "Syntax error: unknown action \"$1\""; usage; return 1
+	echo "Syntax error: unknown action \"$ACTION\""; usage; return 1
       ;;
   esac
 
   [[ -z "$CONFIG_KEY" ]] && {
-    echo "Syntax error: CONFIG_KEY is missing"; usage ; return 1; }
+    echo "Syntax error: <key> is missing"; usage ; return 1; }
   if [[ -z "$CONFIG_VALUE" ]] ; then
     # error, unless action is delete (need only key)
     [[ "$ACTION" != 'delete' ]] && {
-      echo "Syntax error: CONFIG_VALUE is missing"; usage ; return 1; }
+      echo "Syntax error: config <value> is missing"; usage ; return 1; }
   fi
 
   eval set -- "$@" # move arg pointer so $1 points to next arg past last opt
@@ -177,12 +177,11 @@ function parse_cmd() {
 function removeValue() {
 
   local str="$1"; local rmStr="$2"
-  local new_str
 
-  new_str="${str/$rmStr/}" # remove arg2 from arg1
-  new_str="${str#,}"       # remove leading comma, if any
-  new_str="${str%,}"       # remove trailing comma, if any
-  new_str="${str/,,/,}"    # fold double commas to single, if any
+  str="${str/$rmStr/}" # remove arg2 from arg1
+  str="${str#,}"       # remove leading comma, if any
+  str="${str%,}"       # remove trailing comma, if any
+  str="${str/,,/,}"    # fold double commas to single, if any
 
   echo "$str"
 }
@@ -195,8 +194,7 @@ function doUpdate() {
   local tmp_cfg="$(mktemp --suffix .$SITE)"
   local old_value; local new_value; local newTag
   local line; local out; local err
-  local json_begin=\
-    "{ \"Clusters\": { \"desired_config\": {\"type\": \"$SITE\", "
+  local json_begin="{ \"Clusters\": { \"desired_config\": {\"type\": \"$SITE\", "
   local json_end='}}}'
 
   debug echo "########## Performing '$mode' $configkey:$configvalue on (Site:$SITE, Tag:$SITETAG)";
@@ -220,7 +218,7 @@ function doUpdate() {
     [[ "$mode" != 'add' ]] && {
       echo "ERROR: cannot update since $configkey is missing in $SITE";
       return 1; }
-  elif "$mode" == 'add' ; then
+  elif [[ "$mode" == 'add' ]] ; then
     echo "WARN: existing $configkey in $SITE will be overwritten: $line"
     mode='replace'
   fi
@@ -235,22 +233,19 @@ function doUpdate() {
   case "$mode" in
       add) # create new key : value attribute in tmp file
 	# add new key:value immediately after properties tag
-	sed -i "/\"properties\" : {/a\"$configkey\" : \"$configvalue\"," \
+	sed -i "/\"properties\" : {/a\"$configkey\" : \"$configvalue\",\n" \
 	  $tmp_cfg
       ;;
-      append|prepend)
-	if [[ ",$old_value," =~ ",$configvalue," ]] ; then
-	  # remove dup value so config value can be prepended or appended
-	  old_value="$(removeValue $old_value $configvalue)"
-	fi
-	if [[ "$mode" == 'prepend' ]] ; then
-	  new_value="$configvalue,$old_value"
-	else # append
-	  new_value="$old_value,$configvalue"
-	fi
+      append)
+	# in case configvalue is present in old_value, remove it
+	new_value="$(removeValue "$old_value" "$configvalue"),$configvalue"
       ;;
       delete) # delete key from tmp file
 	sed -i "/\"$configkey\" :/d" $tmp_cfg
+      ;;
+      prepend)
+	# in case configvalue is present in old_value, remove it
+	new_value="$configvalue,$(removeValue "$old_value" "$configvalue")"
       ;;
       remove) # remove configvalue from old_value
 	# check if configvalue exists
@@ -258,7 +253,7 @@ function doUpdate() {
 	  echo "WARN: $configvalue not present in $configkey; no action needed"
 	  return 0 
 	fi
-	new_value="$(removeValue $old_value $configvalue)"
+	new_value="$(removeValue "$old_value" "$configvalue")"
       ;;
       replace)
 	new_value="$configvalue"
@@ -279,6 +274,7 @@ function doUpdate() {
   echo "$json_end" >>$tmp_cfg
   debug echo "########## new property:"
   debug echo "$(cat $tmp_cfg)"
+exit ############
 
   # PUT/update the real config(core) file
   out="$(curl -k -s -u $USERID:$PASSWD -X PUT -H 'X-Requested-By:ambari' \
