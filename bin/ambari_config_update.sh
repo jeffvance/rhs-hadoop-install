@@ -274,7 +274,6 @@ function doUpdate() {
   echo "$json_end" >>$tmp_cfg
   debug echo "########## new property:"
   debug echo "$(cat $tmp_cfg)"
-exit ############
 
   # PUT/update the real config(core) file
   out="$(curl -k -s -u $USERID:$PASSWD -X PUT -H 'X-Requested-By:ambari' \
