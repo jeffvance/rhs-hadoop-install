@@ -182,7 +182,9 @@ debug echo "########## PARAMS = $PARAMS"
 PORT="$(echo "$PORT" | sed 's/[\"\,\:\ ]//g')"
 
 # update the fs.glusterfs.volumes attribute
-CONFIG_UPDATE_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST --config core-site --action $ACTION --configkey fs.glusterfs.volumes --configvalue $VOLNAME"
+CONFIG_UPDATE_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST \
+  --config 'core-site' --configkey fs.glusterfs.volumes --configvalue $VOLNAME \
+  --action $ACTION"
 [[ $DEBUG == true ]] && CONFIG_UPDATE_PARAM+=" --debug"
 
 debug echo "ambari_config_update.sh $CONFIG_UPDATE_PARAM" 
@@ -191,8 +193,9 @@ $PREFIX/ambari_config_update.sh "$CONFIG_UPDATE_PARAM"
 # add or delete the fs.glusterfs.volume.fuse.<volname> property
 mode='add'
 [[ "$ACTION" == 'remove' ]] && mode='delete'
-CONFIG_SET_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST --config core-site --action $mode --configkey fs.glusterfs.volume.fuse.$VOLNAME"
-##CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT $mode $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME"
+CONFIG_SET_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST \
+  --config 'core-site' --configkey fs.glusterfs.volume.fuse.$VOLNAME \
+  --action $mode"
 [[ "$mode" == 'add' ]] && CONFIG_SET_PARAM+=" --configvalue $VOLNAME"
 
 debug echo "ambari_config_update.sh $CONFIG_SET_PARAM" 
