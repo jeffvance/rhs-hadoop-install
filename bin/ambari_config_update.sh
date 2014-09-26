@@ -35,16 +35,26 @@ function debug() {
 
 # usage: echos general usage paragraph.
 function usage() {
-  echo "Usage: ambari_config_update.sh [-u userId] [-p password] [--port port] [-h ambari_host] [--config config-site] --action add|remove  --configkey CONFIG_KEY --configvalue CONFIG_VALUE"
-  echo ""
-  echo "       [-u userId]: Optional user ID to use for authentication. Default is 'admin'."
-  echo "       [-p password]: Optional password to use for authentication. Default is 'admin'."
-  echo "       [--port port]: Optional port number for Ambari server. Default is '8080'. Provide empty string to not use port."
-  echo "       [-h ambari_host]: Optional external host name for Ambari server. Default is 'localhost'."
-  echo "       [--config config-site]: core-site | mapred-site | yarn site .default config file is core-site."
-  echo "       --action add|prepend|append|replace|remove: performa one of these actions to key:value"
-  echo "       --configkey CONFIG_KEY : property Key in config-site."
-  echo "       --configvalue CONFIG_VALUE: property value to be appended with comma."
+
+  cat <<EOF
+
+Usage: ambari_config_update.sh --configkey <key> [--configvalue <value>] \\
+         --action <verb> [-h <ambari_host>] [--config <site-file>] \\
+         [-u <user>] [-p <password>] [--port <port>]
+
+key        : Required. Property key in <site-file>.
+value      : Optional. Property value to update <site-file> with. If --action
+             is delete no <value> is required (or expected).
+verb       : Required. Action to be done to <site-file>. Expected values:
+             add|delete|prepend|append|replace|remove.
+ambari_host: Optional. Host name for the Ambari server. Default is localhost.
+site-file  : Optional. Hadoop "site" file. Expect "core-site", "mapred-site",
+             or "yarn-site" . Default is "core-site".
+user       : Optional. Ambari user. Default is "admin".
+password   : Optional. Ambari password. Default is "admin".
+port       : Optional. Port number for Ambari server. Default is 8080.
+
+EOF
   exit 1
 }
 
@@ -185,33 +195,34 @@ function doUpdate() {
   local tmp_cfg="$(mktemp --suffix .$SITE)"
   local old_value; local new_value; local newTag
   local line; local out; local err
-  local json_begin="{ \"Clusters\": { \"desired_config\": {\"type\": \"$SITE\", "
+  local json_begin=\
+    "{ \"Clusters\": { \"desired_config\": {\"type\": \"$SITE\", "
   local json_end='}}}'
-  local delKeyCmd="sed -i '/\"$configkey\" :/d' $tmp_cfg"
 
   debug echo "########## Performing '$mode' $configkey:$configvalue on (Site:$SITE, Tag:$SITETAG)";
 
   # extract the properties section and write to tmp config file
   curl -k -s -u $USERID:$PASSWD \
-   "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/configurations?type=$SITE&tag=$SITETAG"\
+   "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/configurations?type=$SITE&tag=$SITETAG" \
   | sed -n '/\"properties\" :/,/}$/p' >$tmp_cfg # just the "properties" section
 
-  # extract the target key line
+  # extract the target key line, if present
   line="$(grep "\"$configkey\" :" $tmp_cfg)"
   line="${line%,}" # remove trailing comma if present
   debug echo "########## LINE = $line"
 
-  # handle missing key:value in core-site
+  # handle missing key in core-site
   # line expected to be non-empty for modes: append, prepend, remove, replace
   if [[ -z "$line" ]] ; then
     [[ "$mode" == 'delete' ]] && {
-      echo "WARN: $configkey not found; no action needed";
+      echo "WARN: $configkey not found in $SITE; no action needed";
       return 0; }
     [[ "$mode" != 'add' ]] && {
-      echo "ERROR: cannot update since $configkey is missing";
+      echo "ERROR: cannot update since $configkey is missing in $SITE";
       return 1; }
   elif "$mode" == 'add' ; then
-    echo "WARN: existing $configkey will be overwritten: $line"
+    echo "WARN: existing $configkey in $SITE will be overwritten: $line"
+    mode='replace'
   fi
 
   # extract the unquoted value from line
@@ -223,8 +234,6 @@ function doUpdate() {
 
   case "$mode" in
       add) # create new key : value attribute in tmp file
-	# delete key if present
-	[[ -n "$line" ]] && $delKeyCmd
 	# add new key:value immediately after properties tag
 	sed -i "/\"properties\" : {/a\"$configkey\" : \"$configvalue\"," \
 	  $tmp_cfg
@@ -241,7 +250,7 @@ function doUpdate() {
 	fi
       ;;
       delete) # delete key from tmp file
-	$delKeyCmd
+	sed -i "/\"$configkey\" :/d" $tmp_cfg
       ;;
       remove) # remove configvalue from old_value
 	# check if configvalue exists
