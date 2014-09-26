@@ -123,11 +123,15 @@ function parse_cmd() {
 
   # error is unexpected action
   [[ -z "$ACTION" ]] && {
-    echo "Syntax error: action/verb is missing"; usage; return 1; }
-  [[ "$ACTION" != 'prepend' && "$ACTION" != 'append' && \
-     "$ACTION" != 'remove' ]] && {
-    echo "Syntax error: action expected to be: prepend|append|remove";
-    usage; return 1; }
+    echo "Syntax error: action verb is missing"; usage; return 1; }
+  case "$ACTION" in
+      append|prepend|remove) # expected...
+      ;;
+      *)
+	echo "Syntax error: action expected to be: prepend|append|remove"
+	usage; return 1
+      ;;
+  esac
 
   # error if required options are missing
   [[ -z "$MOUNTPATH" && "$ACTION" != 'remove' ]] && {
@@ -176,12 +180,15 @@ PARAMS="$(echo $PARAMS | sed 's/\"//g')"
 debug echo "########## PARAMS = $PARAMS"
 	
 PORT="$(echo "$PORT" | sed 's/[\"\,\:\ ]//g')"
+
+# update the fs.glusterfs.volumes attribute
 CONFIG_UPDATE_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST --config core-site --action $ACTION --configkey fs.glusterfs.volumes --configvalue $VOLNAME"
 [[ $DEBUG == true ]] && CONFIG_UPDATE_PARAM+=" --debug"
 
 debug echo "ambari_config_update.sh $CONFIG_UPDATE_PARAM" 
 $PREFIX/ambari_config_update.sh "$CONFIG_UPDATE_PARAM" 
 
+# add or delete the fs.glusterfs.volume.fuse.<volname> property
 mode='add'
 [[ "$ACTION" == 'remove' ]] && mode='delete'
 CONFIG_SET_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST --config core-site --action $mode --configkey fs.glusterfs.volume.fuse.$VOLNAME"

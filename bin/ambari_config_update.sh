@@ -138,18 +138,20 @@ function parse_cmd() {
   [[ -z "$ACTION" ]] && {
     echo "Syntax error: ACTION is missing"; usage; return 1; }
   case "$ACTION" in
-      add|append|prepend|replace|remove) # valid
+      add|append|delete|remove|replace|prepend) # valid
       ;;
       *)
 	echo "Syntax error: unknown action \"$1\""; usage; return 1
       ;;
   esac
 
-  [[ -z "$CONFIG_VALUE" ]] && {
-    echo "Syntax error: CONFIG_VALUE is missing"; usage ; return 1; }
-
   [[ -z "$CONFIG_KEY" ]] && {
     echo "Syntax error: CONFIG_KEY is missing"; usage ; return 1; }
+  if [[ -z "$CONFIG_VALUE" ]] ; then
+    # error, unless action is delete (need only key)
+    [[ "$ACTION" != 'delete' ]] && {
+      echo "Syntax error: CONFIG_VALUE is missing"; usage ; return 1; }
+  fi
 
   eval set -- "$@" # move arg pointer so $1 points to next arg past last opt
 
@@ -157,11 +159,11 @@ function parse_cmd() {
   return 0
 }
 
-# removeValue: remove arg2 from the passed-in string, arg1 and output the new
+# removeValue: remove arg2 from the passed-in string, arg1, and output the new
 # arg1 string.
 # Note: leading, trailing and double commas are also removed from the string 
 #   being output.
-# arg1=string in which arg2 is removed
+# arg1=string in which arg2 is removed.
 function removeValue() {
 
   local str="$1"; local rmStr="$2"
@@ -176,7 +178,7 @@ function removeValue() {
 }
 
 # doUpdate: updates the PROPERTY in SITETAG. Returns 1 on errors.
-# Input : $1 mode; $2 key; $3 value
+# Input: $1 mode; $2 key; $3 value (optional depending on mode)
 function doUpdate() {
 
   local mode=$1; local configkey=$2; local configvalue=$3
@@ -185,6 +187,7 @@ function doUpdate() {
   local line; local out; local err
   local json_begin="{ \"Clusters\": { \"desired_config\": {\"type\": \"$SITE\", "
   local json_end='}}}'
+  local delKeyCmd="sed -i '/\"$configkey\" :/d' $tmp_cfg"
 
   debug echo "########## Performing '$mode' $configkey:$configvalue on (Site:$SITE, Tag:$SITETAG)";
 
@@ -194,34 +197,37 @@ function doUpdate() {
   | sed -n '/\"properties\" :/,/}$/p' >$tmp_cfg # just the "properties" section
 
   # extract the target key line
-  line="$(grep "\"$configkey\"" $tmp_cfg)"
+  line="$(grep "\"$configkey\" :" $tmp_cfg)"
   line="${line%,}" # remove trailing comma if present
   debug echo "########## LINE = $line"
 
-  # handle missing key:value
-  # line expected to be non-empty for modes: append, prepend, replace
+  # handle missing key:value in core-site
+  # line expected to be non-empty for modes: append, prepend, remove, replace
   if [[ -z "$line" ]] ; then
-    [[ "$mode" == 'remove' ]] && return 0 # nothing to do
+    [[ "$mode" == 'delete' ]] && {
+      echo "WARN: $configkey not found; no action needed";
+      return 0; }
     [[ "$mode" != 'add' ]] && {
       echo "ERROR: cannot update since $configkey is missing";
       return 1; }
-    # for add mode set line to "key:''" (empty value)
-    line="\"$configkey\" : \"\""
   elif "$mode" == 'add' ; then
-    echo "ERROR: $configkey already exists: $line"
-    return 1
+    echo "WARN: existing $configkey will be overwritten: $line"
   fi
 
   # extract the unquoted value from line
-  old_value="${line#*: }"       # just value portion
-  old_value="${old_value//\"/}" # remove all double-quotes
-  debug echo "########## current VALUE = $old_value"
+  if [[ -n "$line" ]] ; then
+    old_value="${line#*: }"       # just value portion
+    old_value="${old_value//\"/}" # remove all double-quotes
+    debug echo "########## current VALUE = $old_value"
+  fi
 
   case "$mode" in
-      add) # create new key : value attribute
-	new_value="$configvalue"
+      add) # create new key : value attribute in tmp file
+	# delete key if present
+	[[ -n "$line" ]] && $delKeyCmd
 	# add new key:value immediately after properties tag
-	sed -i "/\"properties\" : {/a\"$configkey\" : \"$new_value\"," $tmp_cfg
+	sed -i "/\"properties\" : {/a\"$configkey\" : \"$configvalue\"," \
+	  $tmp_cfg
       ;;
       append|prepend)
 	if [[ ",$old_value," =~ ",$configvalue," ]] ; then
@@ -233,6 +239,9 @@ function doUpdate() {
 	else # append
 	  new_value="$old_value,$configvalue"
 	fi
+      ;;
+      delete) # delete key from tmp file
+	$delKeyCmd
       ;;
       remove) # remove configvalue from old_value
 	# check if configvalue exists
@@ -246,12 +255,13 @@ function doUpdate() {
 	new_value="$configvalue"
       ;;
   esac
-  debug echo "########## new config value for $configkey = $new_value"
 
   # fix up the "property" section for the PUT below:
-  # update new configvalue in place, unless add mode
-  [[ "mode" != 'add' ]] &&
+  # update new configvalue in place, unless add or delete modes
+  if [[ -n "$new_value" ]] ; then
+    debug echo "########## new config value for $configkey = $new_value"
     sed -i "/$configkey/s/$old_value/$new_value/" $tmp_cfg # inline edit
+  fi
 
   # prepend and append "desired_config" json to config file
   newTag="version$(date '+%s')001"
