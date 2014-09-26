@@ -35,7 +35,7 @@ function debug() {
 function usage() {
   echo "Usage: set_glusterfs_uri.sh [-u userId] [-p password] [--port port] [-h ambari_host] --mountpath <path> --action <verb> <VOLNAME>"
   echo ""
-  echo "       [--action verb]: Required action/verb to perform to property value: prepdend|append|remove."
+  echo "       [--action verb]: Required action/verb to perform to property value: prepend|append|remove."
   echo "       [-u userId]: Optional user ID to use for authentication. Default is 'admin'."
   echo "       [-p password]: Optional password to use for authentication. Default is 'admin'."
   echo "       [--port port]: Optional port number for Ambari server. Default is '8080'. Provide empty string to not use port."
@@ -182,13 +182,14 @@ CONFIG_UPDATE_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST --config
 debug echo "ambari_config_update.sh $CONFIG_UPDATE_PARAM" 
 $PREFIX/ambari_config_update.sh "$CONFIG_UPDATE_PARAM" 
 
-mode='set'
+mode='add'
 [[ "$ACTION" == 'remove' ]] && mode='delete'
-CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT $mode $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME"
-[[ "$mode" == 'set' ]] && CONFIG_SET_PARAM+=" $MOUNTPATH"
+CONFIG_SET_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST --config core-site --action $mode --configkey fs.glusterfs.volume.fuse.$VOLNAME"
+##CONFIG_SET_PARAM="-u $USERID -p $PASSWD -port $PORT $mode $AMBARI_HOST $CLUSTER_NAME core-site fs.glusterfs.volume.fuse.$VOLNAME"
+[[ "$mode" == 'add' ]] && CONFIG_SET_PARAM+=" --configvalue $VOLNAME"
 
-debug echo "ambari_config.sh $CONFIG_SET_PARAM"
-$PREFIX/ambari_config.sh $CONFIG_SET_PARAM
+debug echo "ambari_config_update.sh $CONFIG_SET_PARAM" 
+$PREFIX/ambari_config_update.sh "$CONFIG_SET_PARAM" 
 
 restartService
 

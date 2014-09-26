@@ -282,10 +282,11 @@ case "$1" in
     fi
     ;;
   delete)
-    if (($# != 5)); then
+    if (($# == 5)); then
+      doConfigUpdate "delete"
+    else
       usage
     fi
-    doConfigUpdate "delete"
     ;;
   *) 
     usage

@@ -1,6 +1,13 @@
 #!/bin/bash
 #
 # ambari_config_update.sh add/remove value in a property
+# Actions (for the passed-in key):
+#   add     - add a new key:value to the "properties"
+#   append  - append the new value to the end of the existing value
+#   delete  - delete the passed-in config key:value
+#   prepend - prepend the new value to the beginning of the existing value
+#   remove  - remove the passed-in value from the key's value
+#   replace - replace the existing config value with a new value
 #
 # Syntax: see usage() function.
 
@@ -35,7 +42,7 @@ function usage() {
   echo "       [--port port]: Optional port number for Ambari server. Default is '8080'. Provide empty string to not use port."
   echo "       [-h ambari_host]: Optional external host name for Ambari server. Default is 'localhost'."
   echo "       [--config config-site]: core-site | mapred-site | yarn site .default config file is core-site."
-  echo "       --action prepend|append|remove: add/remove CONFIG_VALUE"
+  echo "       --action add|prepend|append|replace|remove: performa one of these actions to key:value"
   echo "       --configkey CONFIG_KEY : property Key in config-site."
   echo "       --configvalue CONFIG_VALUE: property value to be appended with comma."
   exit 1
@@ -127,12 +134,16 @@ function parse_cmd() {
   done
 
   
-  # take care of all other arguments
+  # missing options/args?
   [[ -z "$ACTION" ]] && {
-    echo "Syntax error: ACTION is missing"; usage ; return 1; }
-  [[ "$ACTION" != "prepend" && "$ACTION" != "append" && "$ACTION" != "remove" ]] && {
-    echo "Syntax error: ACTION is expected to be  one of: prepend|append|remove";
-    usage ; return 1; }
+    echo "Syntax error: ACTION is missing"; usage; return 1; }
+  case "$ACTION" in
+      add|append|prepend|replace|remove) # valid
+      ;;
+      *)
+	echo "Syntax error: unknown action \"$1\""; usage; return 1
+      ;;
+  esac
 
   [[ -z "$CONFIG_VALUE" ]] && {
     echo "Syntax error: CONFIG_VALUE is missing"; usage ; return 1; }
@@ -146,8 +157,25 @@ function parse_cmd() {
   return 0
 }
 
-# doUpdate: updates the PROPERTY in SITETAG. Returns 1 on errors. Returns 0 for no
-# errors or for warnings.
+# removeValue: remove arg2 from the passed-in string, arg1 and output the new
+# arg1 string.
+# Note: leading, trailing and double commas are also removed from the string 
+#   being output.
+# arg1=string in which arg2 is removed
+function removeValue() {
+
+  local str="$1"; local rmStr="$2"
+  local new_str
+
+  new_str="${str/$rmStr/}" # remove arg2 from arg1
+  new_str="${str#,}"       # remove leading comma, if any
+  new_str="${str%,}"       # remove trailing comma, if any
+  new_str="${str/,,/,}"    # fold double commas to single, if any
+
+  echo "$str"
+}
+
+# doUpdate: updates the PROPERTY in SITETAG. Returns 1 on errors.
 # Input : $1 mode; $2 key; $3 value
 function doUpdate() {
 
@@ -170,41 +198,61 @@ function doUpdate() {
   line="${line%,}" # remove trailing comma if present
   debug echo "########## LINE = $line"
 
+  # handle missing key:value
+  # line expected to be non-empty for modes: append, prepend, replace
+  if [[ -z "$line" ]] ; then
+    [[ "$mode" == 'remove' ]] && return 0 # nothing to do
+    [[ "$mode" != 'add' ]] && {
+      echo "ERROR: cannot update since $configkey is missing";
+      return 1; }
+    # for add mode set line to "key:''" (empty value)
+    line="\"$configkey\" : \"\""
+  elif "$mode" == 'add' ; then
+    echo "ERROR: $configkey already exists: $line"
+    return 1
+  fi
+
   # extract the unquoted value from line
   old_value="${line#*: }"       # just value portion
   old_value="${old_value//\"/}" # remove all double-quotes
   debug echo "########## current VALUE = $old_value"
 
-  if [[ "$mode" == 'append' || "$mode" == 'prepend' ]] ; then
-    # check if key is already present
-    if [[ ",$old_value," =~ ",$configvalue," ]] ; then
-      echo "WARN: $configvalue already present in $configkey; no action needed"
-      return 0
-    fi
-    if [[ "$mode" == 'prepend' ]] ; then
-      new_value="$configvalue,$old_value"
-    else # append
-      new_value="$old_value,$configvalue"
-    fi
-    debug echo "########## new configvalue = $new_value"
+  case "$mode" in
+      add) # create new key : value attribute
+	new_value="$configvalue"
+	# add new key:value immediately after properties tag
+	sed -i "/\"properties\" : {/a\"$configkey\" : \"$new_value\"," $tmp_cfg
+      ;;
+      append|prepend)
+	if [[ ",$old_value," =~ ",$configvalue," ]] ; then
+	  # remove dup value so config value can be prepended or appended
+	  old_value="$(removeValue $old_value $configvalue)"
+	fi
+	if [[ "$mode" == 'prepend' ]] ; then
+	  new_value="$configvalue,$old_value"
+	else # append
+	  new_value="$old_value,$configvalue"
+	fi
+      ;;
+      remove) # remove configvalue from old_value
+	# check if configvalue exists
+	if [[ ! ",$old_value," =~ ",$configvalue," ]] ; then
+	  echo "WARN: $configvalue not present in $configkey; no action needed"
+	  return 0 
+	fi
+	new_value="$(removeValue $old_value $configvalue)"
+      ;;
+      replace)
+	new_value="$configvalue"
+      ;;
+  esac
+  debug echo "########## new config value for $configkey = $new_value"
 
-  else # mode(action) = remove
-    # check if configvalue exists
-    if [[ ! ",$old_value," =~ ",$configvalue," ]] ; then
-      echo "WARN: $configvalue not present in $configkey; no action needed"
-      return 0 
-    fi
-    new_value="${old_value/$configvalue/}" # remove configvalue
-    new_value="${new_value#,}"    # remove leading comma, if any
-    new_value="${new_value%,}"    # remove trailing comma, if any
-    new_value="${new_value/,,/,}" # fold double commas to single, if any
-    debug echo "########## remove configvalue = $new_value"
-  fi
-
-  # done constructing new property value
   # fix up the "property" section for the PUT below:
-  # update new configvalue in place
-  sed -i "/$configkey/s/$old_value/$new_value/" $tmp_cfg
+  # update new configvalue in place, unless add mode
+  [[ "mode" != 'add' ]] &&
+    sed -i "/$configkey/s/$old_value/$new_value/" $tmp_cfg # inline edit
+
   # prepend and append "desired_config" json to config file
   newTag="version$(date '+%s')001"
   json_begin+="\"tag\":\"$newTag\", "
@@ -221,8 +269,8 @@ function doUpdate() {
     echo "ERROR: $out"
     return 1
   fi
-  sleep 4
 
+  sleep 4
   return 0
 }
 
