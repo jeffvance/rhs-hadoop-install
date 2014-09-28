@@ -17,14 +17,11 @@ _DEBUG="off"
 USERID="admin"
 PASSWD="admin"
 PORT=":8080"
-PARAMS=''
 AMBARI_HOST='localhost'
 PROPERTY=''
-CLUSTER_NAME=""
-SITE="core-site"
+SITE='core-site'
 CONFIG_KEY=''
 CONFIG_VALUE=''
-ACTION=""
 
 # debug: execute cmd in $1 if _DEBUG is set to 'on'.
 # Uses globals:
@@ -40,7 +37,7 @@ function usage() {
 
 Usage: ambari_config_update.sh --configkey <key> [--configvalue <value>] \\
          --action <verb> [-h <ambari_host>] [--config <site-file>] \\
-         [-u <user>] [-p <password>] [--port <port>]
+         [-u <user>] [-p <password>] [--port <port>] --cluster <name>
 
 key        : Required. Property key in <site-file>.
 value      : Optional. Property value to update <site-file> with. If --action
@@ -53,6 +50,7 @@ site-file  : Optional. Hadoop "site" file. Expect "core-site", "mapred-site",
 user       : Optional. Ambari user. Default is "admin".
 password   : Optional. Ambari password. Default is "admin".
 port       : Optional. Port number for Ambari server. Default is 8080.
+name       : Required. The ambari cluster name.
 
 EOF
   exit 1
@@ -61,6 +59,7 @@ EOF
 # parse_cmd: parses the command line via getopt. Returns 1 on errors. Sets the
 # following globals:
 #   AMBARI_HOST
+#   CLUSTER_NAME
 #   _DEBUG
 #   DEBUG
 #   PASSWD
@@ -71,8 +70,9 @@ EOF
 #   CONFIG_VALUE
 function parse_cmd() {
 
+  local errcnt=0
   local OPTIONS='u:p:h:'
-  local LONG_OPTS='port:,action:,configkey:,configvalue:,config:,help,debug'
+  local LONG_OPTS='cluster:,port:,action:,configkey:,configvalue:,config:,debug'
 
   local args=$(getopt -n "$SCRIPT" -o $OPTIONS --long $LONG_OPTS -- $@)
   (( $? == 0 )) || { echo "$SCRIPT syntax error"; exit -1; }
@@ -81,61 +81,50 @@ function parse_cmd() {
 
   while true ; do
     case "$1" in
-      --help)
-        usage; exit 0
-      ;;
-      --port)
-        if [[ -z "$2" ]]; then
-          PORT=""
-        else
-          PORT=":$2"
-        fi
-        debug echo "PORT=$2"
-        PARAMS=$PARAMS" -port $2 "
-        shift 2; continue
-      ;;
       --debug)
         DEBUG=true;_DEBUG="on"; shift; continue
       ;;
+      --port)
+        if [[ -z "$2" ]]; then
+          PORT=''
+        else
+          PORT=":$2"
+        fi
+        shift 2; continue
+      ;;
+      --cluster)
+        [[ -n "$2" ]] && CLUSTER_NAME="$2"
+        shift 2; continue
+       ;;
       --config)
         [[ -n "$2" ]] && SITE="$2"
-        debug echo "SITE=$SITE"
         shift 2; continue
        ;;
       --action)
         [[ -n "$2" ]] && ACTION="$2"
-        debug echo "ACTION=$ACTION"
         shift 2; continue
        ;;
       --configkey)
         [[ -n "$2" ]] && CONFIG_KEY="$2"
-        debug echo "CONFIG_KEY=$CONFIG_KEY"
         shift 2; continue
        ;;
       --configvalue)
         [[ -n "$2" ]] && CONFIG_VALUE="$2"
-        debug echo "CONFIG_VALUE=$CONFIG_VALUE"
         shift 2; continue
        ;;
       -u)
         USERID="$2"
-        debug echo "USERID=$USERID"
-        PARAMS="-u $USERID "
         shift 2; continue
       ;;
       -p)
         PASSWD="$2"
-        debug echo "PASSWORD=$PASSWD"
-        PARAMS=$PARAMS" -p $PASSWD "
         shift 2; continue
       ;;
       -h)
         [[ -n "$2" ]] && AMBARI_HOST="$2"
-        debug echo "AMBARI_HOST=$2"
         shift 2; continue
       ;;
       --) # no more args to parse
-        debug echo "parsing done"
         shift; break;
       ;;
       *) echo "Error: Unknown option: \"$1\""; return 1
@@ -143,25 +132,31 @@ function parse_cmd() {
     esac
   done
 
-  
   # missing options/args?
+  [[ -z "$CLUSTER_NAME" ]] && {
+    echo "Syntax error: cluster name is missing"; ((errcnt++)); }
+
   [[ -z "$ACTION" ]] && {
-    echo "Syntax error: ACTION is missing"; usage; return 1; }
+    echo "Syntax error: ACTION is missing"; ((errcnt++)); }
   case "$ACTION" in
       add|append|delete|remove|replace|prepend) # valid
       ;;
       *)
-	echo "Syntax error: unknown action \"$ACTION\""; usage; return 1
+	echo "Syntax error: unknown action \"$ACTION\""; ((errcnt++))
       ;;
   esac
 
   [[ -z "$CONFIG_KEY" ]] && {
-    echo "Syntax error: <key> is missing"; usage ; return 1; }
+    echo "Syntax error: <key> is missing"; ((errcnt++)); }
+
   if [[ -z "$CONFIG_VALUE" ]] ; then
     # error, unless action is delete (need only key)
     [[ "$ACTION" != 'delete' ]] && {
-      echo "Syntax error: config <value> is missing"; usage ; return 1; }
+      echo "Syntax error: config <value> is missing"; ((errcnt++)); }
   fi
+
+  (( errcnt > 0 )) && {
+    usage; return 1; }
 
   eval set -- "$@" # move arg pointer so $1 points to next arg past last opt
 
@@ -190,7 +185,7 @@ function removeValue() {
 # Input: $1 mode; $2 key; $3 value (optional depending on mode)
 function doUpdate() {
 
-  local mode=$1; local configkey=$2; local configvalue=$3
+  local mode=$1; local configkey=$2; local configvalue="$3"
   local tmp_cfg="$(mktemp --suffix .$SITE)"
   local old_value; local new_value; local newTag
   local line; local out; local err
@@ -264,6 +259,9 @@ function doUpdate() {
   # update new configvalue in place, unless add or delete modes
   if [[ -n "$new_value" ]] ; then
     debug echo "########## new config value for $configkey = $new_value"
+    # escape / if found in new and/or old values
+    [[ "$old_value" =~ '/' ]] && old_value=${old_value//\//\\/}
+    [[ "$new_value" =~ '/' ]] && new_value=${new_value//\//\\/}
     sed -i "/$configkey/s/$old_value/$new_value/" $tmp_cfg # inline edit
   fi
 
@@ -274,6 +272,7 @@ function doUpdate() {
   echo "$json_end" >>$tmp_cfg
   debug echo "########## new property:"
   debug echo "$(cat $tmp_cfg)"
+exit #####
 
   # PUT/update the real config(core) file
   out="$(curl -k -s -u $USERID:$PASSWD -X PUT -H 'X-Requested-By:ambari' \
@@ -298,11 +297,6 @@ parse_cmd $@ || exit -1
 
 AMBARIURL="http://$AMBARI_HOST$PORT"
 debug echo "########## AMBARIURL = "$AMBARIURL
-
-CLUSTER_NAME="$(
-	$PREFIX/find_cluster_name.sh $AMBARIURL "$USERID:$PASSWD")" || {
-  echo "ERROR: cannot get cluster name: $CLUSTER_NAME";
-  exit 1; }
 
 SITETAG="$(
 	$PREFIX/find_coresite_tag.sh "$AMBARIURL" "$USERID:$PASSWD" \

@@ -10,10 +10,8 @@ _DEBUG="off"
 USERID="admin"
 PASSWD="admin"
 PORT=":8080"
-PARAMS=''
 AMBARI_HOST='localhost'
 SERVICENAME=''
-CLUSTER_NAME=""
 ACTION=""
 
 
@@ -27,20 +25,29 @@ function debug()
 
 # usage: echos general usage paragraph.
 function usage () {
-  echo "Usage: ambari_service.sh [-u userId] [-p password] [--port port] [-h ambari_host] --action start|stop <SERVICENAME>"
-  echo ""
-  echo "       [-u userId]: Optional user ID to use for authentication. Default is 'admin'."
-  echo "       [-p password]: Optional password to use for authentication. Default is 'admin'."
-  echo "       [--port port]: Optional port number for Ambari server. Default is '8080'. Provide empty string to not use port."
-  echo "       [-h ambari_host]: Optional external host name for Ambari server. Default is 'localhost'."
-  echo "       --action start|stop : start/stop SERVICENAME"
-  echo "       [SERVICENAME]: service name HDFS|YARN|MAPREDUCE2."
+
+  cat <<EOF
+
+Usage: ambari_service.sh [-u <user>] [-p <password>] [--port <port>] \\
+              [-h <ambari_host>] --cluster <name> --action <verb> \\
+              <SERVICE>"
+
+user       : Optional. Ambari user. Default is "admin".
+password   : Optional. Ambari password. Default is "admin".
+port       : Optional. Port number for Ambari server. Default is 8080.
+ambari_host: Optional. Host name for the Ambari server. Default is localhost.
+name       : Required. The ambari cluster name.
+verb       : Required. Action to be performed. Expected values: start|stop.
+SERVICE    : Required. The ambari service to be stopped or started, eg. Yarn.
+
+EOF
   exit 1
 }
 
 # parse_cmd: parses the command line via getopt. Returns 1 on errors. Sets the
 # following globals:
 #   AMBARI_HOST
+#   CLUSTER_NAME
 #   _DEBUG
 #   DEBUG
 #   PASSWD
@@ -50,8 +57,9 @@ function usage () {
 #   SERVICENAME
 function parse_cmd(){
 
+  local errcnt=0
   local OPTIONS='u:p:h:'
-  local LONG_OPTS='port:,action:,help,debug'
+  local LONG_OPTS='cluster:,port:,action:,debug'
 
   local args=$(getopt -n "$SCRIPT" -o $OPTIONS --long $LONG_OPTS -- $@)
   (( $? == 0 )) || { echo "$SCRIPT syntax error"; exit -1; }
@@ -60,8 +68,8 @@ function parse_cmd(){
 
   while true ; do
     case "$1" in
-      --help)
-        usage; exit 0
+      --debug)
+        DEBUG=true;_DEBUG="on"; shift; continue
       ;;
       --port)
         if [[ -z "$2" ]]; then
@@ -69,71 +77,53 @@ function parse_cmd(){
         else
           PORT=":$2"
         fi
-        debug echo "PORT=$2"
-        PARAMS=$PARAMS" -port $2 "
         shift 2; continue
       ;;
-      --debug)
-        DEBUG=true;_DEBUG="on"; shift; continue
+      --cluster)
+	[[ -n "$2" ]] && CLUSTER_NAME="$2"
+	shift 2; continue
       ;;
       --action)
-        [[ -n "$2" ]] && ACTION="$2"
-        debug echo "ACTION=$ACTION"
-        shift 2; continue
+	[[ -n "$2" ]] && ACTION="$2"
+	shift 2; continue
        ;;
       -u)
         USERID="$2"
-        debug echo "USERID=$USERID"
-        PARAMS="-u $USERID "
         shift 2; continue
       ;;
       -p)
         PASSWD="$2"
-        debug echo "PASSWORD=$PASSWD"
-        PARAMS=$PARAMS" -p $PASSWD "
         shift 2; continue
       ;;
       -h)
         [[ -n "$2" ]] && AMBARI_HOST="$2"
-        debug echo "AMBARI_HOST=$2"
         shift 2; continue
       ;;
       --) # no more args to parse
-        debug echo "parsing done"
         shift; break;
       ;;
       *) echo "Error: Unknown option: \"$1\""; return 1
       ;;
     esac
   done
-
   
-  #take care of all other arguments
-  #make sure property is there
-  if (( $# == 0 )); then
-    echo "Syntax error: [SERVICENAME] is missing"; usage ; return 1
-  fi
-  #make sure there is only one property
-  if (( $# > 1 )); then
-    echo "Syntax error:: Unknown values: \"$@\""; return 1
-  fi
+  SERVICENAME="$1"
 
-  if [[ -z "$1" ]]; then
-    echo "Syntax error: SERVICENAME is missing: \"$@\""; usage ; return 1
-  else
-    SERVICENAME="$1"
-  fi
+  # enforce required args and options
+  [[ -z "$SERVICENAME" ]] && {
+    echo "Syntax error: SERVICE is missing"; ((errcnt++)); }
 
-  if [[ -z "$ACTION" ]]; then
-    echo "Syntax error: ACTION is missing"; usage ; return 1
-  fi
+  [[ -z "$CLUSTER_NAME" ]] && {
+    echo "Syntax error: cluster name is missing"; ((errcnt++)); }
 
-  ACTION=$(echo "$ACTION" | sed "s/[\"\,\ ]//g")
-  if [ "$ACTION" == "start" ] || [ "$ACTION" == "stop" ]; then
-   ACTION=$ACTION
-  else
-    echo "Syntax error: ACTION should be start|stop"; usage ; return 1
-  fi
+  [[ -z "$ACTION" ]] && {
+    echo "Syntax error: ACTION is missing"; ((errcnt++)); }
+
+  [[ "$ACTION" != 'start' && "$ACTION" != 'stop' ]] && {
+    echo "Syntax error: ACTION expected to be start|stop"; ((errcnt++)); }
+
+  (( errcnt > 0 )) && {
+    usage; return 1; }
 
   eval set -- "$@" # move arg pointer so $1 points to next arg past last opt
 
@@ -251,20 +241,13 @@ parse_cmd $@ || exit -1
 
 AMBARIURL="http://$AMBARI_HOST$PORT"
 debug echo "########## AMBARIURL = "$AMBARIURL
-
-CLUSTER_NAME="$(
-	$PREFIX/find_cluster_name.sh $AMBARIURL "$USERID:$PASSWD")" || {
-  echo "$CLUSTER_NAME"; # contains error msg
-  exit 1; }
 debug echo "########## CLUSTER_NAME = "$CLUSTER_NAME
 debug echo "########## SERVICENAME  = "$SERVICENAME
 debug echo "########## ACTION = "$ACTION
 
-if [ "$ACTION" == "start" ] ; then 
-  startService $SERVICENAME || exit 1
-else [ "$ACTION" == "stop" ]
-  stopService $SERVICENAME || exit 1
-fi
-  
+[[ "$ACTION" == "start" ]] && {
+  startService $SERVICENAME || exit 1; }
+[[ "$ACTION" == "stop" ]] && {
+  stopService $SERVICENAME || exit 1; }
 
 exit 0

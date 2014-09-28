@@ -18,10 +18,8 @@ _DEBUG="off"
 USERID="admin"
 PASSWD="admin"
 PORT=":8080"
-PARAMS='' # used only for debugging
 AMBARI_HOST='localhost'
 VOLNAME=''
-CLUSTER_NAME=""
 
 
 # debug: execute cmd in $1 if _DEBUG is set to 'on'.
@@ -33,15 +31,24 @@ function debug() {
 
 # usage: echos general usage paragraph.
 function usage() {
-  echo "Usage: set_glusterfs_uri.sh [-u userId] [-p password] [--port port] [-h ambari_host] --mountpath <path> --action <verb> <VOLNAME>"
-  echo ""
-  echo "       [--action verb]: Required action/verb to perform to property value: prepend|append|remove."
-  echo "       [-u userId]: Optional user ID to use for authentication. Default is 'admin'."
-  echo "       [-p password]: Optional password to use for authentication. Default is 'admin'."
-  echo "       [--port port]: Optional port number for Ambari server. Default is '8080'. Provide empty string to not use port."
-  echo "       [--mountpath path]: mount path for the volume when the action is prepend or append. Not used for the removee action"
-  echo "       [-h ambari_host]: Optional external host name for Ambari server. Default is 'localhost'."
-  echo "       VOLNAME: Gluster Volume name."
+
+  cat <<EOF
+
+Usage: set_glusterfs_uri.sh [-u <ambari-user>] [-p <password>] \\
+         [-h <ambari-host>] [--port <port>] --mountpath <path> \\
+         --action <verb> <VOLNAME>
+
+ambari-user: Optional. Ambari user ID. Default is "admin".
+password   : Optional. Ambari password. Default is "admin".
+ambari-host: Optional. Ambari host name. Default is localhost.
+port       : Optional. Port number for Ambari server. Default is '8080'.
+path       : Required. Mount path for the volume when the action is prepend or
+             append. Not used for the removee action.
+verb       : Required. action to perform to property value:
+             prepend|append|remove.
+VOLNAME    : Required. RHS volume to be enabled/disabled.
+
+EOF
   exit 1
 }
 
@@ -77,7 +84,6 @@ function parse_cmd() {
 		else
 		  PORT=":$2"
 		fi
-		PARAMS="$PARAMS -port $2 "
 		shift 2; continue
 	;;
 	--action)
@@ -93,12 +99,10 @@ function parse_cmd() {
 	;;
 	-u)
 		USERID="$2"
-		PARAMS="-u $USERID "
 		shift 2; continue
 	;;
 	-p)
 		PASSWD="$2"
-		PARAMS="$PARAMS -p $PASSWD "
 		shift 2; continue
 	;;
 	-h)
@@ -148,12 +152,12 @@ function restartService() {
 
   for service in MAPREDUCE2 YARN GLUSTERFS ; do # order matters
       $PREFIX/ambari_service.sh -u $USERID -p $PASSWD --port $PORT \
-	  -h $AMBARI_HOST --action stop $service
+	  -h $AMBARI_HOST --cluster "$CLUSTER_NAME" --action stop $service
   done
   
   for service in GLUSTERFS MAPREDUCE2 YARN ; do # order matters
       $PREFIX/ambari_service.sh -u $USERID -p $PASSWD --port $PORT \
-	  -h $AMBARI_HOST --action start $service
+	  -h $AMBARI_HOST --cluster "$CLUSTER_NAME" --action start $service
   done
 }
 
@@ -175,31 +179,27 @@ CLUSTER_NAME="$(
   exit 1; }
 debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
 
-PARAMS="$PARAMS add_volume $AMBARI_HOST $CLUSTER_NAME core-site $VOLNAME"
-PARAMS="$(echo $PARAMS | sed 's/\"//g')"
-debug echo "########## PARAMS = $PARAMS"
-	
 PORT="$(echo "$PORT" | sed 's/[\"\,\:\ ]//g')"
 
 # update the fs.glusterfs.volumes attribute
-CONFIG_UPDATE_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST \
-  --config 'core-site' --configkey fs.glusterfs.volumes --configvalue $VOLNAME \
-  --action $ACTION"
-[[ $DEBUG == true ]] && CONFIG_UPDATE_PARAM+=" --debug"
+CMD="-u $USERID -p $PASSWD -h $AMBARI_HOST --port $PORT \
+    --cluster "$CLUSTER_NAME" --config core-site \
+    --configkey fs.glusterfs.volumes --configvalue $VOLNAME --action $ACTION"
+[[ $DEBUG == true ]] && CMD+=" --debug"
 
-debug echo "ambari_config_update.sh $CONFIG_UPDATE_PARAM" 
-$PREFIX/ambari_config_update.sh "$CONFIG_UPDATE_PARAM" 
+debug echo "ambari_config_update.sh $CMD" 
+$PREFIX/ambari_config_update.sh $CMD 
 
 # add or delete the fs.glusterfs.volume.fuse.<volname> property
 mode='add'
 [[ "$ACTION" == 'remove' ]] && mode='delete'
-CONFIG_SET_PARAM="-u $USERID -p $PASSWD --port $PORT -h $AMBARI_HOST \
-  --config 'core-site' --configkey fs.glusterfs.volume.fuse.$VOLNAME \
-  --action $mode"
-[[ "$mode" == 'add' ]] && CONFIG_SET_PARAM+=" --configvalue $VOLNAME"
+CMD="-u $USERID -p $PASSWD -h $AMBARI_HOST --port $PORT \
+    --cluster "$CLUSTER_NAME" --config core-site \
+    --configkey fs.glusterfs.volume.fuse.$VOLNAME --action $mode"
+[[ "$mode" == 'add' ]] && CMD+=" --configvalue $VOLNAME"
 
-debug echo "ambari_config_update.sh $CONFIG_SET_PARAM" 
-$PREFIX/ambari_config_update.sh "$CONFIG_SET_PARAM" 
+debug echo "ambari_config_update.sh $CMD" 
+$PREFIX/ambari_config_update.sh $CMD 
 
 restartService
 
