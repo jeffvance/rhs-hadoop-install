@@ -205,7 +205,7 @@ function doUpdate() {
   debug echo "########## LINE = $line"
 
   # handle missing key in core-site
-  # line expected to be non-empty for modes: append, prepend, remove, replace
+  # line expected to be non-empty for all modes other than add
   if [[ -z "$line" ]] ; then
     [[ "$mode" == 'delete' ]] && {
       echo "WARN: $configkey not found in $SITE; no action needed";
@@ -272,7 +272,6 @@ function doUpdate() {
   echo "$json_end" >>$tmp_cfg
   debug echo "########## new property:"
   debug echo "$(cat $tmp_cfg)"
-exit #####
 
   # PUT/update the real config(core) file
   out="$(curl -k -s -u $USERID:$PASSWD -X PUT -H 'X-Requested-By:ambari' \
