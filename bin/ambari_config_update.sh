@@ -2,12 +2,15 @@
 #
 # ambari_config_update.sh add/remove value in a property
 # Actions (for the passed-in key):
-#   add     - add a new key:value to the "properties"
-#   append  - append the new value to the end of the existing value
-#   delete  - delete the passed-in config key:value
-#   prepend - prepend the new value to the beginning of the existing value
+#   add     - add a new key:value to core-site
+#   append  - append the new value to the end of the existing value for the
+#             passed-in key
+#   delete  - delete the passed-in config key[:value]
+#   prepend - prepend the new value to the beginning of the existing value for
+#             the passed-in key
 #   remove  - remove the passed-in value from the key's value
-#   replace - replace the existing config value with a new value
+#   replace - replace the existing config value with a new value for the passed-
+#             in key.
 #
 # Syntax: see usage() function.
 
