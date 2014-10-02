@@ -103,6 +103,8 @@ function ambari_server() {
   (( err != 0 )) && {
     echo "WARN $err: chkconfig ambari-server on";
     ((warncnt++)); }
+
+  return 0
 }
 
 ## main ##
