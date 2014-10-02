@@ -196,7 +196,7 @@ mode='add'
 CMD="-u $USERID -p $PASSWD -h $AMBARI_HOST --port $PORT \
     --cluster "$CLUSTER_NAME" --config core-site \
     --configkey fs.glusterfs.volume.fuse.$VOLNAME --action $mode"
-[[ "$mode" == 'add' ]] && CMD+=" --configvalue $VOLNAME"
+[[ "$mode" == 'add' ]] && CMD+=" --configvalue $MOUNTPATH"
 
 debug echo "ambari_config_update.sh $CMD" 
 $PREFIX/ambari_config_update.sh $CMD 

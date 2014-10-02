@@ -186,6 +186,10 @@ function removeValue() {
 
 # doUpdate: updates the PROPERTY in SITETAG. Returns 1 on errors.
 # Input: $1 mode; $2 key; $3 value (optional depending on mode)
+# Note: the passed-in action (mode) may be changed based on existing settings:
+#   'add'     --> 'replace', when prop already exists
+#   'append'  --> 'add', when prop does not exist
+#   'prepend' --> 'add', when prop does not exist
 function doUpdate() {
 
   local mode=$1; local configkey=$2; local configvalue="$3"
@@ -210,12 +214,12 @@ function doUpdate() {
   # handle missing key in core-site
   # line expected to be non-empty for all modes other than add
   if [[ -z "$line" ]] ; then
-    [[ "$mode" == 'delete' ]] && {
-      echo "WARN: $configkey not found in $SITE; no action needed";
+    [[ "$mode" == 'delete' || "$mode" == 'remove' ]] && {
+      echo "WARN: $configkey not found in $SITE; '$mode' cannot be performed";
       return 0; }
-    [[ "$mode" != 'add' ]] && {
-      echo "ERROR: cannot update since $configkey is missing in $SITE";
-      return 1; }
+    [[ "$mode" != 'add' ]] && { # append|prepend|replace
+      echo "WARN: $configkey missing in $SITE, action changed from '$mode' to 'add'";
+      mode='add'; }
   elif [[ "$mode" == 'add' ]] ; then
     echo "WARN: existing $configkey in $SITE will be overwritten: $line"
     mode='replace'
