@@ -265,6 +265,9 @@ function doUpdate() {
   # fix up the "property" section for the PUT below:
   # update new configvalue in place, unless add or delete modes
   if [[ -n "$new_value" ]] ; then
+    [[ ",$old_value," =~ ",$new_value," ]] && {
+      echo "WARN: no change in $configkey value: $old_value, skipping...";
+      return 0; }
     debug echo "########## new config value for $configkey = $new_value"
     # escape / if found in new and/or old values
     [[ "$old_value" =~ '/' ]] && old_value=${old_value//\//\\/}
@@ -303,16 +306,13 @@ parse_cmd $@ || exit -1
 
 AMBARIURL="http://$AMBARI_HOST$PORT"
 debug echo "########## AMBARIURL = "$AMBARIURL
+debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
 
 SITETAG="$(
 	$PREFIX/find_coresite_tag.sh "$AMBARIURL" "$USERID:$PASSWD" \
 	    "$CLUSTER_NAME")" || {
   echo "ERROR: Cannot get current core-site tag: $SITETAG";
   exit 1; }
-
-debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
-debug echo "########## SITETAG = $SITETAG"
-debug echo "########## $ACTION $CONFIG_KEY $CONFIG_VALUE"
 
 doUpdate $ACTION $CONFIG_KEY $CONFIG_VALUE || exit 1
 
