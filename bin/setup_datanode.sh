@@ -8,6 +8,7 @@
 #  --blkdev: (optional) block dev path(s), skip xfs and blk-mnts if missing.
 #  --brkmnt: (optional) brick mnt path(s), skip xfs and blk-mnts if missing.
 #  --profile: (optional) rhs/kernel profile, won't set a profile if missing.
+#  --force-ambari: (optional) if passed then update the agent even if running.
 #  --hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server 
 #       (expected to be outside of the storage pool). Default=localhost.
 #
@@ -23,11 +24,12 @@ source $PREFIX/functions
 # Sets globals:
 #   BLKDEV()
 #   BRICKMNT()
+#   FORCE_AMBARI
 #   MGMT_NODE
 #   PROFILE
 function parse_cmd() {
 
-  local long_opts='blkdev::,brkmnt::,profile::,hadoop-mgmt-node:'
+  local long_opts='blkdev::,brkmnt::,profile::,hadoop-mgmt-node:,force-ambari'
 
   eval set -- "$(getopt -o'-' --long $long_opts -- $@)"
 
@@ -48,6 +50,9 @@ function parse_cmd() {
 	  [[ "${1:0:2}" == '--' ]] && continue # missing option value
           PROFILE="$1"; shift; continue
         ;;
+        --force-ambari) # optional
+          FORCE_AMBARI=1; shift; continue
+        ;;
         --hadoop-mgmt-node)
           MGMT_NODE="$2"; shift 2; continue
         ;;
@@ -57,8 +62,9 @@ function parse_cmd() {
       esac
   done
 
-  # fill in any defaults
+  # fill in defaults
   [[ -z "$MGMT_NODE" ]] && MGMT_NODE="$HOSTNAME"
+  [[ -z "$FORCE_AMBARI" ]] && FORCE_AMBARI=0 # false
 
   # convert list of 1 or more blkdevs and brkmnts to arrays
   BLKDEV=(${BLKDEV//,/ })
@@ -102,9 +108,12 @@ function mount_blkdev() {
   return 0
 }
 
-# setup_ambari_agent: yum install the ambari agent rpm, modify the .ini file
-# to point to the ambari server, start the agent, and set up agent to start
-# automatically after a reboot. Returns 1 on errors.
+# setup_ambari_agent: unless the agent is already running, yum install the
+# ambari agent rpm, modify the .ini file to point to the ambari server, start
+# the agent, and set up agent to start automatically after a reboot. 
+# Returns 1 on errors.
+# NOTE: if FORCE_AMBARI is set then even if the agent is running it will be re-
+#   yum installed and started.
 function setup_ambari_agent() {
 
   local err; local errcnt=0
@@ -113,16 +122,20 @@ function setup_ambari_agent() {
 
   echo "setting up the ambari agent..."
 
-  get_ambari_repo
-
-  # stop agent if running
-  if [[ -f $AMBARI_AGENT_PID ]] ; then
+  # detect if agent is running
+  if [[ -f $AMBARI_AGENT_PID ]] && \
+     which ambari-agent >& /dev/null && \
+     ambari-agent status >& /dev/null ; then # agent is definitely running
+    (( ! FORCE_AMBARI )) && {
+      echo "ambari-agent is running, install skipped";
+      return 0; } # done
+    # stop ambari-agent since we're in "FORCE" mode
     ambari-agent stop 2>&1
     err=$?
-    if (( err != 0 )) ; then
-      echo "WARN $err: couldn't stop ambari agent"
-    fi
+    (( err != 0 )) && echo "WARN $err: couldn't stop ambari agent"
   fi
+
+  get_ambari_repo
 
   # install agent
   yum -y install ambari-agent 2>&1

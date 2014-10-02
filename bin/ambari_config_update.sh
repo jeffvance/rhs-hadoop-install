@@ -266,7 +266,7 @@ function doUpdate() {
   # update new configvalue in place, unless add or delete modes
   if [[ -n "$new_value" ]] ; then
     [[ ",$old_value," =~ ",$new_value," ]] && {
-      echo "WARN: no change in '$configkey' value: $old_value, skipping...";
+      echo "WARN: no change in '$configkey' value: '$old_value', skipping...";
       return 0; }
     debug echo "########## new config value for $configkey = $new_value"
     # escape / if found in new and/or old values

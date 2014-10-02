@@ -52,8 +52,8 @@ SYNTAX:
 $ME --version | --help
 
 $ME [-y] [--hadoop-mgmt-node <node>] [--yarn-master <node>] \\
-              [--profile <profile>] [--quiet | --verbose | --debug] \\
-              <nodes-spec-list>
+              [--profile <profile>] [--force-ambari-update] \\
+              [--quiet | --verbose | --debug] <nodes-spec-list>
 where:
 
 <nodes-spec-list>: a list of two or more <node-spec's>.
@@ -79,6 +79,15 @@ where:
                   localhost.
 --profile       : (optional) the name of a supported rhs/kernel profile, eg.
                   "rhs-high-throughput". Default is not set a profile.
+--force-ambari-update: (optional) force the update of the ambari-server and
+                  ambari-agents even if they are already installed and running.
+                  The default is to install/start the ambari-server and all 
+                  ambari-agents unless they are already running. If the ambari-
+                  server is running, by default, it will not be re-installed.
+                  For each node where the agent is already running, by default,
+                  the agent will not be re-installed. Note: if the server and/or
+                  agents are not installed (or not running) they will be
+                  installed and started.
 -y              : (optional) auto answer "yes" to all prompts. Default is to 
                   answer a confirmation prompt.
 --quiet         : (optional) output only basic progress/step messages. Default.
@@ -94,6 +103,7 @@ EOF
 # parse_cmd: use get_opt to parse the command line. Returns 1 on errors.
 # Sets globals:
 #   AUTO_YES
+#   FORCE_AMBARI
 #   MGMT_NODE
 #   NODE_SPEC
 #   PROFILE
@@ -102,9 +112,11 @@ EOF
 function parse_cmd() {
 
   local opts='y'
-  local verbose_opts='verbose,quiet,debug'   # default= --quiet
+  local verbose_opts='verbose,quiet,debug' # default= --quiet
+  local help_opts='help,version'
+  local ambari_opts='force-ambari-update'
   local node_opts='hadoop-mgmt-node:,yarn-master:'
-  local long_opts="help,version,profile:,$node_opts,$verbose_opts"
+  local long_opts="$help_opts,profile:,$ambari_opts,$node_opts,$verbose_opts"
   local errcnt=0
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
@@ -128,6 +140,9 @@ function parse_cmd() {
 	;;
 	-y)
 	  AUTO_YES=1; shift; continue
+	;;
+	--force-ambari-update)
+	  FORCE_AMBARI=1; shift; continue
 	;;
 	--yarn-master)
 	  YARN_NODE="$2"; shift 2; continue
@@ -438,6 +453,7 @@ function prep_rhel_nodes() {
 # outside of the storage pool. Note: if the hadoop mgmt-node is outside of the
 # storage pool then it will not have the agent installed. Returns 1 on errors.
 # Uses globals:
+#   FORCE_AMBARI
 #   NODES
 #   NODE_BLKDEVS
 #   NODE_BRKMNTS
@@ -457,16 +473,18 @@ function setup_nodes() {
     local node="$1"
     local blkdev="$2" # can be blank
     local brkmnt="$3" # can be blank
-    local out; local err; local ssh
+    local out; local err; local ssh; local cmd
 
     [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
 
     verbose "+++"
     verbose "+++ begin node $node"
-    out="$(eval "
-	$ssh $PREFIX/bin/setup_datanode.sh --blkdev $blkdev --brkmnt $brkmnt \
-		--profile $PROFILE --hadoop-mgmt-node $MGMT_NODE
- 	")"
+
+    cmd="$PREFIX/bin/setup_datanode.sh --blkdev $blkdev --brkmnt $brkmnt \
+         --profile $PROFILE --hadoop-mgmt-node $MGMT_NODE"
+    (( FORCE_AMBARI )) && cmd+=" --force-ambari"
+
+    out="$(eval "$ssh $cmd")"
     err=$?
     if (( err != 0 )) ; then
       err -e $err "setup_datanode on $node:\n$out"
@@ -664,17 +682,21 @@ function create_pool() {
 # permissive mode, and disabling the firewall on the ambari-server. Returns 1
 # on errors.
 # Uses globals:
+#   FORCE_AMBARI
 #   MGMT_NODE
 #   PREFIX
 function ambari_server() {
 
-  local err; local out; local ssh
+  local err; local out; local ssh; local cmd
 
   verbose "--- installing ambari-server on $MGMT_NODE... this can take time"
 
   [[ "$MGMT_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $MGMT_NODE"
 
-  out="$(eval "$ssh $PREFIX/bin/setup_ambari_server.sh")"
+  cmd="$PREFIX/bin/setup_ambari_server.sh"
+  (( FORCE_AMBARI )) && cmd+=" --force-ambari"
+
+  out="$(eval "$ssh $cmd")"
   err=$?
   if (( err != 0 )) ; then
     err -e $err "setting up ambari-sever on $MGMT_NODE:\n$out"
@@ -766,9 +788,10 @@ function update_yarn() {
 ME="$(basename $0 .sh)"
 NODES=()
 declare -A NODE_IPS; declare -A NODE_BRKMNTS; declare -A NODE_BLKDEVS
-MGMT_INSIDE=0		# assume false
-YARN_INSIDE=0		# assume false
-AUTO_YES=0		# assume false
+MGMT_INSIDE=0		# false
+YARN_INSIDE=0		# false
+AUTO_YES=0		# false
+FORCE_AMBARI=0		# false
 VERBOSE=$LOG_QUIET	# default
 errnodes=''; errcnt=0
 
