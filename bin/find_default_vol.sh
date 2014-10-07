@@ -25,8 +25,8 @@ done
 
 [[ "$rhs_node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $rhs_node"
 
-vol="$(eval "
-     $ssh \"sed -n '/$prop/,/<\/property>/{/<value>/p}' $core_site 2>&1\"")" 
+vol="$(eval "$ssh [[ -f $core_site ]] &&
+	sed -n '/$prop/,/<\/property>/{/<value>/p}' $core_site 2>&1")" 
 (( $? != 0 )) || [[ -z "$vol" ]] && {
   echo "$rhs_node: \"$prop\" property value is missing from $core_site"; 
   exit 1; }
