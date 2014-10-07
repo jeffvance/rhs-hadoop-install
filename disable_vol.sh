@@ -174,8 +174,8 @@ parse_cmd $@ || exit -1
 default_nodes MGMT_NODE 'management' YARN_NODE 'yarn-master' \
         RHS_NODE 'RHS storage' || exit -1
 
-# check for passwordless ssh connectivity to nodes
-check_ssh $(uniq_nodes $MGMT_NODE $YARN_NODE $RHS_NODE) || exit 1
+# check for passwordless ssh connectivity to rhs_node first
+check_ssh $RHS_NODE) || exit 1
 
 vol_exists $VOLNAME $RHS_NODE || {
   err "volume $VOLNAME does not exist";
@@ -187,6 +187,9 @@ if (( $? != 0 )) ; then
   exit 1
 fi
 debug "nodes spanned by $VOLNAME: ${NODES[*]}"
+
+# check for passwordless ssh connectivity to all nodes
+check_ssh $(uniq_nodes $MGMT_NODE $YARN_NODE $NODES) || exit 1
 
 DEFAULT_VOL="$($PREFIX/bin/find_default_vol.sh -n $RHS_NODE)"
 debug "Default volume: $DEFAULT_VOL"
