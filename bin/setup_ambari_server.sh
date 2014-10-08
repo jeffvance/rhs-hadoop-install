@@ -9,12 +9,12 @@
 # NOTE: if FORCE_AMBARI is set then even if the server is running it will be re-
 #   yum installed and started.
 # Syntax:
-#  --force-ambari: (optional) if passed then update the agent server even if it's
-#                  running.
+#  --ambari-repo:  (optional) ambari repo file url.
+#  --force-ambari: (optional) if passed then update the agent server even if
+#                  it's running.
 
 PREFIX="$(dirname $(readlink -f $0))"
 warncnt=0
-FORCE_AMBARI=0 # false
 AMBARI_SERVER_PID='/var/run/ambari-server/ambari-server.pid'
 METAINFO_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.1.GlusterFS/metainfo.xml' # hdp 2.1
 ACTIVE_FALSE='<active>false<'; ACTIVE_TRUE='<active>true<'
@@ -22,11 +22,41 @@ SERVER_ALREADY_INSTALLED=0 # false
 SERVICE_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.1.GlusterFS/services'
 RM_SERVICE_DIRS='FALCON STORM' # dirs to be deleted
 
-# minimal parsing...
-(( $# == 1 )) && [[ "$1" == '--force-ambari' ]] && FORCE_AMBARI=1 # true
 
 ## functions ##
 source $PREFIX/functions
+
+# parse_cmd: use get_opt to parse the command line. Returns 1 on errors.
+# Sets globals:
+#   AMBARI_REPO
+#   FORCE_AMBARI
+function parse_cmd() {
+
+  local long_opts='ambari-repo::,force-ambari'
+
+  eval set -- "$(getopt -o'-' --long $long_opts -- $@)"
+
+  while true; do
+      case "$1" in
+        --ambari-repo) # optional
+          shift 2
+          [[ "${1:0:2}" == '--' ]] && continue # missing option value
+          AMBARI_REPO="$1"; shift; continue
+        ;;
+        --force-ambari) # optional
+          FORCE_AMBARI=1; shift; continue
+        ;;
+        --)
+          shift; break
+        ;;
+      esac
+  done
+
+  # fill in defaults
+  [[ -z "$FORCE_AMBARI" ]] && FORCE_AMBARI=0 # false
+
+  return 0
+}
 
 # ambari_server: install, start, persist the ambari-server. Returns 1 on errors.
 function ambari_server() {
@@ -51,10 +81,10 @@ function ambari_server() {
   fi
 
   echo "...wget-ing ambari-server repo..."
-  get_ambari_repo
+  get_ambari_repo $AMBARI_REPO
   err=$?
   (( err != 0 )) && {
-    echo "ERROR $err: can't wget ambari repo";
+    echo "ERROR $err: can't wget ambari repo $AMBARI_REPO";
     return 1; }
   
   echo "...yum installing ambari-server..."
@@ -108,6 +138,8 @@ function ambari_server() {
 }
 
 ## main ##
+
+parse_cmd $@ || exit -1
 
 ambari_server || exit 1
 

@@ -119,21 +119,28 @@ function force() {
   display $opt "$1" $LOG_FORCE
 }
 
-# get_ambari_repo: wget the ambari repo file in the correct location.
-# Returns 1 on errors.
+# get_ambari_repo: wget the ambari repo file in the correct location. Returns 1
+# on errors. Optional arg: $1=the ambari repo URL to be used rather than the
+# default url.
 function get_ambari_repo(){
  
+  local url="$1"
   local REPO_DIR='/etc/yum.repos.d'; local REPO_FILE='ambari.repo'
-  local REPO_URL='http://public-repo-1.hortonworks.com/ambari/centos6/1.x/updates/1.6.1/ambari.repo' # hdp 2.1
-  local out; local err
+  local out; local err; local prefix
+
+  # which repo file?
+  if [[ -z "$url" ]] ; then # not passed in, use default
+    prefix="$(dirname $BASH_SOURCE)" # sourced functions file dir
+    url="$($prefix/gen_ambari_repo_url.sh)"
+  fi
 
   [[ -d $REPO_DIR ]] || mkdir -p $REPO_DIR
 
   # 20 sec max time, overwrites existing repo
-  out="$(wget --timeout 20 -O $REPO_DIR/$REPO_FILE $REPO_URL 2>&1)"
+  out="$(wget --timeout 20 -O $REPO_DIR/$REPO_FILE $url 2>&1)"
   err=$?
   if (( err != 0 )) ; then
-    echo "ERROR $err: ambari repo wget: $out"
+    echo "ERROR $err: ambari repo wget $url: $out"
     return 1
   fi
 

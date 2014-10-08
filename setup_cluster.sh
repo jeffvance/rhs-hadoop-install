@@ -52,8 +52,9 @@ SYNTAX:
 $ME --version | --help
 
 $ME [-y] [--hadoop-mgmt-node <node>] [--yarn-master <node>] \\
-              [--profile <profile>] [--force-ambari-update] \\
-              [--quiet | --verbose | --debug] <nodes-spec-list>
+              [--profile <profile>] [--ambari-repo <url>] \\
+              [--force-ambari-update] [--quiet | --verbose | --debug] \\
+              <nodes-spec-list>
 where:
 
 <nodes-spec-list>: a list of two or more <node-spec's>.
@@ -79,15 +80,16 @@ where:
                   localhost.
 --profile       : (optional) the name of a supported rhs/kernel profile, eg.
                   "rhs-high-throughput". Default is not set a profile.
+--ambari-repo   : (optional) the URL of the ambari repo file. Default is the
+                  value hard-coded in the installer.
+                  "rhs-high-throughput". Default is not set a profile.
 --force-ambari-update: (optional) force the update of the ambari-server and
                   ambari-agents even if they are already installed and running.
-                  The default is to install/start the ambari-server and all 
-                  ambari-agents unless they are already running. If the ambari-
-                  server is running, by default, it will not be re-installed.
-                  For each node where the agent is already running, by default,
-                  the agent will not be re-installed. Note: if the server and/or
-                  agents are not installed (or not running) they will be
-                  installed and started.
+                  If the ambari-server is running, by default, it will not be
+                  re-installed. For each node where the agent is already
+                  running, by default, the agent will not be re-installed. Note:
+                  if the server and/or agents are not installed (or not running)
+                  they will be installed and started.
 -y              : (optional) auto answer "yes" to all prompts. Default is to 
                   answer a confirmation prompt.
 --quiet         : (optional) output only basic progress/step messages. Default.
@@ -102,6 +104,7 @@ EOF
 
 # parse_cmd: use get_opt to parse the command line. Returns 1 on errors.
 # Sets globals:
+#   AMBARI_REPO
 #   AUTO_YES
 #   FORCE_AMBARI
 #   MGMT_NODE
@@ -114,7 +117,7 @@ function parse_cmd() {
   local opts='y'
   local verbose_opts='verbose,quiet,debug' # default= --quiet
   local help_opts='help,version'
-  local ambari_opts='force-ambari-update'
+  local ambari_opts='ambari-repo:,force-ambari-update'
   local node_opts='hadoop-mgmt-node:,yarn-master:'
   local long_opts="$help_opts,profile:,$ambari_opts,$node_opts,$verbose_opts"
   local errcnt=0
@@ -140,6 +143,9 @@ function parse_cmd() {
 	;;
 	-y)
 	  AUTO_YES=1; shift; continue
+	;;
+	--ambari-repo)
+	  AMBARI_REPO="$2"; shift 2; continue
 	;;
 	--force-ambari-update)
 	  FORCE_AMBARI=1; shift; continue
@@ -453,6 +459,7 @@ function prep_rhel_nodes() {
 # outside of the storage pool. Note: if the hadoop mgmt-node is outside of the
 # storage pool then it will not have the agent installed. Returns 1 on errors.
 # Uses globals:
+#   AMBARI_REPO
 #   FORCE_AMBARI
 #   NODES
 #   NODE_BLKDEVS
@@ -482,6 +489,7 @@ function setup_nodes() {
 
     cmd="$PREFIX/bin/setup_datanode.sh --blkdev $blkdev --brkmnt $brkmnt \
          --profile $PROFILE --hadoop-mgmt-node $MGMT_NODE"
+    [[ -n "$AMBARI_REPO" ]] && cmd+=" --ambari-repo $AMBARI_REPO"
     (( FORCE_AMBARI )) && cmd+=" --force-ambari"
 
     out="$(eval "$ssh $cmd")"
@@ -682,6 +690,7 @@ function create_pool() {
 # permissive mode, and disabling the firewall on the ambari-server. Returns 1
 # on errors.
 # Uses globals:
+#   AMBARI_REPO
 #   FORCE_AMBARI
 #   MGMT_NODE
 #   PREFIX
@@ -694,6 +703,7 @@ function ambari_server() {
   [[ "$MGMT_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $MGMT_NODE"
 
   cmd="$PREFIX/bin/setup_ambari_server.sh"
+  [[ -n "$AMBARI_REPO" ]] && cmd+=" --ambari-repo $AMBARI_REPO"
   (( FORCE_AMBARI )) && cmd+=" --force-ambari"
 
   out="$(eval "$ssh $cmd")"

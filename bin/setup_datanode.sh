@@ -5,9 +5,10 @@
 # It is assumed that localhost has already been validated (eg. check_node.sh
 # has been run) prior to setting up the node.
 # Syntax:
-#  --blkdev: (optional) block dev path(s), skip xfs and blk-mnts if missing.
-#  --brkmnt: (optional) brick mnt path(s), skip xfs and blk-mnts if missing.
+#  --blkdev:  (optional) block dev path(s), skip xfs and blk-mnts if missing.
+#  --brkmnt:  (optional) brick mnt path(s), skip xfs and blk-mnts if missing.
 #  --profile: (optional) rhs/kernel profile, won't set a profile if missing.
+#  --ambari-repo:  (optional) ambari repo file url.
 #  --force-ambari: (optional) if passed then update the agent even if running.
 #  --hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server 
 #       (expected to be outside of the storage pool). Default=localhost.
@@ -22,6 +23,7 @@ source $PREFIX/functions
 
 # parse_cmd: use get_opt to parse the command line. Returns 1 on errors.
 # Sets globals:
+#   AMBARI_REPO
 #   BLKDEV()
 #   BRICKMNT()
 #   FORCE_AMBARI
@@ -29,7 +31,7 @@ source $PREFIX/functions
 #   PROFILE
 function parse_cmd() {
 
-  local long_opts='blkdev::,brkmnt::,profile::,hadoop-mgmt-node:,force-ambari'
+  local long_opts='blkdev::,brkmnt::,profile::,hadoop-mgmt-node:,ambari-repo::,force-ambari'
 
   eval set -- "$(getopt -o'-' --long $long_opts -- $@)"
 
@@ -50,6 +52,11 @@ function parse_cmd() {
 	  [[ "${1:0:2}" == '--' ]] && continue # missing option value
           PROFILE="$1"; shift; continue
         ;;
+        --ambari-repo) # optional
+	  shift 2
+	  [[ "${1:0:2}" == '--' ]] && continue # missing option value
+          AMBARI_REPO="$1"; shift; continue
+        ;;
         --force-ambari) # optional
           FORCE_AMBARI=1; shift; continue
         ;;
@@ -63,7 +70,7 @@ function parse_cmd() {
   done
 
   # fill in defaults
-  [[ -z "$MGMT_NODE" ]] && MGMT_NODE="$HOSTNAME"
+  [[ -z "$MGMT_NODE" ]]    && MGMT_NODE="$HOSTNAME"
   [[ -z "$FORCE_AMBARI" ]] && FORCE_AMBARI=0 # false
 
   # convert list of 1 or more blkdevs and brkmnts to arrays
@@ -135,7 +142,11 @@ function setup_ambari_agent() {
     (( err != 0 )) && echo "WARN $err: couldn't stop ambari agent"
   fi
 
-  get_ambari_repo
+  get_ambari_repo $AMBARI_REPO
+  err=$?
+  (( err != 0 )) && {
+    echo "ERROR $err: can't wget ambari repo $AMBARI_REPO";
+    return 1; }
 
   # install agent
   yum -y install ambari-agent 2>&1
@@ -276,7 +287,7 @@ function setup_profile() {
 
 ## main ##
 
-errcnt=0; q=''
+errcnt=0
 STORAGE_NODE=$([[ -f /etc/redhat-storage-release ]] && echo 1 || echo 0)
 
 parse_cmd $@ || exit -1
