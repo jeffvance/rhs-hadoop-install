@@ -136,7 +136,7 @@ function setup_ambari_agent() {
     (( ! FORCE_AMBARI )) && {
       echo "ambari-agent is running, install skipped";
       return 0; } # done
-    # stop ambari-agent since we're in "FORCE" mode
+    echo "stopping ambari-agent since running in \"FORCE\" mode"
     ambari-agent stop 2>&1
     err=$?
     (( err != 0 )) && echo "WARN $err: couldn't stop ambari agent"

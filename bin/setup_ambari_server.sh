@@ -18,7 +18,6 @@ warncnt=0
 AMBARI_SERVER_PID='/var/run/ambari-server/ambari-server.pid'
 METAINFO_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.1.GlusterFS/metainfo.xml' # hdp 2.1
 ACTIVE_FALSE='<active>false<'; ACTIVE_TRUE='<active>true<'
-SERVER_ALREADY_INSTALLED=0 # false
 SERVICE_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.1.GlusterFS/services'
 RM_SERVICE_DIRS='FALCON STORM' # dirs to be deleted
 
@@ -67,12 +66,7 @@ function ambari_server() {
     (( ! FORCE_AMBARI )) && {
       echo "ambari-server running, install skipped";
       return 0; } # done
-    SERVER_ALREADY_INSTALLED=1 # true
-  fi
-
-  # stop ambari-server if running
-  if (( SERVER_ALREADY_INSTALLED )) ; then
-    echo "...stopping ambari-server..."
+    echo "stopping ambari-server since running in \"FORCE\" mode"
     ambari-server stop 2>&1
     err=$?
     (( err != 0 )) && {
