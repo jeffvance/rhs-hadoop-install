@@ -66,11 +66,16 @@ function ambari_server() {
     (( ! FORCE_AMBARI )) && {
       echo "ambari-server running, install skipped";
       return 0; } # done
-    echo "stopping ambari-server since running in \"FORCE\" mode"
+    echo "resetting ambari-server since running in \"FORCE\" mode..."
     ambari-server stop 2>&1
     err=$?
     (( err != 0 )) && {
       echo "WARN $err: couldn't stop ambari server";
+      ((warncnt++)); }
+    ambari-server reset -s 2>&1
+    err=$?
+    (( err != 0 )) && {
+      echo "WARN $err: couldn't reset ambari server";
       ((warncnt++)); }
   fi
 
