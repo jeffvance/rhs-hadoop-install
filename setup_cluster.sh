@@ -726,24 +726,10 @@ function ambari_server() {
 #   YARN_NODE
 function update_yarn() {
 
-  local out; local err
-  local major; local minor; local fix
+  local out; local err; local ver
   local channel='rhel-x86_64-server-rhsclient-6'
   local gluster_rpms='glusterfs glusterfs-api glusterfs-fuse glusterfs-libs'
 
-  # nested function that extracts the glusterfs major, minor, and fix level
-  # from the passed-in long version string. Sets these variables.
-  function gluster_version() {
-
-    local ver=(${1//./ }) # easy convert to array
-
-    major=${ver[0]} # main function local
-    minor=${ver[1]} # main function local
-    fix=${ver[2]}   # main function local
-    debug "glusterfs version on yarn-master ($YARN_NODE): ${major}.${minor}.$fix"
-  }
-
-  ## main
   (( YARN_INSIDE )) && return 0 # rhs nodes have the correct client bits
 
   # which glusterfs version is installed on the yarn-node
@@ -751,12 +737,12 @@ function update_yarn() {
 	grep ^glusterfs | \
 	head -n 1"))
   if (( ${#out[*]} > 0 )) ; then # see if current enough version is installed
-    gluster_version "${out[1]}" # sets major/minor/fix variables
-    if (( major > 3 || ( major == 3 && minor >= 6 ) )) ; then # 3.6+
-      verbose "--- yarn-master ($YARN_NODE) has the correct glusterfs client version"
+    ver="${out[1]}"
+    if version_ok "$ver" '3.6' ; then
+      verbose "--- yarn-master ($YARN_NODE) has the correct glusterfs client version: $ver" 
       return 0 # no need to update glusterfs
     else
-      debug "installed glusterfs client version on $YARN_NODE is pre 3.6 and needs updating"
+      debug "installed glusterfs client version on $YARN_NODE is $ver (pre-3.6) and needs updating"
     fi
   else
     debug "no installed glusterfs client packages on $YARN_NODE"
@@ -772,13 +758,13 @@ function update_yarn() {
   fi
 
   # we have available glusterfs pkg but is it 3.6+?
-  gluster_version "${out[1]}" # sets major/minor/fix local vars
-  if (( major < 3 || ( major == 3 && minor < 6 ) )) ; then
+  ver="${out[1]}"
+  if ! version_ok "$ver" '3.6' ; then
     err -e "the available glusterfs client packages are older than 3.6 and therefore should not be yum installed on the yarn-master ($YARN_NODE).\nEnsure that the client channel \"$channel\" has been added"
     return 1
   fi
 
-  verbose "--- updating yarn-master ($YARN_NODE) to gluster client ${major}.${minor}.$fix ..."
+  verbose "--- updating yarn-master ($YARN_NODE) to gluster client $ver..."
 
   out="$(ssh $YARN_NODE "yum -y install $gluster_rpms 2>&1")"
   err=$?
