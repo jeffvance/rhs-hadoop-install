@@ -402,6 +402,53 @@ function verify_gid_uids() {
   return 0
 }
 
+# version_ok: return shell true(0) if the passed-in version string ($1) is
+# greater-than-or-equal to the passed-in compare version string ($2). Arg 2
+# can be shorter than arg 1. Neither version string is expected to have a '+',
+# '-', etc.
+function version_ok() {
+
+  local ver=(${1//./ }); local compare_ver=(${2//./ }) # arrays: (v u f)
+  local i
+
+  # nested function to parse out numbers and non-numerics from an individual
+  # version string component. Arg1 and 2 are the two version pieces to compare.
+  # Returns 0(true) if arg 1 >= arg2.
+  # Note: numbers are compared using (( ... )) and strings are compared using
+  #   [[ ... ]]. This is needed so that "12" compares greater than "9".
+  function greater_or_eq() {
+    local v1; local v2; local v; local j
+
+    # v1 and v2 are arrays of the number and/or string parts of a single
+    # version component. Eg., if arg1="2ab16" then v1 is (2 ab 16)
+    v1=($(echo "$1" | sed -e 's/\([0-9]\+\)/\1 /g' -e 's/\([a-z]\+\)/\1 /g'))
+    v2=($(echo "$2" | sed -e 's/\([0-9]\+\)/\1 /g' -e 's/\([a-z]\+\)/\1 /g'))
+
+    for (( j=0; j<${#v1[@]}; j++ )) ; do
+	v="${v1[$j]}"
+	if [[ "$v" =~ ^[0-9]+$ ]]; then # all numeric
+	  (( $v < ${v2[$j]} )) && return 1
+	elif [[ "$v" < ${v2[$j]} ]] ; then
+	  return 1
+	fi
+    done
+    return 0
+  }
+
+  ## main
+
+  [[ -z "$compare_ver" ]] || (( ${#compare_ver[@]} == 0 )) && \
+    return 0 # true, no compare-to version
+  (( ${#compare_ver[@]} > ${#ver[@]} )) && return 1 # false, over specified
+
+  # compare each version component
+  for (( i=0; i<${#compare_ver[@]}; i++ )) ; do
+      greater_or_eq "${ver[$i]}" "${compare_ver[$i]}" || return 1 # false
+  done
+
+  return 0 # true
+}
+
 # vol_exists: invokes gluster vol info to see if VOLNAME exists. Returns 1 on
 # errors. 
 # Args:
