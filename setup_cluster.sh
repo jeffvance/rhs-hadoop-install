@@ -424,28 +424,40 @@ function nodes_to_ips() {
 function prep_rhel_nodes() {
 
   local rhel_nodes="$@"
-  local node; local ssh; local ssh_close
-  local err; local errcnt=0; local out
+  local node; local ssh
+  local err; local errcnt=0; local out; local ver
 
   verbose "--- prepping rhel nodes..."
 
   for node in $rhel_nodes; do
-      [[ "$node" == "$HOSTNAME" ]] && { ssh=''; ssh_close=''; } \
-				   || { ssh="ssh $node '"; ssh_close="'"; }
-      out="$(eval "$ssh 
-	     if [[ -f /etc/redhat-storage-release ]] ; then
-	       echo \"RHS node: no openssl upgrade needed...\"
-	     else
-	       echo \"RHEL node...\"
-	       yum -y upgrade openssl 2>&1
-	     fi
-	     $ssh_close "
-	  )"
-      err=$?
-      debug "yum upgrade openssl on $node: $out"
-      if (( err != 0 )) ; then
-	err $err "yum upgrade openssl on $node"
-	(( errcnt++ ))
+      [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
+
+      eval "$ssh [[ -f /etc/redhat-storage-release ]]"
+      if (( $? != 0 )) ; then  # rhel node...
+	# which openssl version is installed on the rhel node
+	out=($(eval "$ssh yum list installed openssl 2>&1 | \
+		grep ^openssl | \
+		head -n 1"))
+	if (( ${#out[*]} > 0 )) ; then # see if current enough version
+	  ver="${out[1]}"
+	  if version_ok "$ver" '1.0.1e-16' ; then
+	    verbose "--- rhel node ($node) has the correct openssl version: $ver" 
+	    continue
+	  fi
+	  debug "installed openssl version on $node is $ver and needs updating"
+	else
+  	  debug "no installed openssl packages on $node, skipping..."
+	  continue
+	fi
+
+	# upgrade openssl
+	out="$(eval "$ssh yum -y upgrade openssl 2>&1")"
+	err=$?
+	debug "yum upgrade openssl on $node: $out"
+	if (( err != 0 )) ; then
+	  err $err "yum upgrade openssl on $node"
+	  (( errcnt++ ))
+	fi
       fi
   done
 
