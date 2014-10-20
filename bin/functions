@@ -403,8 +403,11 @@ function verify_gid_uids() {
 }
 
 # version_ok: return shell true(0) if the passed-in version string ($1) is
-# greater-than-or-equal to the passed-in compare version string ($2). Arg 2
-# can be shorter than arg 1. Neither version string is expected to have a '+'.
+# greater-than-or-equal to the passed-in compare version string ($2). Neither
+# version string is expected to have a '+'.
+# Args: 
+#   1=actual version string, can be longer and more specific than arg2.
+#   2=compare-to version string, usually shorter (less specific) than arg1.
 function version_ok() {
 
   local ver=(${1//./ }); local compare_ver=(${2//./ }) # arrays: (v u f)
@@ -413,8 +416,8 @@ function version_ok() {
   # nested function to parse out numbers and non-numerics from an individual
   # version string component. $1 and $2 are the two version pieces to compare.
   # Returns 0(true) if $1 >= $2.
-  # Note: numbers are compared using (( ... )) and strings are compared using
-  #   [[ ... ]]. This is needed so that "12" compares greater than "9".
+  # Note: numbers are compared using (( ... )) and non-numbers are compared
+  #  using [[ ... ]]. This is needed so that "12" compares greater than "9".
   function greater_or_eq() {
     local arg1; local arg2; local v1; local v2; local j
 
@@ -425,10 +428,10 @@ function version_ok() {
 
     (( ${#arg2[@]} > ${#arg1[@]} )) && return 1 # false, arg2 more specific
 
-    for (( j=0; j<${#arg2[@]}; j++ )) ; do
+    for (( j=0; j<${#arg2[@]}; j++ )); do # only compare arg2 num of pieces
 	v1="${arg1[$j]}"
 	v2="${arg2[$j]}"
-	if [[ "$v1" =~ ^[0-9]+$ ]]; then # all numeric
+	if [[ "$v1" =~ ^[0-9]+$ && "$v2" =~ ^[0-9]+$ ]]; then # all numeric
 	  (( v1 < v2 )) && return 1 # false
 	elif [[ "$v1" < "$v2" ]] ; then
 	  return 1 # false
@@ -443,8 +446,8 @@ function version_ok() {
     return 0 # true, no compare-to version
   (( ${#compare_ver[@]} > ${#ver[@]} )) && return 1 # false, over specified
 
-  # compare each version component
-  for (( i=0; i<${#compare_ver[@]}; i++ )) ; do
+  # compare each version component, only look at compare_ver num components
+  for (( i=0; i<${#compare_ver[@]}; i++ )); do # only look at compare_ver # of components
       greater_or_eq "${ver[$i]}" "${compare_ver[$i]}" || return 1 # false
   done
 
