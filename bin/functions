@@ -422,7 +422,11 @@ function version_ok() {
     local arg1; local arg2; local v1; local v2; local j
 
     # arg1 and arg2 are arrays of the number and/or string parts of a single
-    # version component. Eg., if $1="2ab16" then arg1 is (2 ab 16)
+    # version component. Eg:
+    #   $1="16"      --> arg1 = (16)
+    #   $1="16abc"   --> arg1 = (16 abc)
+    #   $1="2ab16"   --> arg1 = (2 ab 16)
+    #   $1="21e-66"  --> arg1 = (21 e- 66)
     arg1=($(echo "$1" | sed -e 's/\([0-9]\+\)/\1 /g' -e 's/\([^0-9]\+\)/\1 /g'))
     arg2=($(echo "$2" | sed -e 's/\([0-9]\+\)/\1 /g' -e 's/\([^0-9]\+\)/\1 /g'))
 
@@ -447,7 +451,7 @@ function version_ok() {
   (( ${#compare_ver[@]} > ${#ver[@]} )) && return 1 # false, over specified
 
   # compare each version component, only look at compare_ver num components
-  for (( i=0; i<${#compare_ver[@]}; i++ )); do # only look at compare_ver # of components
+  for (( i=0; i<${#compare_ver[@]}; i++ )); do
       greater_or_eq "${ver[$i]}" "${compare_ver[$i]}" || return 1 # false
   done
 
