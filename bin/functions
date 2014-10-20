@@ -412,27 +412,30 @@ function version_ok() {
   local i
 
   # nested function to parse out numbers and non-numerics from an individual
-  # version string component. Arg1 and 2 are the two version pieces to compare.
-  # Returns 0(true) if arg 1 >= arg2.
+  # version string component. $1 and $2 are the two version pieces to compare.
+  # Returns 0(true) if $1 >= $2.
   # Note: numbers are compared using (( ... )) and strings are compared using
   #   [[ ... ]]. This is needed so that "12" compares greater than "9".
   function greater_or_eq() {
-    local v1; local v2; local v; local j
+    local arg1; local arg2; local v1; local v2; local j
 
-    # v1 and v2 are arrays of the number and/or string parts of a single
-    # version component. Eg., if arg1="2ab16" then v1 is (2 ab 16)
-    v1=($(echo "$1" | sed -e 's/\([0-9]\+\)/\1 /g' -e 's/\([a-z]\+\)/\1 /g'))
-    v2=($(echo "$2" | sed -e 's/\([0-9]\+\)/\1 /g' -e 's/\([a-z]\+\)/\1 /g'))
+    # arg1 and arg2 are arrays of the number and/or string parts of a single
+    # version component. Eg., if $1="2ab16" then arg1 is (2 ab 16)
+    arg1=($(echo "$1" | sed -e 's/\([0-9]\+\)/\1 /g' -e 's/\([a-z]\+\)/\1 /g'))
+    arg2=($(echo "$2" | sed -e 's/\([0-9]\+\)/\1 /g' -e 's/\([a-z]\+\)/\1 /g'))
 
-    for (( j=0; j<${#v1[@]}; j++ )) ; do
-	v="${v1[$j]}"
-	if [[ "$v" =~ ^[0-9]+$ ]]; then # all numeric
-	  (( $v < ${v2[$j]} )) && return 1
-	elif [[ "$v" < ${v2[$j]} ]] ; then
-	  return 1
+    (( ${#arg2[@]} > ${#arg1[@]} )) && return 1 # false, arg2 more specific
+
+    for (( j=0; j<${#arg2[@]}; j++ )) ; do
+	v1="${arg1[$j]}"
+	v2="${arg2[$j]}"
+	if [[ "$v1" =~ ^[0-9]+$ ]]; then # all numeric
+	  (( v1 < v2 )) && return 1 # false
+	elif [[ "$v1" < "$v2" ]] ; then
+	  return 1 # false
 	fi
     done
-    return 0
+    return 0 # true
   }
 
   ## main
