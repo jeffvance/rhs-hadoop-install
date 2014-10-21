@@ -417,7 +417,7 @@ function version_ok() {
   # version string component. $1 and $2 are the two version pieces to compare.
   # Returns 0(true) if $1 >= $2.
   # Note: numbers are compared using (( ... )) and non-numbers are compared
-  #  using [[ ... ]]. This is needed so that "12" compares greater than "9".
+  #   using [[ ... ]]. This is needed so that "12" compares greater than "9".
   function greater_or_eq() {
     local arg1; local arg2; local v1; local v2; local j
 
