@@ -58,46 +58,44 @@ $ME [-y] [--hadoop-mgmt-node <node>] [--yarn-master <node>] \\
 where:
 
 <nodes-spec-list>: a list of two or more <node-spec's>.
-<node-spec>     : a storage node followed by a ':', followed by a brick mount
-                  path, followed by another ':', followed by a block device
-                  path.
-                  Eg: <node1><:brickmnt1>:<blkdev1> <node2>[:<brickmnt2>]
-                      [:<blkdev2>] [<node3>] ...
-                  Only the brick mount path and the block device path associated
-                  with the first node are required. If omitted from the other
-                  <nodes-spec-list>'s then each node assumes the values of the
-                  first node for brick mount path and block device path. If a
-                  brick mount path is omitted but a block device path is
-                  specified then the block device path is proceded by two ':'s,
-                  e.g., "<nodeN>::<blkdevN>". It is recommended that the mgmt
-                  and yarn-master nodes are not also storage nodes and are not
-                  the same server.
---yarn-master   : (optional) hostname or ip of the yarn-master server which is
-                  expected to be outside of the storage pool. Default is
-                  localhost.
+<node-spec>   : a storage node followed by a ':', followed by a brick mount
+                path, followed by another ':', followed by a block device path.
+                Eg: <n1><:brkmnt1>:<blkdev1> <n2>[:<brkmnt2>][:<blkdev2>] \\
+                    [<n3>] ...
+                Only the brick mount path and the block device path associated
+                with the first node are required. If omitted from the other
+                <nodes-spec-list>'s then each node assumes the values of the
+                first node for brick mount path and block device path. If a
+                brick mount path is omitted but a block device path is
+                specified then the block device path is proceded by two ':'s,
+                e.g., "<nodeN>::<blkdevN>". It is recommended that the mgmt
+                and yarn-master nodes are not also storage nodes and are not
+                collocated on the same server.
+--yarn-master : (optional) hostname or ip of the yarn-master server which is
+                expected to be outside of the storage pool. Default is
+                localhost.
 --hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server which
-                  is expected to be outside of the storage pool. Default is
-                  localhost.
---profile       : (optional) the name of a supported rhs/kernel profile, eg.
-                  "rhs-high-throughput". Default is not set a profile.
---ambari-repo   : (optional) the URL of the ambari repo file. Default is the
-                  value hard-coded in the installer.
-                  "rhs-high-throughput". Default is not set a profile.
+                is expected to be outside of the storage pool. Default is
+                localhost.
+--profile     : (optional) the name of a supported rhs/kernel profile, e.g.,
+                "rhs-high-throughput". Default is not set a profile.
+--ambari-repo : (optional) the URL of the ambari repo file. Default is the
+                value hard-coded in the installer.
 --force-ambari-update: (optional) force the update of the ambari-server and
-                  ambari-agents even if they are already installed and running.
-                  If the ambari-server is running, by default, it will not be
-                  re-installed. For each node where the agent is already
-                  running, by default, the agent will not be re-installed. Note:
-                  if the server and/or agents are not installed (or not running)
-                  they will be installed and started.
--y              : (optional) auto answer "yes" to all prompts. Default is to 
-                  answer a confirmation prompt.
---quiet         : (optional) output only basic progress/step messages. Default.
---verbose       : (optional) output --quiet plus more details of each step.
---debug         : (optional) output --verbose plus greater details useful for
-                  debugging.
---version       : output only the version string.
---help          : this text.
+                ambari-agents even if they are already installed and running.
+                If the ambari-server is running, by default, it will not be re-
+                installed. For each node where the agent is already running, by
+                default, the agent will not be re-installed. Note: if the server
+                and/or agents are not installed (or not running) they will be
+                installed and started.
+-y            : (optional) auto answer "yes" to all prompts. Default is to 
+                answer a confirmation prompt.
+--quiet       : (optional) output only basic progress/step messages. Default.
+--verbose     : (optional) output --quiet plus more details of each step.
+--debug       : (optional) output --verbose plus greater details useful for
+                debugging.
+--version     : output only the version string.
+--help        : this text.
 
 EOF
 }
