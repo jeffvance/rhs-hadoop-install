@@ -190,6 +190,7 @@ function removeValue() {
 #   'add'     --> 'replace', when prop already exists
 #   'append'  --> 'add', when prop does not exist
 #   'prepend' --> 'add', when prop does not exist
+#   'replace' --> 'add', when prop does not exist
 function doUpdate() {
 
   local mode=$1; local configkey=$2; local configvalue="$3"
@@ -240,14 +241,18 @@ function doUpdate() {
       ;;
       append)
 	# in case configvalue is present in old_value, remove it
-	new_value="$(removeValue "$old_value" "$configvalue"),$configvalue"
+	new_value="$(removeValue "$old_value" "$configvalue")"
+	[[ -n "$new_value" ]] && new_value+=','
+	new_value+="$configvalue"
       ;;
       delete) # delete key from tmp file
 	sed -i "/\"$configkey\" :/d" $tmp_cfg
       ;;
       prepend)
 	# in case configvalue is present in old_value, remove it
-	new_value="$configvalue,$(removeValue "$old_value" "$configvalue")"
+	new_value="$(removeValue "$old_value" "$configvalue")"
+	[[ -n "$new_value" ]] && new_value=",$new_value"
+	new_value="$configvalue$new_value"
       ;;
       remove) # remove configvalue from old_value
 	# check if configvalue exists
