@@ -174,8 +174,9 @@ function parse_cmd() {
   return 0
 }
 
-# parse_nodes_brkmnts_blkdevs: set the global NODE_BRKMNTS and NODE_BLKDEVS 
-# arrays based on NODE_SPEC. The format of these assoc arrays is:
+# parse_nodes_brkmnts_blkdevs: set the global NODES array, and the NODE_BRKMNTS
+# and NODE_BLKDEVS assoc arrays, based on NODE_SPEC. The format of the assoc
+# arrays is:
 #   NODE_BRKMNTS[<node>]="<brickmnt>[,<brkmnt1>][,<brmknt2>]..."
 #   NODE_BLKDEVS[<node>]="<blkdev>[,<blkdev>][,<blkdev>]..."
 # The brick mount and block dev values are a comma separated list. Most times
@@ -242,6 +243,28 @@ function parse_nodes_brkmnts_blkdevs() {
       NODE_BLKDEVS[$node]=${NODE_BLKDEVS[$node]%*,}
   done
 
+  return 0
+}
+
+# storage_node_version: log the rhs version of each storage node provide in $@.
+# Returns 1 if any of the nodes is not a rhs node.
+function storage_node_version() {
+
+  local errcnt=0; local node; local ssh; local out
+  local rhs_file='/etc/redhat-storage-release'
+
+  for node in $@; do
+      [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
+      out="$(eval "$ssh cat $rhs_file 2>&1")"
+      if (( $? != 0 )) ; then
+	((errcnt++))
+	err "$node is not a rhs storage node"
+      else
+	debug "$node RHS version: $out"
+      fi
+  done
+
+  (( errcnt > 0 )) && return 1
   return 0
 }
 
@@ -811,6 +834,9 @@ default_nodes MGMT_NODE 'management' YARN_NODE 'yarn-master' || exit -1
 
 # extract nodes, brick mnts and blk devs arrays from NODE_SPEC
 parse_nodes_brkmnts_blkdevs || exit -1
+
+# log each storage node's version, error if not an RHS node
+storage_node_version ${NODES[@]} || exit 1
 
 # for cases where storage nodes are repeated and/or the mgmt and/or yarn nodes
 # are inside the pool, there is some improved efficiency in reducing the nodes

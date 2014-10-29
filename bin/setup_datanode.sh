@@ -90,7 +90,10 @@ function mount_blkdev() {
   local mntopts="noatime,inode64"
 
   [[ -z "$BLKDEV" || -z "$BRICKMNT" ]] && return 0 # need both to mount bricks
-  (( STORAGE_NODE )) || return 0 # nothing to do...
+
+  (( STORAGE_NODE )) || {
+    echo "$HOSTNAME is not a RHS storage node, skipping block dev mount";
+    return 0; } # nothing to do...
 
   for brkmnt in ${BRICKMNT[@]}; do
       blkdev=${BLKDEV[$i]}
@@ -268,8 +271,11 @@ function setup_profile() {
   local tuned_path="/etc/tune-profiles/$PROFILE"
   local err
 
-  (( STORAGE_NODE ))  || return 0 # nothing to do...
   [[ -z "$PROFILE" ]] && return 0 # leave default profile set
+
+  (( STORAGE_NODE )) || {
+    echo "$HOSTNAME is not a RHS storage node, skipping tuned-adm step";
+    return 0; } # nothing to do...
 
   [[ -d $tuned_path ]] || {
     echo "ERROR: $tuned_path directory is missing, can't set $PROFILE profile";
