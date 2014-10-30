@@ -242,8 +242,8 @@ function doUpdate() {
       append)
 	# in case configvalue is present in old_value, remove it
 	new_value="$(removeValue "$old_value" "$configvalue")"
-	[[ -n "$new_value" ]] && new_value+=','
-	new_value+="$configvalue"
+	[[ -n "$new_value" ]] && new_value+=",$configvalue" ||
+	  new_value="$configvalue"
       ;;
       delete) # delete key from tmp file
 	sed -i "/\"$configkey\" :/d" $tmp_cfg
@@ -251,8 +251,8 @@ function doUpdate() {
       prepend)
 	# in case configvalue is present in old_value, remove it
 	new_value="$(removeValue "$old_value" "$configvalue")"
-	[[ -n "$new_value" ]] && new_value=",$new_value"
-	new_value="$configvalue$new_value"
+	[[ -n "$new_value" ]] && new_value="$configvalue,$new_value" ||
+	  new_value="$configvalue"
       ;;
       remove) # remove configvalue from old_value
 	# check if configvalue exists
