@@ -504,8 +504,7 @@ function prep_rhel_nodes() {
 #   YARN_NODE
 function setup_nodes() {
 
-  local errcnt=0; local errnodes=''
-  local node; local brkmnt; local blkdev
+  local errcnt=0; local node; local brkmnt; local blkdev
 
   # nested function to call setup_datanodes on a passed-in node, blkdev and
   # brick-mnt.
@@ -544,9 +543,7 @@ function setup_nodes() {
   for node in ${NODES[@]}; do
       brkmnt="${NODE_BRKMNTS[$node]}" # 1 or more brk-mnt path(s)
       blkdev="${NODE_BLKDEVS[$node]}" # 1 or more blk-dev path(s)
-      do_node "$node" "$blkdev" "$brkmnt" || {
-	  errnodes+="$node ";
-	  ((errcnt++)); }
+      do_node "$node" "$blkdev" "$brkmnt" || ((errcnt++))
   done
 
   if (( ! YARN_INSIDE )) ; then
@@ -824,7 +821,7 @@ YARN_INSIDE=0		# false
 AUTO_YES=0		# false
 FORCE_AMBARI=0		# false
 VERBOSE=$LOG_QUIET	# default
-errnodes=''; errcnt=0
+errcnt=0
 
 report_version $ME $PREFIX
 
