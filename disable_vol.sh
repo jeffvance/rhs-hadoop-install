@@ -163,7 +163,6 @@ function edit_core_site() {
 ## main ##
 
 ME="$(basename $0 .sh)"
-errcnt=0
 AUTO_YES=0 # false
 VERBOSE=$LOG_QUIET # default
 

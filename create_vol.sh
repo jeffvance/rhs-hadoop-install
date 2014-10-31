@@ -457,10 +457,9 @@ function start_vol() {
 ME="$(basename $0 .sh)"
 AUTO_YES=0 # assume false
 VOL_NODES=()
-declare -A BRKMNTS=() # assco array, node=key list of 1 or more mnt=value
+declare -A BRKMNTS=() # assoc array, node=key list of 1 or more mnt=value
 REPLICA_CNT=2  # hard-coded for now
 VERBOSE=$LOG_QUIET # default
-errcnt=0
 
 report_version $ME $PREFIX
 
@@ -469,13 +468,13 @@ parse_cmd $@ || exit -1
 parse_nodes_brkmnts || exit -1
 FIRST_NODE=${VOL_NODES[0]} # use this storage node for all gluster cli cmds
 
+# check for passwordless ssh connectivity to storage nodes
+check_ssh ${VOL_NODES[*]} || exit 1
+
 # make sure the volume doesn't already exist
 vol_exists $VOLNAME $FIRST_NODE && {
   err "volume \"$VOLNAME\" already exists";
   exit 1; }
-
-# check for passwordless ssh connectivity to storage nodes
-check_ssh ${VOL_NODES[*]} || exit 1
 
 # volume name can't conflict with other names under the brick mnts
 path_avail || exit 1
