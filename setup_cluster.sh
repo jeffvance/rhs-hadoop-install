@@ -821,7 +821,6 @@ YARN_INSIDE=0		# false
 AUTO_YES=0		# false
 FORCE_AMBARI=0		# false
 VERBOSE=$LOG_QUIET	# default
-errcnt=0
 
 report_version $ME $PREFIX
 
@@ -831,9 +830,6 @@ default_nodes MGMT_NODE 'management' YARN_NODE 'yarn-master' || exit -1
 
 # extract nodes, brick mnts and blk devs arrays from NODE_SPEC
 parse_nodes_brkmnts_blkdevs || exit -1
-
-# log each storage node's version, error if not an RHS node
-storage_node_version ${NODES[@]} || exit 1
 
 # for cases where storage nodes are repeated and/or the mgmt and/or yarn nodes
 # are inside the pool, there is some improved efficiency in reducing the nodes
@@ -853,6 +849,9 @@ FIRST_NODE=${NODES[0]}
 
 # check for passwordless ssh connectivity to nodes
 check_ssh ${UNIQ_NODES[*]} || exit 1
+
+# log each storage node's version, error if not an RHS node
+storage_node_version ${NODES[@]} || exit 1
 
 # check that the block devs are (likely to be) block devices
 check_blkdevs || exit 1
