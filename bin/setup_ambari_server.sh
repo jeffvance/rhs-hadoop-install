@@ -15,11 +15,6 @@
 
 PREFIX="$(dirname $(readlink -f $0))"
 warncnt=0
-AMBARI_SERVER_PID='/var/run/ambari-server/ambari-server.pid'
-METAINFO_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.1.GlusterFS/metainfo.xml' # hdp 2.1
-ACTIVE_FALSE='<active>false<'; ACTIVE_TRUE='<active>true<'
-SERVICE_PATH='/var/lib/ambari-server/resources/stacks/HDP/2.1.GlusterFS/services'
-RM_SERVICE_DIRS='FALCON STORM' # dirs to be deleted
 
 
 ## functions ##
@@ -60,23 +55,33 @@ function parse_cmd() {
 # ambari_server: install, start, persist the ambari-server. Returns 1 on errors.
 function ambari_server() {
 
+  local AMBARI_SERVER_PID='/var/run/ambari-server/ambari-server.pid'
+  local HDP_DIR='/var/lib/ambari-server/resources/stacks/HDP/2.1.GlusterFS'
+  local METAINFO_PATH="$HDP_DIR/metainfo.xml"
+  local SERVICE_PATH="$HDP_DIR/services"
+  local RM_SERVICE_DIRS='FALCON STORM' # dirs to be deleted
+  local ACTIVE_FALSE='<active>false<'; ACTIVE_TRUE='<active>true<'
+  local dir
+
   if [[ -f $AMBARI_SERVER_PID ]] && \
      which ambari-server >& /dev/null && \
      ambari-server status >& /dev/null ; then # server is definitely running
     (( ! FORCE_AMBARI )) && {
       echo "ambari-server running, install skipped";
       return 0; } # done
-    echo "resetting ambari-server since running in \"FORCE\" mode..."
+    echo "stopping ambari-server since running in \"FORCE\" mode..."
     ambari-server stop 2>&1
     err=$?
     (( err != 0 )) && {
       echo "WARN $err: couldn't stop ambari server";
       ((warncnt++)); }
-    ambari-server reset -s 2>&1
-    err=$?
-    (( err != 0 )) && {
-      echo "WARN $err: couldn't reset ambari server";
-      ((warncnt++)); }
+    ## Not sure we should reset ambari just because of a "forced" update
+    #echo "resetting ambari-server since running in \"FORCE\" mode..."
+    #ambari-server reset -s 2>&1
+    #err=$?
+    #(( err != 0 )) && {
+      #echo "WARN $err: couldn't reset ambari server";
+      #((warncnt++)); }
   fi
 
   echo "...wget-ing ambari-server repo..."
@@ -95,13 +100,16 @@ function ambari_server() {
 
   # delete un-needed service related directories
   # note: must be done after the yum install and before the setup step
+  echo "...removing certain service directories until they are supported:"
+  echo "...  $RM_SERVICE_DIRS, if present..."
   for dir in $RM_SERVICE_DIRS; do
-      if [[ -f $SERVICE_PATH/$dir ]] ; then
+      dir="$SERVICE_PATH/$dir"
+      if [[ -f $dir ]] ; then
 	echo "...deleting un-needed service directory $dir..."
-	rm - rf $SERVICE_PATH / $dir
+	rm -rf $dir
 	err=$?
 	(( err != 0 )) && {
-	  echo "WARN $err: deleting $SERVICE_PATH/$dir directory";
+	  echo "WARN $err: deleting $dir directory";
 	  ((warncnt++)); }
       fi
   done
