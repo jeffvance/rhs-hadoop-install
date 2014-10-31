@@ -104,7 +104,7 @@ function ambari_server() {
   echo "...  $RM_SERVICE_DIRS, if present..."
   for dir in $RM_SERVICE_DIRS; do
       dir="$SERVICE_PATH/$dir"
-      if [[ -f $dir ]] ; then
+      if [[ -d $dir ]] ; then
 	echo "...deleting un-needed service directory $dir..."
 	rm -rf $dir
 	err=$?
