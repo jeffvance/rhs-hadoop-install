@@ -88,8 +88,8 @@ where:
                 default, the agent will not be re-installed. Note: if the server
                 and/or agents are not installed (or not running) they will be
                 installed and started.
--y            : (optional) auto answer "yes" to all prompts. Default is to 
-                answer a confirmation prompt.
+-y            : (optional) auto answer "yes" to all prompts. Default is the 
+                script waits for the user to answer each prompt.
 --quiet       : (optional) output only basic progress/step messages. Default.
 --verbose     : (optional) output --quiet plus more details of each step.
 --debug       : (optional) output --verbose plus greater details useful for

@@ -39,8 +39,8 @@ where:
 --hadoop-mgmt-node : (optional) hostname or ip of the hadoop mgmt server which
                is expected to be outside of the storage pool. Default is
                localhost.
--y : auto answer "yes" to all prompts. Default is to be promoted before the
-               script continues.
+-y           : (optional) auto answer "yes" to all prompts. Default is the
+               script waits for the user to answer each prompt.
 --quiet      : (optional) output only basic progress/step messages. Default.
 --verbose    : (optional) output --quiet plus more details of each step.
 --debug      : (optional) output --verbose plus greater details useful for

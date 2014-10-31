@@ -48,8 +48,8 @@ where:
 <volname>       : name of the new volume.
 <vol-mnt-prefix>: path of the glusterfs-fuse mount point, eg. /mnt/glusterfs.
                   Note: the volume name will be appended to this mount point.
--y              : auto answer "yes" to all prompts. Default is to be promoted 
-                  before the script continues.
+-y              : (optional) auto answer "yes" to all prompts. Default is the 
+                  script waits for the user to answer each prompt.
 --quiet         : (optional) output only basic progress/step messages. Default.
 --verbose       : (optional) output --quiet plus more details of each step.
 --debug         : (optional) output --verbose plus greater details useful for

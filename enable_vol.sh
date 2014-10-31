@@ -53,8 +53,8 @@ where:
 --make-default: if specified then the volume is set to be the default volume
                used when hadoop job URIs are unqualified. Default is to NOT 
                make this volume the default volume.
--y           : (optional) auto answer "yes" to all prompts. Default is to answer
-               a confirmation prompt.
+-y           : (optional) auto answer "yes" to all prompts. Default is the 
+               script waits for the user to answer each prompt.
 --quiet      : (optional) output only basic progress/step messages. Default.
 --verbose    : (optional) output --quiet plus more details of each step.
 --debug      : (optional) output --verbose plus greater details useful for
