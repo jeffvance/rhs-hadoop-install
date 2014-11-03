@@ -4,7 +4,7 @@
 # setup_cluster.sh, create_vol.sh, and enable_vol.sh. This script is to be
 # used at the user's own risk.
 #
-# Steps:
+# Steps performed by this script:
 # 1) re-start glusterd
 # 2) stop vol **
 # 3) delete vol **
@@ -74,7 +74,7 @@ for vol in $VOLS; do
 done
 
 # reduce to unique bricks
-BRICKS=($(printf '%s\n' "$BRICKS"   | sort -u))
+BRICKS=($(printf '%s\n' "$BRICKS" | sort -u))
 
 # check for passwordless ssh to the supplied storage nodes
 check_ssh $NODES $yarn_node || exit 1
@@ -92,7 +92,9 @@ yesno "  Continue? [y|N] " || exit 1
 echo
 echo "-- restart glusterd on all nodes..."
 for node in $NODES; do
-    ssh $node "killall -r gluster && sleep 2 && service glusterd start"
+    ssh $node "killall -r gluster && sleep 2 && \
+	rm -rf /var/lib/glusterd/* && \
+	service glusterd start"
 done
 
 echo
@@ -105,7 +107,7 @@ done
 echo
 echo "-- detach all nodes from the pool..."
 for node in $NODES; do
-    [[ "$node" == "$rhs_node" ]] && continue # skip
+    [[ "$node" == "$rhs_node" ]] && continue # skip node executing peer detach
     ssh $rhs_node "gluster peer detach $node force"
 done
 
