@@ -262,12 +262,8 @@ function setup_multi_tenancy() {
   for node in $nodes; do
       out="$(ssh $node $PREFIX/bin/setup_container_executor.sh)"
       err=$?
-      if (( err == 0 )) ; then
-	debug "on $node: setup_container_executor: $out"
-      else
-	((errcnt++))
-	err $err "on $node: setup_container_executor: $out"
-      fi
+      debug "$node: setup_container_executor, status=$err: $out"
+      (( err != 0 )) && ((errcnt++))
   done
 
   (( errcnt > 0 )) && return 1
