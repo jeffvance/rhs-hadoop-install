@@ -5,6 +5,7 @@
 # Note: the following users are expected to exist:
 #   ambari-qa, falcon, hbase, hcat, hive, mapred, oozie,
 #   tez, yarn, zookeeper
+# Note: the caller is expected to execute mkdir -p on the returned dirs.
 #
 # Syntax:
 # -a, output all dirs as if all options below were passed.
@@ -14,7 +15,7 @@
 #     after Ambari services have been installed and then stopped.
 
 # format: <dir-path>:<perms>:<owner>
-local_dirs='mapredlocal:0755:root'
+local_dirs='mapredlocal:0755:root hadoop/yarn:0755:yarn hadoop/yarn/timeline:0755:yarn'
 
 # the remaining dirs are distributed:
 mr_dirs='mapred:0770:mapred mapred/system:0755:mapred mr-history:0755:yarn mr-history/tmp:1777:yarn mr-history/done:0770:yarn'
@@ -54,8 +55,8 @@ done
   exit -1; }
 
 dirs=''
-[[ -n "$DIST" ]] && dirs+="$mr_dirs $apps_dirs $user_dirs $misc_dirs "
-[[ -n "$POST" ]] && dirs+="$post_processing_dirs "
+[[ -n "$DIST" ]]  && dirs+="$mr_dirs $apps_dirs $user_dirs $misc_dirs "
+[[ -n "$POST" ]]  && dirs+="$post_processing_dirs "
 [[ -n "$LOCAL" ]] && dirs+="$local_dirs "
 
 echo "$dirs"
