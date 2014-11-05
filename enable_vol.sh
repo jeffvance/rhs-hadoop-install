@@ -270,20 +270,22 @@ function setup_multi_tenancy() {
   return 0
 }
 
-# create_post_processing_dirs: create the distributed hadoop directories that
-# need to be added after the Ambari services have been started. Returns 1 on
-# errors.
+# post_processing: create the distributed hadoop directories that need to be
+# added after the Ambari services have been started, and copy some jar files.
+# Returns 1 on errors.
 # Uses globals:
 #   PREFIX
 #   RHS_NODE
 #   VOLMNT (includes volname)
 #   VOLNAME
-function create_post_processing_dirs() {
+function post_processing() {
 
-  local err; local ssh; local out
+  local err; local ssh; local out; local f; local warncnt=0
+  local src_dir='/usr/share/HDP-webhcat'
+  local cp_files="/usr/lib/hadoop-mapreduce/hadoop-streaming-*.jar $src_dir/pig.tar.gz $src_dir/hive.tar.gz"
+  local tgt_dir="$VOLMNT/apps/webhcat"
 
   verbose "--- adding post-processing hadoop directories for $VOLNAME..."
-
   [[ "$RHS_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $RHS_NODE"
 
   # add the required post-processing hadoop dirs
@@ -294,8 +296,29 @@ function create_post_processing_dirs() {
     return 1
   fi
   debug "add_dirs -p $VOLMNT: $out"
-
   verbose "--- added post-processing hadoop directories for $VOLNAME"
+
+  # now copy select jar and tar files
+  if [[ ! -d "$src_dir" ]] ; then # webhcat not installed, so we're done
+    debug "$src_dir missing, service not installed, no copy needed"
+    return 0
+  fi
+  
+  verbose "--- copying jar and tar files as needed..."
+  [[ ! -d "$tgt_dir" ]] && {
+    err "$tgt_dir target dir missing, cannot copy post-processing jar files";
+    return 1; }
+
+  for f in $cp_files; do
+      debug "cp $f $tgt_dir"
+      out="$(cp $f $tgt_dir 2>&1)"
+      err=$?
+      (( err != 0 )) && {
+	((warncnt++));
+	debug "warn: cp error $err: $out"; }
+  done
+
+  verbose "--- copied jar files with $warncnt warnings"
   return 0
 }
 
@@ -392,8 +415,8 @@ chk_nodes || exit 1
 # set up storage nodes for multi-tennancy
 setup_multi_tenancy $NODES || exit 1
 
-# create dirs needed after Ambari services have been started
-create_post_processing_dirs || exit 1
+# create dirs needed after Ambari services have been started and copy jar files
+post_processing || exit 1
 
 # edit the core-site file to recognize the enabled volume
 edit_core_site || exit 1
