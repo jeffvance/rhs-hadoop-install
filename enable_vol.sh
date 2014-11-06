@@ -86,6 +86,11 @@ function parse_cmd() {
   local long_opts='version,help,make-default,yarn-master:,rhs-node:,hadoop-mgmt-node:,user:,pass:,port:,verbose,quiet,debug'
   local errcnt=0
 
+  # global defaults
+  MGMT_PASS='admin'
+  MGMT_PORT=8080
+  MGMT_USER='admin'
+  
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
 
   while true; do
@@ -183,32 +188,77 @@ function show_todo() {
 
 }
 
-# yarn_mount: this is the first opportunity to setup the yarn-master server
+# setup_yarn: this is the first opportunity to setup the yarn-master server
 # because we need both the yarn-master node and a volume. Invokes setup_yarn.sh
-# script. Returns 1 for errors.
+# script to create the glusterfs-fuse mount for the volume. Also, the yarn/
+# timeline dir is set with the correct owner:group and perms. Returns 1 on
+# errors.
 # Uses globals:
+#   MGMT_*
 #   PREFIX
 #   RHS_NODE
 #   VOLNAME
 #   YARN_INSIDE
 #   YARN_NODE
-function yarn_mount() {
+function setup_yarn() {
 
   local out; local err
+  local dirs='yarn:0755:yarn yarn/timeline:0755:yarn'
+  local yarn_timeline_prop='yarn.timeline-service.leveldb-timeline-store.path'
+  local dir_filter='/yarn/timeline/leveldb-timeline-store.ldb'
+  local url="$MGMT_NODE:$MGMT_PORT"
+  local userpass="$MGMT_USER:$MGMT_PASS"
+  local owner; local perms; local dir_prefix; local site_ver; local cluster
 
-  (( YARN_INSIDE )) && return 0 # already mounted as a storage node
+  if (( ! YARN_INSIDE )) ; then # yarn node is not a rhs node, so need vol mnt
+    verbose "--- setting up the yarn-master: $YARN_NODE..."
+    out="$(ssh $YARN_NODE $PREFIX/bin/setup_yarn.sh -n $RHS_NODE $VOLNAME)"
+    err=$?
+    if (( err != 0 )) ; then
+      err $err "setup_yarn on $YARN_NODE: $out"
+      return 1
+    fi
+    debug -e "setup_yarn on $YARN_NODE:\n$out"
+    verbose "--- done setting up the yarn-master"
+  fi
 
-  verbose "--- setting up the yarn-master: $YARN_NODE..."
+  # set yarn/timeline dir with correct owner and perms
+  verbose "--- update yarn local directories on $MGMT_NODE (yarn-master)..."
 
-  out="$(ssh $YARN_NODE $PREFIX/bin/setup_yarn.sh -n $RHS_NODE $VOLNAME)"
-  err=$?
-  if (( err != 0 )) ; then
-    err -e $err "setup_yarn on $YARN_NODE:\n$out"
+  cluster="$($PREFIX/bin/find_cluster_name.sh $url $userpass)"
+  (( $? != 0 )) && {
+    err "Cannot retrieve cluster name therefore cannot chown yarn timline dir";
+    err "$cluster"; # error msg from script
+    return 1; }
+
+  site_ver="$($PREFIX/bin/find_site_tag.sh yarn $url $userpass)"
+  (( $? != 0 )) && {
+    err "Cannot retrieve yarn-site version therefore cannot chown yarn timline dir";
+    err "$site_ver"; # error msg from script
+    return 1; }
+
+  yarn_dir_prefix="$(curl "http://$url/api/v1/clusters/$cluster/configurations?type=yarn-site&tag=$site_ver" \
+	-s -H 'X-Requested-By: X-Requested-By' -u $userpass \
+  | grep $yarn_timeline_prop)"
+
+  if (( $? != 0 )) || [[ -z "$yarn_dir_prefix" ]] ; then
+    err "Cannot retrieve yarn dir prefix therefore cannot chown yarn timline dir"
+    err "$yarn_dir_prefix" # error msg from curl
     return 1
   fi
 
-  debug -e "setup_yarn on $YARN_NODE:\n$out"
-  verbose "--- done setting up the yarn-master"
+  # extract prop value (timeline prefix)
+  yarn_dir_prefix="${yarn_dir_prefix#*:}"  # just value token
+  yarn_dir_prefix="${yarn_dir_prefix%$dir_filter\",}" # remove non-prefix & ",
+  yarn_dir_prefix="${yarn_dir_prefix#*\"}" # remove leading quote
+
+  # add (if needed) and chown && chmod the dirs
+  out="$($PREFIX/bin/add_dirs.sh $yarn_dir_prefix $dirs)"
+  (( $? != 0 )) && {
+    err "updating local yarn-specific dirs \"$dirs\": $out";
+    return 1; }
+
+  verbose "--- updated yarn local directories on $MGMT_NODE (yarn-master)"
   return 0
 }
 
@@ -406,8 +456,8 @@ show_todo
 (( ! AUTO_YES )) && ! yesno "Enabling volume $VOLNAME. Continue? [y|N] " && \
   exit 0
 
-# setup volume mount on yarn-node
-yarn_mount || exit 1
+# do post-ambari install setup on the yarn node
+setup_yarn || exit 1
 
 # verify nodes spanned by the volume are ready for hadoop workloads, and if
 # not prompt user to fix problems.

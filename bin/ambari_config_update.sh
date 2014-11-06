@@ -314,7 +314,7 @@ debug echo "########## AMBARIURL = "$AMBARIURL
 debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
 
 SITETAG="$(
-	$PREFIX/find_coresite_tag.sh "$AMBARIURL" "$USERID:$PASSWD" \
+	$PREFIX/find_site_tag.sh core "$AMBARIURL" "$USERID:$PASSWD" \
 	    "$CLUSTER_NAME")" || {
   echo "ERROR: Cannot get current core-site tag: $SITETAG";
   exit 1; }

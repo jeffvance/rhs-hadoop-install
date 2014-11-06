@@ -2,7 +2,7 @@
 #
 # find_cluster_name.sh outputs the name of the current ambari cluster.
 # Args: $1=ambari server url (including :port),
-#       $2=ambari admin username:password,
+#       $2=ambari admin username:password.
 
 # check args
 (( $# != 2 )) && {

@@ -85,7 +85,7 @@ function currentSiteTag() {
 
   local tag
 
-  tag="$($PREFIX/find_coresite_tag.sh $AMBARIURL "$USERID:$PASSWD" "$CLUSTER")"
+  tag="$($PREFIX/find_site_tag.sh core $AMBARIURL "$USERID:$PASSWD" "$CLUSTER")"
   if (( $? != 0 )) || [[ -z "$tag" ]] ; then
     echo "ERROR: Cannot get current core-site tag: $tag"
     exit 1
