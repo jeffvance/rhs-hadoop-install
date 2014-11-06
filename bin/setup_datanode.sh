@@ -261,7 +261,7 @@ function add_local_dirs() {
 
   [[ -z "$BRICKMNT" ]] && return 0 # nothing to do
 
-  $PREFIX/add_dirs.sh -l ${BRICKMNT[0]} # return add_dir's rnt-code
+  $PREFIX/add_dirs.sh ${BRICKMNT[0]} $($PREFIX/gen_dirs.sh -l)
 }
 
 # setup_profile: apply the PROFILE tune-adm profile to this storage node.

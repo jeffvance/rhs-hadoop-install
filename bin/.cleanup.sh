@@ -62,6 +62,9 @@ echo "**********"
 yesno "  Are you sure you want to continue? [y|N] " || exit 1
 
 
+# check for passwordless ssh to the supplied rhs node
+check_ssh $rhs_node || exit 1
+
 # find bricks, nodes, and volumes in pool
 VOLS="$($PREFIX/find_volumes.sh -n $rhs_node)"  # all volumes in pool
 NODES="$($PREFIX/find_nodes.sh -un $rhs_node)"  # all storage nodes in pool
@@ -76,8 +79,8 @@ done
 # reduce to unique bricks
 BRICKS=($(printf '%s\n' "$BRICKS" | sort -u))
 
-# check for passwordless ssh to the supplied storage nodes
-check_ssh $NODES $yarn_node || exit 1
+# check for passwordless ssh to the storage and yarn nodes
+check_ssh $(uniq_nodes $rhs_node $NODES $yarn_node) || exit 1
 
 echo
 echo "** The following nodes, volumes, bricks and vol mounts are affected:"

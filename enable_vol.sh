@@ -200,7 +200,7 @@ function yarn_mount() {
 
   verbose "--- setting up the yarn-master: $YARN_NODE..."
 
-  out="$($PREFIX/bin/setup_yarn.sh -n $RHS_NODE -y $YARN_NODE $VOLNAME)"
+  out="$(ssh $YARN_NODE $PREFIX/bin/setup_yarn.sh -n $RHS_NODE $VOLNAME)"
   err=$?
   if (( err != 0 )) ; then
     err -e $err "setup_yarn on $YARN_NODE:\n$out"
@@ -289,7 +289,8 @@ function post_processing() {
   [[ "$RHS_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $RHS_NODE"
 
   # add the required post-processing hadoop dirs
-  out="$(eval "$ssh $PREFIX/bin/add_dirs.sh -p $VOLMNT")"
+  out="$(eval "$ssh $PREFIX/bin/add_dirs.sh $VOLMNT \
+		$($PREFIX/bin/gen_dirs.sh -p)")"
   err=$?
   if (( err != 0 )) ; then
     err $err "could not add required hadoop dirs: $out"

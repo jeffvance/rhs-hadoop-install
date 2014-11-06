@@ -359,7 +359,8 @@ function add_distributed_dirs() {
   [[ "$FIRST_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $FIRST_NODE"
 
   # add the required distributed hadoop dirs
-  out="$(eval "$ssh $PREFIX/bin/add_dirs.sh -d $VOLMNT/$VOLNAME")"
+  out="$(eval "$ssh $PREFIX/bin/add_dirs.sh $VOLMNT/$VOLNAME \
+		$($PREFIX/bin/gen_dirs.sh -d)")"
   err=$?
   if (( err != 0 )) ; then
     err $err "could not add required hadoop dirs: $out"
