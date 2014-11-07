@@ -37,9 +37,8 @@ for tuple in $DIRS; do
     perm=${tuple%:*}; perm=${perm#*:}
     owner=${tuple##*:}
 
-    mkdir -p $path 2>&1 &&
-	chmod $perm $path 2>&1 &&
-	chown $owner:$HADOOP_G $path 2>&1
+    mkdir -p $path 2>&1  # ignore err, we want to do the chmod and chown
+    chmod $perm $path 2>&1 && chown $owner:$HADOOP_G $path 2>&1
     err=$?
 
     if (( err == 0 )) ; then

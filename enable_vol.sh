@@ -158,6 +158,7 @@ function parse_cmd() {
 # show_todo: display values set by the user and discovered by enable_vol.
 # Uses globals:
 #   ACTION
+#   CLUSTER_NAME
 #   DEFAULT_VOL
 #   MGMT_NODE
 #   NODES
@@ -180,6 +181,7 @@ function show_todo() {
   quiet "*** Volume             : $VOLNAME ($msg)"
   [[ -n "$DEFAULT_VOL" ]] && \
     quiet "*** Current default vol: $DEFAULT_VOL"
+  quiet "*** Cluster name       : $CLUSTER_NAME"
   quiet "*** Nodes              : $(echo $NODES | sed 's/ /, /g')"
   quiet "*** Volume mount       : $VOLMNT"
   quiet "*** Ambari mgmt node   : $MGMT_NODE"
@@ -194,6 +196,7 @@ function show_todo() {
 # timeline dir is set with the correct owner:group and perms. Returns 1 on
 # errors.
 # Uses globals:
+#   CLUSTER_NAME
 #   MGMT_*
 #   PREFIX
 #   RHS_NODE
@@ -202,13 +205,10 @@ function show_todo() {
 #   YARN_NODE
 function setup_yarn() {
 
-  local out; local err
+  local out; local err; local dir_prefix
   local dirs='yarn:0755:yarn yarn/timeline:0755:yarn'
   local yarn_timeline_prop='yarn.timeline-service.leveldb-timeline-store.path'
   local dir_filter='/yarn/timeline/leveldb-timeline-store.ldb'
-  local url="$MGMT_NODE:$MGMT_PORT"
-  local userpass="$MGMT_USER:$MGMT_PASS"
-  local owner; local perms; local dir_prefix; local site_ver; local cluster
 
   if (( ! YARN_INSIDE )) ; then # yarn node is not a rhs node, so need vol mnt
     verbose "--- setting up the yarn-master: $YARN_NODE..."
@@ -219,46 +219,29 @@ function setup_yarn() {
       return 1
     fi
     debug -e "setup_yarn on $YARN_NODE:\n$out"
-    verbose "--- done setting up the yarn-master"
   fi
 
   # set yarn/timeline dir with correct owner and perms
-  verbose "--- update yarn local directories on $MGMT_NODE (yarn-master)..."
+  debug "update yarn local directories on $MGMT_NODE (yarn-master)..."
 
-  cluster="$($PREFIX/bin/find_cluster_name.sh $url $userpass)"
-  (( $? != 0 )) && {
-    err "Cannot retrieve cluster name therefore cannot chown yarn timline dir";
-    err "$cluster"; # error msg from script
-    return 1; }
-
-  site_ver="$($PREFIX/bin/find_site_tag.sh yarn $url $userpass)"
-  (( $? != 0 )) && {
-    err "Cannot retrieve yarn-site version therefore cannot chown yarn timline dir";
-    err "$site_ver"; # error msg from script
-    return 1; }
-
-  yarn_dir_prefix="$(curl "http://$url/api/v1/clusters/$cluster/configurations?type=yarn-site&tag=$site_ver" \
-	-s -H 'X-Requested-By: X-Requested-By' -u $userpass \
-  | grep $yarn_timeline_prop)"
-
+  yarn_dir_prefix="$($PREFIX/bin/find_prop_value.sh $prop yarn \
+	$MGMT_NODE:$MGMT_PORT $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
   if (( $? != 0 )) || [[ -z "$yarn_dir_prefix" ]] ; then
     err "Cannot retrieve yarn dir prefix therefore cannot chown yarn timline dir"
-    err "$yarn_dir_prefix" # error msg from curl
+    err "$yarn_dir_prefix"
     return 1
   fi
+  # save just the left-most dirs in the path
+  yarn_dir_prefix="${yarn_dir_prefix%$dir_filter}"
 
-  # extract prop value (timeline prefix)
-  yarn_dir_prefix="${yarn_dir_prefix#*:}"  # just value token
-  yarn_dir_prefix="${yarn_dir_prefix%$dir_filter\",}" # remove non-prefix & ",
-  yarn_dir_prefix="${yarn_dir_prefix#*\"}" # remove leading quote
-
-  # add (if needed) and chown && chmod the dirs
-  out="$($PREFIX/bin/add_dirs.sh $yarn_dir_prefix $dirs)"
+  # add dirs (if needed) and chown && chmod the dirs
+  out="$(ssh $YARN_NODE $PREFIX/bin/add_dirs.sh $yarn_dir_prefix $dirs)"
   (( $? != 0 )) && {
     err "updating local yarn-specific dirs \"$dirs\": $out";
     return 1; }
+  debug "updated yarn local directories on $MGMT_NODE (yarn-master)"
 
-  verbose "--- updated yarn local directories on $MGMT_NODE (yarn-master)"
+  verbose "--- done setting up the yarn-master"
   return 0
 }
 
@@ -377,6 +360,7 @@ function post_processing() {
 # restart all ambari services across the cluster. Returns 1 on errors.
 # Uses globals:
 #   ACTION (append, prepend, or remove volname in core-site)
+#   CLUSTER_NAME
 #   MGMT_*
 #   PREFIX
 #   VOLMNT
@@ -393,7 +377,8 @@ function edit_core_site() {
   [[ -n "$MGMT_PORT" ]] && mgmt_port="--port $MGMT_PORT"
 
   out="$($PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE $mgmt_u $mgmt_p \
-	$mgmt_port --mountpath $VOLMNT --action $ACTION $VOLNAME --debug)"
+	$mgmt_port -c $CLUSTER_NAME --mountpath $VOLMNT --action $ACTION \
+	$VOLNAME --debug)"
   err=$?
 
   if (( err != 0 )) ; then
@@ -449,6 +434,14 @@ DEFAULT_VOL="$($PREFIX/bin/find_default_vol.sh -n $RHS_NODE)"
   warn "Cannot find configured default volume on node: $DEFAULT_VOL";
   DEFAULT_VOL=''; }
 debug "Default volume: $DEFAULT_VOL"
+
+CLUSTER_NAME="$($PREFIX/bin/find_cluster_name.sh $MGMT_NODE:$MGMT_PORT \
+	$MGMT_USER:$MGMT_PASS)"
+if (( $? != 0 )) ; then
+  err "Cannot retrieve cluster name: $CLUSTER_NAME"
+  exit 1
+fi
+debug "Cluster name: $CLUSTER_NAME"
 
 show_todo
 

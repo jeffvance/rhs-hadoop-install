@@ -14,13 +14,6 @@
 
 PREFIX="$(dirname $(readlink -f $0))"
 
-_DEBUG="off"
-USERID="admin"
-PASSWD="admin"
-PORT=":8080"
-AMBARI_HOST='localhost'
-VOLNAME=''
-
 
 # debug: execute cmd in $1 if _DEBUG is set to 'on'.
 # Uses globals:
@@ -35,18 +28,19 @@ function usage() {
   cat <<EOF
 
 Usage: set_glusterfs_uri.sh [-u <ambari-user>] [-p <password>] \\
-         [-h <ambari-host>] [--port <port>] --mountpath <path> \\
-         --action <verb> <VOLNAME>
+         [-h <ambari-host>] [--port <port>] [-c <cluster-name>] \\
+         --mountpath <path> --action <verb> <VOLNAME>
 
-ambari-user: Optional. Ambari user ID. Default is "admin".
-password   : Optional. Ambari password. Default is "admin".
-ambari-host: Optional. Ambari host name. Default is localhost.
-port       : Optional. Port number for Ambari server. Default is '8080'.
-path       : Required. Mount path for the volume when the action is prepend or
-             append. Not used for the removee action.
-verb       : Required. action to perform to property value:
-             prepend|append|remove.
-VOLNAME    : Required. RHS volume to be enabled/disabled.
+ambari-user : Optional. Ambari user ID. Default is "admin".
+password    : Optional. Ambari password. Default is "admin".
+ambari-host : Optional. Ambari host name. Default is localhost.
+cluster-name: Optional. The name of the current cluster.
+port        : Optional. Port number for Ambari server. Default is '8080'.
+path        : Required. Mount path for the volume when the action is prepend or
+              append. Not used for the removee action.
+verb        : Required. action to perform to property value:
+              prepend|append|remove.
+VOLNAME     : Required. RHS volume to be enabled/disabled.
 
 EOF
   exit 1
@@ -56,6 +50,7 @@ EOF
 # following globals:
 #   ACTION
 #   AMBARI_HOST
+#   CLUSTER_NAME
 #   _DEBUG
 #   DEBUG
 #   MOUNTPATH
@@ -65,7 +60,7 @@ EOF
 #   VOLNAME
 function parse_cmd() {
 
-  local OPTIONS='u:p:h:'
+  local OPTIONS='u:p:h:c:'
   local LONG_OPTS='port:,mountpath:,action:,help,debug'
 
   local args=$(getopt -n "$SCRIPT" -o $OPTIONS --long $LONG_OPTS -- $@)
@@ -96,6 +91,10 @@ function parse_cmd() {
 	;;
 	--debug)
 		DEBUG=true; _DEBUG="on"; shift; continue
+	;;
+	-c)
+		CLUSTER_NAME="$2"
+		shift 2; continue
 	;;
 	-u)
 		USERID="$2"
@@ -165,18 +164,27 @@ function restartService() {
 ## ** main ** ##
 
 # defaults (global variables)
-DEBUG=false
 SCRIPT=$0
+DEBUG=false
+_DEBUG="off"
+USERID="admin"
+PASSWD="admin"
+PORT=":8080"
+AMBARI_HOST='localhost'
+VOLNAME=''
+CLUSTER_NAME=''
 
 parse_cmd $@ || exit -1
 
 AMBARIURL="http://$AMBARI_HOST$PORT"
 debug echo "########## AMBARIURL = $AMBARIURL"
 
-CLUSTER_NAME="$(
+if [[ -z "$CLUSTER_NAME" ]] ; then
+  CLUSTER_NAME="$(
 	$PREFIX/find_cluster_name.sh $AMBARIURL "$USERID:$PASSWD")" || {
-  echo "$CLUSTER_NAME"; # contains error msg
-  exit 1; }
+    echo "$CLUSTER_NAME"; # contains error msg
+    exit 1; }
+fi
 debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
 
 PORT="$(echo "$PORT" | sed 's/[\"\,\:\ ]//g')"
