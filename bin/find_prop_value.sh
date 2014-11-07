@@ -30,7 +30,7 @@ fi
 
 if [[ -z "$tag" ]] ; then
   tag="$($PREFIX/find_site_tag.sh $site $url "$userpass" $cluster)" || {
-    echo "Could not get cluster \"$cluster\" tag: $tag"; # contains error msg
+    echo "Could not get cluster \"$cluster\" tag for ${site}-site: $tag";
     exit 1; }
 fi
 

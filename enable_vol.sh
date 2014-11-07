@@ -224,18 +224,18 @@ function setup_yarn() {
   # set yarn/timeline dir with correct owner and perms
   debug "update yarn local directories on $MGMT_NODE (yarn-master)..."
 
-  yarn_dir_prefix="$($PREFIX/bin/find_prop_value.sh $prop yarn \
+  dir_prefix="$($PREFIX/bin/find_prop_value.sh $prop yarn \
 	$MGMT_NODE:$MGMT_PORT $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
-  if (( $? != 0 )) || [[ -z "$yarn_dir_prefix" ]] ; then
-    err "Cannot retrieve yarn dir prefix therefore cannot chown yarn timline dir"
-    err "$yarn_dir_prefix"
+  if (( $? != 0 )) || [[ -z "$dir_prefix" ]] ; then
+    err "Cannot retrieve yarn dir path therefore cannot chown yarn timline dir"
+    err "$dir_prefix"
     return 1
   fi
   # save just the left-most dirs in the path
-  yarn_dir_prefix="${yarn_dir_prefix%$dir_filter}"
+  dir_prefix="${dir_prefix%$dir_filter}"
 
   # add dirs (if needed) and chown && chmod the dirs
-  out="$(ssh $YARN_NODE $PREFIX/bin/add_dirs.sh $yarn_dir_prefix $dirs)"
+  out="$(ssh $YARN_NODE $PREFIX/bin/add_dirs.sh $dir_prefix $dirs)"
   (( $? != 0 )) && {
     err "updating local yarn-specific dirs \"$dirs\": $out";
     return 1; }
