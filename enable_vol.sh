@@ -206,11 +206,9 @@ function show_todo() {
 #   YARN_NODE
 function setup_yarn() {
 
-  local out; local err; local dir_prefix; local dir
-  local yarn_dir='yarn/' # this and all dirs below
+  local out; local err; local dir
   local yarn_owner='yarn:hadoop'; local yarn_perms='0755'
   local yarn_timeline_prop='yarn.timeline-service.leveldb-timeline-store.path'
-  local dir_filter='/yarn/timeline/leveldb-timeline-store.ldb'
 
   if (( ! YARN_INSIDE )) ; then # yarn node is not a rhs node, so need vol mnt
     verbose "--- setting up the yarn-master: $YARN_NODE..."
@@ -227,18 +225,16 @@ function setup_yarn() {
   # set yarn/timeline dir with correct owner and perms
   debug "update yarn local directories on $YARN_NODE (yarn-master)..."
 
-  dir_prefix="$($PREFIX/bin/find_prop_value.sh $yarn_timeline_prop yarn \
+  dir="$($PREFIX/bin/find_prop_value.sh $yarn_timeline_prop yarn \
 	$MGMT_NODE:$MGMT_PORT $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
-  if (( $? != 0 )) || [[ -z "$dir_prefix" ]] ; then
-    err "Cannot retrieve yarn dir path therefore cannot chown yarn timline dir"
-    err "$dir_prefix"
+  if (( $? != 0 )) || [[ -z "$dir" ]] ; then
+    err "Cannot retrieve yarn dir path therefore cannot chown local yarn dir"
+    err "$dir"
     return 1
   fi
-  # save just the left-most dirs in the path
-  dir_prefix="${dir_prefix%$dir_filter}"
+  dir="$(dirname $dir)" # save just the left-most dirs in the path
 
   # chown -R && chmod -R the yarn dir 
-  dir="$dir_prefix/$yarn_dir"
   out="$(ssh $YARN_NODE "chown -R $yarn_owner $dir 2>&1 && \
 			 chmod -R $yarn_perms $dir 2>&1")"
   (( $? != 0 )) && {
