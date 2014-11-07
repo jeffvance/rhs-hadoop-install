@@ -206,7 +206,7 @@ function show_todo() {
 function setup_yarn() {
 
   local out; local err; local dir_prefix
-  local dirs='yarn:0755:yarn yarn/timeline:0755:yarn'
+  local dirs='yarn:0755:yarn yarn/timeline:0755:yarn' "<dir>:<perm>:<owner>"
   local yarn_timeline_prop='yarn.timeline-service.leveldb-timeline-store.path'
   local dir_filter='/yarn/timeline/leveldb-timeline-store.ldb'
 
