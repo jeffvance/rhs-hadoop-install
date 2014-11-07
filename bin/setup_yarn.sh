@@ -1,15 +1,21 @@
 #!/bin/bash
 #
 # setup_yarn.sh setup this node (localhost), expected to be the yarn-master
-# node, using the passed-in volume name. So far this includes creating the
-# glusterfs-fuse mount.
+# node, using the passed-in volume name and volume mount. So far this includes
+# creating the glusterfs-fuse mount.
+# Note: volume mount was added so that passwordless ssh from localhost (yarn-
+#   node) to the -n node (rhs-node) is not required.
 # Syntax:
 #   $1=volume name (required).
+#   $2=volume mount which includes the volname (required).
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
 
 PREFIX="$(dirname $(readlink -f $0))"
 errcnt=0
+
+source $PREFIX/functions # for function calls below
+
 
 # yarn_mount: if the yarn node does not already have VOLNAME mounted then
 # append the glusterfs-fuse volume mount to fstab and mount it. Note: since
@@ -29,7 +35,6 @@ function yarn_mount() {
     yum -y install $fuse_rpm 2>&1
   fi
 
-  source $PREFIX/functions # for function call below
   gluster_mnt_vol $RHS_NODE $VOLNAME $VOLMNT
   err=$?
 
@@ -61,13 +66,10 @@ VOLNAME="$1"
   echo "Syntax error: volume name is required";
   exit -1; }
 
-[[ -n "$RHS_NODE" ]] && RHS_NODE_OPT="-n $RHS_NODE" || RHS_NODE_OPT=''
-
-# get volume mount
-VOLMNT="$($PREFIX/find_volmnt.sh $RHS_NODE_OPT $VOLNAME)" # includes volname
+VOLMNT="$2"
 [[ -z "$VOLMNT" ]] && {
-  echo "ERROR: $VOLNAME not mounted (on $RHS_NODE)";
-  exit 1; }
+  echo "Syntax error: volume mount is required";
+  exit -1; }
 
 # set up a glusterfs-fuse mount for the volume if it's not already mounted
 yarn_mount || ((errcnt++))

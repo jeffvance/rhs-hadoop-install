@@ -200,19 +200,22 @@ function show_todo() {
 #   MGMT_*
 #   PREFIX
 #   RHS_NODE
+#   VOLMNT
 #   VOLNAME
 #   YARN_INSIDE
 #   YARN_NODE
 function setup_yarn() {
 
-  local out; local err; local dir_prefix
-  local dirs='yarn:0755:yarn yarn/timeline:0755:yarn' # "<dir>:<perm>:<owner>"
+  local out; local err; local dir_prefix; local dir
+  local yarn_dir='yarn/' # this and all dirs below
+  local yarn_owner='yarn:hadoop'; local yarn_perms='0755'
   local yarn_timeline_prop='yarn.timeline-service.leveldb-timeline-store.path'
   local dir_filter='/yarn/timeline/leveldb-timeline-store.ldb'
 
   if (( ! YARN_INSIDE )) ; then # yarn node is not a rhs node, so need vol mnt
     verbose "--- setting up the yarn-master: $YARN_NODE..."
-    out="$(ssh $YARN_NODE $PREFIX/bin/setup_yarn.sh -n $RHS_NODE $VOLNAME)"
+    out="$(ssh $YARN_NODE $PREFIX/bin/setup_yarn.sh -n $RHS_NODE \
+	$VOLNAME $VOLMNT)"
     err=$?
     if (( err != 0 )) ; then
       err $err "setup_yarn on $YARN_NODE: $out"
@@ -222,9 +225,9 @@ function setup_yarn() {
   fi
 
   # set yarn/timeline dir with correct owner and perms
-  debug "update yarn local directories on $MGMT_NODE (yarn-master)..."
+  debug "update yarn local directories on $YARN_NODE (yarn-master)..."
 
-  dir_prefix="$($PREFIX/bin/find_prop_value.sh $prop yarn \
+  dir_prefix="$($PREFIX/bin/find_prop_value.sh $yarn_timeline_prop yarn \
 	$MGMT_NODE:$MGMT_PORT $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
   if (( $? != 0 )) || [[ -z "$dir_prefix" ]] ; then
     err "Cannot retrieve yarn dir path therefore cannot chown yarn timline dir"
@@ -234,12 +237,14 @@ function setup_yarn() {
   # save just the left-most dirs in the path
   dir_prefix="${dir_prefix%$dir_filter}"
 
-  # add dirs (if needed) and chown && chmod the dirs
-  out="$(ssh $YARN_NODE $PREFIX/bin/add_dirs.sh $dir_prefix $dirs)"
+  # chown -R && chmod -R the yarn dir 
+  dir="$dir_prefix/$yarn_dir"
+  out="$(ssh $YARN_NODE "chown -R $yarn_owner $dir 2>&1 && \
+			 chmod -R $yarn_perms $dir 2>&1")"
   (( $? != 0 )) && {
-    err "updating local yarn-specific dirs \"$dirs\": $out";
+    err "chown/chmod local yarn dir \"$dir\": $out";
     return 1; }
-  debug "updated yarn local directories on $MGMT_NODE (yarn-master)"
+  debug "chown/chmod local yarn dir \"$dir\" on $YARN_NODE (yarn-master)"
 
   verbose "--- done setting up the yarn-master"
   return 0
