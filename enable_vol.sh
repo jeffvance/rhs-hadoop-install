@@ -304,20 +304,22 @@ function setup_multi_tenancy() {
   return 0
 }
 
-# post_processing: create the distributed hadoop directories that need to be
-# added after the Ambari services have been started, and copy some jar files.
-# Returns 1 on errors.
+# post_processing: do all post-ambari install steps. This includes creating 
+# some distributed dirs, fixing owner/perms on other dirs, coping some jar 
+# and tar files... Mostly done on the yarn node. Returns 1 on errors.
 # Uses globals:
 #   PREFIX
 #   RHS_NODE
 #   VOLMNT (includes volname)
 #   VOLNAME
+#   YARN_NODE
 function post_processing() {
 
-  local err; local ssh; local out; local f; local warncnt=0; local cnt=0
+  local err; local ssh; local out; local warncnt=0
   local src_dir='/usr/share/HDP-webhcat'
   local cp_files="/usr/lib/hadoop-mapreduce/hadoop-streaming-*.jar $src_dir/pig.tar.gz $src_dir/hive.tar.gz"
   local tgt_dir="$VOLMNT/apps/webhcat"
+  local owner='hcat:hadoop'; local perms='0755'
 
   verbose "--- adding post-processing hadoop directories for $VOLNAME..."
   [[ "$RHS_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $RHS_NODE"
@@ -334,29 +336,41 @@ function post_processing() {
   verbose "--- added post-processing hadoop directories for $VOLNAME"
 
   # now copy select jar and tar files
-  if [[ ! -d "$src_dir" ]] ; then # webhcat not installed, so we're done
-    debug "$src_dir missing, service not installed, no copy needed"
+  if ! ssh $YARN_NODE "[[ -d $src_dir ]]" ; then # webhcat not installed
+    debug "$src_dir missing on $YARN_NODE, service not installed, no copy needed"
     return 0
   fi
   
   verbose "--- copying jar and tar files as needed..."
-  [[ ! -d "$tgt_dir" ]] && {
-    err "$tgt_dir target dir missing, cannot copy post-processing jar files";
-    return 1; }
+  if ! ssh $YARN_NODE "[[ -d "$tgt_dir" ]]" ; then
+    err "$tgt_dir target dir missing on $YARN_NODE, cannot copy post-processing jar and tar files"
+    return 1
+  fi
 
-  for f in $cp_files; do
-      debug "cp $f $tgt_dir"
-      out="$(cp $f $tgt_dir 2>&1)"
-      err=$?
-      if (( err != 0 )) ; then
-	((warncnt++))
-	debug "warn: cp error $err: $out"
-      else
-	((cnt++))
-      fi
-  done
+  out="$(ssh $YARN_NODE "
+	     warncnt=0
+	     for f in $cp_files; do
+		 echo \"cp \$f $tgt_dir\"
+		 cp \$f $tgt_dir 2>&1
+		 err=\$?
+		 (( err != 0 )) && {
+		   ((warncnt++));
+		   echo \"warn: copy error: \$err\"; }
+	     done
+	     chmod -R $perms $tgt_dir && chown -R $owner $tgt_dir
+	     err=\$?
+	     (( err != 0 )) && {
+	       ((warncnt++));
+	       echo \"warn: chmod/chown error: \$err\"; }
+	     exit $warncnt
+	")"
+  warncnt=$?
 
-  verbose "--- copied $cnt jar and/or tar files with $warncnt warnings"
+  verbose "--- copied jar and/or tar files with $warncnt warnings"
+
+  # do post-ambari install setup on the yarn node
+  setup_yarn || return 1
+
   return 0
 }
 
@@ -452,9 +466,6 @@ show_todo
 # prompt to continue before any changes are made...
 (( ! AUTO_YES )) && ! yesno "Enabling volume $VOLNAME. Continue? [y|N] " && \
   exit 0
-
-# do post-ambari install setup on the yarn node
-setup_yarn || exit 1
 
 # verify nodes spanned by the volume are ready for hadoop workloads, and if
 # not prompt user to fix problems.
