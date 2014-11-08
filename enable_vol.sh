@@ -314,7 +314,7 @@ function setup_multi_tenancy() {
 #   VOLNAME
 function post_processing() {
 
-  local err; local ssh; local out; local f; local warncnt=0
+  local err; local ssh; local out; local f; local warncnt=0; local cnt=0
   local src_dir='/usr/share/HDP-webhcat'
   local cp_files="/usr/lib/hadoop-mapreduce/hadoop-streaming-*.jar $src_dir/pig.tar.gz $src_dir/hive.tar.gz"
   local tgt_dir="$VOLMNT/apps/webhcat"
@@ -324,7 +324,7 @@ function post_processing() {
 
   # add the required post-processing hadoop dirs
   out="$(eval "$ssh $PREFIX/bin/add_dirs.sh $VOLMNT \
-		$($PREFIX/bin/gen_dirs.sh -p)")"
+		    $($PREFIX/bin/gen_dirs.sh -p)")"
   err=$?
   if (( err != 0 )) ; then
     err $err "could not add required hadoop dirs: $out"
@@ -348,12 +348,15 @@ function post_processing() {
       debug "cp $f $tgt_dir"
       out="$(cp $f $tgt_dir 2>&1)"
       err=$?
-      (( err != 0 )) && {
-	((warncnt++));
-	debug "warn: cp error $err: $out"; }
+      if (( err != 0 )) ; then
+	((warncnt++))
+	debug "warn: cp error $err: $out"
+      else
+	((cnt++))
+      fi
   done
 
-  verbose "--- copied jar files with $warncnt warnings"
+  verbose "--- copied $cnt jar and/or tar files with $warncnt warnings"
   return 0
 }
 
