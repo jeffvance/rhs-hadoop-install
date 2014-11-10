@@ -304,50 +304,50 @@ function setup_multi_tenancy() {
   return 0
 }
 
-# post_processing: do all post-ambari install steps. This includes creating 
-# some distributed dirs, fixing owner/perms on other dirs, coping some jar 
-# and tar files... Mostly done on the yarn node. Returns 1 on errors.
+# copy_hcat_files: if the hcat service is enabled then determine which node it
+# resides on, and copy select jar/tar files to that node.
 # Uses globals:
-#   PREFIX
-#   RHS_NODE
-#   VOLMNT (includes volname)
-#   VOLNAME
-#   YARN_NODE
-function post_processing() {
+#   CLUSTER_NAME
+#   MGMT_*
+#   VOLMNT
+function copy_hcat_files() {
 
-  local err; local ssh; local out; local warncnt=0
+  local hcat_node; local warncnt=0; local out
   local src_dir='/usr/share/HDP-webhcat'
   local cp_files="/usr/lib/hadoop-mapreduce/hadoop-streaming-*.jar $src_dir/pig.tar.gz $src_dir/hive.tar.gz"
   local tgt_dir="$VOLMNT/apps/webhcat"
   local owner='hcat:hadoop'; local perms='0755'
 
-  verbose "--- adding post-processing hadoop directories for $VOLNAME..."
-  [[ "$RHS_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $RHS_NODE"
+  verbose "--- copying webhcat related jar and tar files as needed..."
 
-  # add the required post-processing hadoop dirs
-  out="$(eval "$ssh $PREFIX/bin/add_dirs.sh $VOLMNT \
-		    $($PREFIX/bin/gen_dirs.sh -p)")"
-  err=$?
-  if (( err != 0 )) ; then
-    err $err "could not add required hadoop dirs: $out"
-    return 1
-  fi
-  debug "add_dirs -p $VOLMNT: $out"
-  verbose "--- added post-processing hadoop directories for $VOLNAME"
+  # determine which node is running the hcat/webhcat service
+  hcat_node="$(curl "http://$MGMT_NODE:$MGMT_PORT/api/v1/clusters/$CLUSTER_NAME/services/WEBHCAT/components/WEBHCAT_SERVER" \
+	-s -H 'X-Requested-By: X-Requested-By' -u $MGMT_USER:$MGMT_PASS | \
+	grep host_name)"
+  (( $? != 0 )) || [[ -z "$hcat_node" ]] && {
+    debug "webhcat service not enabled, no copy needed: $hcat_node";
+    return 0; }
 
-  # now copy select jar and tar files
-  if ! ssh $YARN_NODE "[[ -d $src_dir ]]" ; then # webhcat not installed
-    debug "$src_dir missing on $YARN_NODE, service not installed, no copy needed"
+  # extract just the host name value
+  hcat_node="${hcat_node#*: }"  # just value token
+  hcat_node="${hcat_node%,}"    # remove trailing comma, if any
+  hcat_node="${hcat_node//\"/}" # remove quotes
+  [[ -z "$hcat_node" ]] && {
+    err "webhcat service host_name missing, copy cannot be done";
+    return 1; }
+  debug "webhcat service node is $hcat_node"
+
+  if ! ssh $hcat_node "[[ -d $src_dir ]]" ; then # webhcat not installed
+    debug "$src_dir missing on $hcat_node, copy cannot be done"
     return 0
   fi
   
-  verbose "--- copying jar and tar files as needed..."
-  if ! ssh $YARN_NODE "[[ -d "$tgt_dir" ]]" ; then
-    err "$tgt_dir target dir missing on $YARN_NODE, cannot copy post-processing jar and tar files"
+  if ! ssh $hcat_node "[[ -d "$tgt_dir" ]]" ; then
+    err "$tgt_dir target dir missing on $hcat_node, cannot copy post-processing jar and tar files"
     return 1
   fi
 
-  out="$(ssh $YARN_NODE "
+  out="$(ssh $hcat_node "
 	     warncnt=0
 	     for f in $cp_files; do
 		 echo \"cp \$f $tgt_dir\"
@@ -365,8 +365,40 @@ function post_processing() {
 	     exit \$warncnt
 	")"
   warncnt=$?
+  debug "on node $hcat_node: copied jar and/or tar files with $warncnt warnings: $out"
 
-  verbose "--- copied jar and/or tar files with $warncnt warnings"
+  verbose "--- copyied webhcat related jar and tar files as needed"
+  return 0
+}
+
+# post_processing: do all post-ambari install steps. This includes creating 
+# some distributed dirs, fixing owner/perms on other dirs, coping some jar 
+# and tar files... Mostly done on the yarn node. Returns 1 on errors.
+# Uses globals:
+#   PREFIX
+#   RHS_NODE
+#   VOLMNT (includes volname)
+#   VOLNAME
+function post_processing() {
+
+  local err; local ssh; local out
+
+  verbose "--- adding post-processing hadoop directories for $VOLNAME..."
+  [[ "$RHS_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $RHS_NODE"
+
+  # add the required post-processing hadoop dirs
+  out="$(eval "$ssh $PREFIX/bin/add_dirs.sh $VOLMNT \
+		    $($PREFIX/bin/gen_dirs.sh -p)")"
+  err=$?
+  if (( err != 0 )) ; then
+    err $err "could not add required hadoop dirs: $out"
+    return 1
+  fi
+  debug "add_dirs -p $VOLMNT: $out"
+  verbose "--- added post-processing hadoop directories for $VOLNAME"
+
+  # if hcat service installed, copy select jar and tar files
+  copy_hcat_files || return 1
 
   # do post-ambari install setup on the yarn node
   setup_yarn || return 1
