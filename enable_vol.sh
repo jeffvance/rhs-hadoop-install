@@ -362,7 +362,7 @@ function post_processing() {
 	     (( err != 0 )) && {
 	       ((warncnt++));
 	       echo \"warn: chmod/chown error: \$err\"; }
-	     exit $warncnt
+	     exit \$warncnt
 	")"
   warncnt=$?
 
