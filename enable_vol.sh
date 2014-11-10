@@ -357,6 +357,7 @@ function copy_hcat_files() {
 		   ((warncnt++));
 		   echo \"warn: copy error: \$err\"; }
 	     done
+	     echo \"chmod -R $perms $tgt_dir && chown -R $owner $tgt_dir\"
 	     chmod -R $perms $tgt_dir && chown -R $owner $tgt_dir
 	     err=\$?
 	     (( err != 0 )) && {
@@ -367,7 +368,7 @@ function copy_hcat_files() {
   warncnt=$?
   debug "on node $hcat_node: copied jar and/or tar files with $warncnt warnings: $out"
 
-  verbose "--- copyied webhcat related jar and tar files as needed"
+  verbose "--- copied webhcat related jar and tar files as needed"
   return 0
 }
 
