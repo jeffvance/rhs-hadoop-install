@@ -309,6 +309,7 @@ function setup_multi_tenancy() {
 # Uses globals:
 #   CLUSTER_NAME
 #   MGMT_*
+#   PREFIX
 #   VOLMNT
 function copy_hcat_files() {
 
@@ -321,25 +322,17 @@ function copy_hcat_files() {
   verbose "--- copying webhcat related jar and tar files as needed..."
 
   # determine which node is running the hcat/webhcat service
-  hcat_node="$(curl "http://$MGMT_NODE:$MGMT_PORT/api/v1/clusters/$CLUSTER_NAME/services/WEBHCAT/components/WEBHCAT_SERVER" \
-	-s -H 'X-Requested-By: X-Requested-By' -u $MGMT_USER:$MGMT_PASS | \
-	grep host_name)"
-  (( $? != 0 )) || [[ -z "$hcat_node" ]] && {
-    debug "webhcat service not enabled, no copy needed: $hcat_node";
-    return 0; }
-
-  # extract just the host name value
-  hcat_node="${hcat_node#*: }"  # just value token
-  hcat_node="${hcat_node%,}"    # remove trailing comma, if any
-  hcat_node="${hcat_node//\"/}" # remove quotes
-  [[ -z "$hcat_node" ]] && {
-    err "webhcat service host_name missing, copy cannot be done";
-    return 1; }
+  hcat_node="$($PREFIX/bin/find_service_node.sh WEBHCAT WEBHCAT_SERVER \
+	$MGMT_NODE:$MGMT_PORT $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
+  if (( $? != 0)) || [[ -z "$hcat_node" ]]; then
+    debug "cannot find WEBHCAT service node, copy cannot be done: $hcat_node"
+    return 0 # not an error
+  fi
   debug "webhcat service node is $hcat_node"
 
   if ! ssh $hcat_node "[[ -d $src_dir ]]" ; then # webhcat not installed
     debug "$src_dir missing on $hcat_node, copy cannot be done"
-    return 0
+    return 1
   fi
   
   if ! ssh $hcat_node "[[ -d "$tgt_dir" ]]" ; then
