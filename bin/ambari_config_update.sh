@@ -168,20 +168,28 @@ function parse_cmd() {
 }
 
 # removeValue: remove arg2 from the passed-in string, arg1, and output the new
-# arg1 string.
+# arg1 string. The arg1 value may be a list of tokens with each token separated
+# by a single comma (not space).
 # Note: leading, trailing and double commas are also removed from the string 
 #   being output.
-# arg1=string in which arg2 is removed.
+# Note: implementation does not support blanks within any token value.
+# arg1=string from which the arg2 string is removed.
 function removeValue() {
 
   local str="$1"; local rmStr="$2"
+  local s; local i=0; local rtn=''
 
-  str="${str/$rmStr/}" # remove arg2 from arg1
-  str="${str#,}"       # remove leading comma, if any
-  str="${str%,}"       # remove trailing comma, if any
-  str="${str/,,/,}"    # fold double commas to single, if any
+  str=(${str//,/ }) # split into array
+  for s in ${str[@]}; do
+      if [[ "$s" == "$rmStr" ]] ; then
+	unset str[$i] # remove arg2 value from str
+      else
+	rtn+="$s,"
+      fi
+      ((i++))
+  done
 
-  echo "$str"
+  echo "${rtn%,}" # don't echo trailing comma
 }
 
 # doUpdate: updates the PROPERTY in SITETAG. Returns 1 on errors.
@@ -222,7 +230,7 @@ function doUpdate() {
       echo "WARN: $configkey missing in $SITE, action changed from '$mode' to 'add'";
       mode='add'; }
   elif [[ "$mode" == 'add' ]] ; then
-    echo "WARN: existing $configkey in $SITE will be overwritten: $line"
+    echo "WARN: existing \"$configkey\" value in $SITE will be overwritten"
     mode='replace'
   fi
 
@@ -246,7 +254,14 @@ function doUpdate() {
 	  new_value="$configvalue"
       ;;
       delete) # delete key from tmp file
-	sed -i "/\"$configkey\" :/d" $tmp_cfg
+	sed -i "/\"$configkey\" :/d" $tmp_cfg # inline delete
+	# handle case of deleted key was the last line therfore the new last
+	# line has a trailing comma which is malformed xml.
+        # Note: the eof-1 record is the line to check for a trailing comma.
+	local rec="$(wc -l $tmp_cfg)" # eof
+	rec=${rec% *} # remove filename
+	((rec--)) # 2nd to last line
+	sed -i "$rec s/,$//" $tmp_cfg # inline edit
       ;;
       prepend)
 	# in case configvalue is present in old_value, remove it
@@ -268,9 +283,8 @@ function doUpdate() {
   esac
 
   # fix up the "property" section for the PUT below:
-  # update new configvalue in place, unless add or delete modes
   if [[ -n "$new_value" ]] ; then
-    [[ ",$old_value," =~ ",$new_value," ]] && {
+    [[ "$old_value" == "$new_value" ]] && {
       echo "WARN: no change in '$configkey' value: '$old_value', skipping...";
       return 0; }
     debug echo "########## new config value for $configkey = $new_value"
