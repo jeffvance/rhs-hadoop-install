@@ -424,7 +424,7 @@ function check_bin_dir() {
 # Assumption: the list of passed-in nodes is *unique*, that way the output has
 #   only 1 ip-addr as the value of each node.
 # Sets globals:
-#   NODE_IPS() # assoc array: key=hostname, value=ip-addr
+#   NODE_IPS() # assoc array: index=hostname, value=ip-addr
 function nodes_to_ips() {
 
   local nodes="$@"
