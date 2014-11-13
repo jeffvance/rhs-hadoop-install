@@ -106,9 +106,13 @@ function parse_cmd() {
   [[ -z "$VOLNAME" ]] && {
     echo "Syntax error: volume name is required";
     ((errcnt++)); }
+
   [[ -z "$VOLMNT" ]] && {
     echo "Syntax error: volume mount path prefix is required";
     ((errcnt++)); }
+  # remove trailing / from volmnt if present
+  VOLMNT=${VOLMNT%/}
+
   if [[ -z "$NODE_SPEC" ]] || (( ${#NODE_SPEC[@]} < 2 )) ; then
     echo "Syntax error: expect list of 2 or more nodes plus brick mount(s)"
     ((errcnt++))
@@ -131,12 +135,15 @@ function parse_nodes_brkmnts() {
 
   local node_spec=(${NODE_SPEC[0]//:/ }) # split after subst ":" with space
   local def_brkmnt=${node_spec[1]} # default
-  local node; local all_mnts=()
+  local node; local all_mnts=(); local brkmnt
 
   if [[ -z "$def_brkmnt" ]] ; then
     echo "Syntax error: expect a brick mount, preceded by a \":\", to immediately follow the first node"
     return 1
   fi
+
+  # remove trailing / if present in default brkmnt
+  def_brkmnt="${def_brkmnt%/}"
 
   # fill in missing brk-mnts
   for node_spec in ${NODE_SPEC[@]}; do
@@ -146,7 +153,8 @@ function parse_nodes_brkmnts() {
 	     BRKMNTS[$node]+="$def_brkmnt "
           ;;
 	  1) # brkmnt specified
-	     BRKMNTS[$node]+="${node_spec#*:} "
+	     brkmnt="${node_spec#*:}"; brkmnt="${brkmnt%/}"; # no trailing /
+	     BRKMNTS[$node]+="$brkmnt "
           ;;
           *) 
 	     echo "Syntax error: improperly specified nodes-spec-list"

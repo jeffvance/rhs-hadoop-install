@@ -197,12 +197,15 @@ function parse_nodes_brkmnts_blkdevs() {
   local node_spec=(${NODE_SPEC[0]//:/ }) # split after subst ":" with space
   local def_brkmnt=${node_spec[1]} # default
   local def_blkdev=${node_spec[2]} # default
-  local brkmnts=(); local blkdev
+  local brkmnts=(); local blkdev; local brkmnt
 
   if [[ -z "$def_brkmnt" || -z "$def_blkdev" ]] ; then
     echo -e "Syntax error: expect a brick mount and block device to immediately follow the\nfirst node (each separated by a \":\")"
     return 1
   fi
+
+  # remove trailing / if present in default brkmnt
+  def_brkmnt="${def_brkmnt%/}"
 
   # parse out list of nodes, format: "node[:brick-mnt][:blk-dev]"
   for node_spec in ${NODE_SPEC[@]}; do
@@ -214,8 +217,9 @@ function parse_nodes_brkmnts_blkdevs() {
              NODE_BLKDEVS[$node]+="$def_blkdev,"
           ;;
           1) # only brkmnt specified
+	     brkmnt="${node_spec#*:}"; brkmnt="${brkmnt%/}"; # no trailing /
+             NODE_BRKMNTS[$node]+="$brkmnt,"
              NODE_BLKDEVS[$node]+="$def_blkdev,"
-             NODE_BRKMNTS[$node]+="${node_spec#*:},"
           ;;
           2) # either both brkmnt and blkdev specified, or just blkdev specified
              blkdev="${node_spec##*:}"
@@ -224,7 +228,8 @@ function parse_nodes_brkmnts_blkdevs() {
              if [[ "${brkmnts[1]}" == "$blkdev" ]] ; then # "::", empty brkmnt
                NODE_BRKMNTS[$node]+="$def_brkmnt,"
              else
-               NODE_BRKMNTS[$node]+="${brkmnts[1]},"
+	       brkmnt="${brkmnts[1]}"; brkmnt="${brkmnt%/}"; # no trailing /
+               NODE_BRKMNTS[$node]+="$brkmnt,"
              fi
           ;;
           *)
@@ -239,8 +244,8 @@ function parse_nodes_brkmnts_blkdevs() {
 
   # remove last trailing comma from each node's brk/blk value
   for node in ${NODES[@]}; do
-      NODE_BRKMNTS[$node]=${NODE_BRKMNTS[$node]%*,}
-      NODE_BLKDEVS[$node]=${NODE_BLKDEVS[$node]%*,}
+      NODE_BRKMNTS[$node]=${NODE_BRKMNTS[$node]%,}
+      NODE_BLKDEVS[$node]=${NODE_BLKDEVS[$node]%,}
   done
 
   return 0
