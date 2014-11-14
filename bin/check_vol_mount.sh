@@ -67,7 +67,7 @@ function check_vol_mnt_attrs() {
     pid=($(ssh $node "ps -ef | grep 'glusterfs --.*$VOLNAME' | grep -v grep"))
     pid=${pid[1]} # extract glusterfs pid, 2nd field
     [[ -z "$pid" ]] && {
-      echo "ERROR: glusterfs client process not running";
+      echo "ERROR: glusterfs process not running. $VOLNAME may not be mounted";
       return 1; }
 
     # generate gluster state file
@@ -101,17 +101,22 @@ function check_vol_mnt_attrs() {
 
     local node="$1"
     local mntopts; local cnt
+    local tmpfstab="$(mktemp --suffix _fstab)"
 
-    cnt=$(ssh $node "grep -c '$VOLNAME\s.*\sglusterfs\s' /etc/fstab")
-    (( cnt == 0 )) && {
-      echo "ERROR on $node: $VOLNAME mount missing in /etc/fstab";
-      return 1; }
+    # create tmp file containing all non-blank, non-comment records in /etc/fstab
+    ssh $node "sed '/^ *#/d;/^ *$/d;s/#.*//' /etc/fstab" >$tmpfstab
 
-    (( cnt > 1 )) && {
-      echo "ERROR on $node: $VOLNAME appears more than once in /etc/fstab";
-      return 1; }
+    cnt=$(grep -c "$VOLNAME\s.*\sglusterfs\s" $tmpfstab)
+    if (( cnt == 0 || cnt > 1 )) ; then
+      echo -n "ERROR on $node: $VOLNAME mount "
+      (( cnt == 0 )) && 
+	echo "missing in /etc/fstab." ||
+	echo "appears more than once in /etc/fstab."
+      echo "  Expect the following mount options: $CHK_MNTOPTS"
+      return 1
+    fi
     
-    mntopts="$(ssh $node "grep '$VOLNAME\s.*\sglusterfs\s' /etc/fstab")"
+    mntopts="$(grep "$VOLNAME\s.*\sglusterfs\s" $tmpfstab)"
     mntopts=${mntopts#* glusterfs }
     # call chk_mnt() and return it's rtncode
     chk_mnt "$mntopts" "$CHK_MNTOPTS" "$CHK_MNTOPTS_WARN"
