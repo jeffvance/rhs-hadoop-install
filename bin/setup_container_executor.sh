@@ -1,14 +1,17 @@
 #!/bin/sh
 #
-# setup_container_executor.sh overwrites this storage node's (localhost's)
-# hadoop specific config files for multi tennancy.
-# Exits with 1 for errors, else 0.
+# setup_container_executor.sh may overwrite this storage node's (localhost's)
+# hadoop specific config files for multi tennancy, depending on whether the
+# container-executor.cfg file has been modified (based on md5sum). In all cases
+# the container cfg files are set to be owned by root and have perms as defined
+# below. Exits with 1 for errors, else 0.
 
+create_file=1 # true
 errcnt=0
 banned_user='yarn'
 allowed_users='mapred,ambari_qa' # comma separated list
 process_group='hadoop'
-perms=6050
+perms=6050 # setuid and setgid bits are set
 task_controller='/usr/lib/hadoop-yarn/bin/container-executor'
 task_cfg='/etc/hadoop/conf/container-executor.cfg'
 
@@ -38,9 +41,10 @@ if [[ -f $task_cfg ]] ; then
   curr_md5="$(md5sum $task_cfg)" # "hash filename"
   curr_md5="${curr_md5%% *}"     # just hash
   if [[ "$curr_md5" != "$MD5SUM" ]] ; then
-    echo "$task_cfg has been previously modified and will not be over-written"
-    echo "  current md5 hash: $curr_md5, original md5: $MD5SUM"
-    exit 0
+    echo "$task_cfg has been previously modified and will not be over-written;"
+    echo "however, the owner and permissions of the file may still be set."
+    echo "Current md5 hash: $curr_md5, original md5: $MD5SUM"
+    create_file=0 # false
   else
     echo "$task_cfg file will be over-written..."
   fi
@@ -49,7 +53,7 @@ else
 fi
 
 echo "$HOSTNAME: configuring the Linux Container Executor for Hadoop"
-create_container_executor
+(( create_file )) && create_container_executor
 
 echo "$HOSTNAME: changing owner and permissions on $task_controller"
 chown root:$process_group $task_controller || ((errcnt++))
