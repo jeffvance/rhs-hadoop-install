@@ -106,9 +106,9 @@ function check_vol_mnt_attrs() {
     # create tmp file containing all non-blank, non-comment records in /etc/fstab
     ssh $node "sed '/^ *#/d;/^ *$/d;s/#.*//' /etc/fstab" >$tmpfstab
 
-    cnt=$(grep -c "$VOLNAME\s.*\sglusterfs\s" $tmpfstab)
-    if (( cnt == 0 || cnt > 1 )) ; then
-      echo -n "ERROR on $node: $VOLNAME mount "
+    cnt=$(grep -c -E "\s+$VOLMNT\s+glusterfs\s" $tmpfstab)
+    if (( cnt != 1 )) ; then
+      echo -n "ERROR on $node: $VOLMNT mount "
       (( cnt == 0 )) && 
 	echo "missing in /etc/fstab." ||
 	echo "appears more than once in /etc/fstab."
@@ -194,6 +194,13 @@ VOLNAME="$1"; shift
 
 NODES="$@" # optional list of nodes
 [[ -z "$NODES" ]] && NODES="$($PREFIX/find_nodes.sh $rhs_node $VOLNAME)" 
+
+# find volume mount
+VOLMNT="$($PREFIX/find_volmnt.sh $rhs_node $VOLNAME)"
+if (( $? != 0 )) ; then
+  echo "ERROR: $VOLNAME may not be mounted. $VOLMNT"
+  exit 1
+fi
 
 for node in $NODES; do
     ((cnt++)) # num of nodes
