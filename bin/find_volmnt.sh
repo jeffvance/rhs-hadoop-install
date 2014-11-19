@@ -31,7 +31,7 @@ else  # use supplied node
 fi
 
 out="$(eval "$ssh 
-	mnt=(\$(grep -E ":/$VOLNAME\s+.*\s+fuse.glusterfs\s" /proc/mounts)) #arry
+	mnt=(\$(grep -E \":/$VOLNAME\s+.*\s+fuse.glusterfs\s\" /proc/mounts)) #arry
 	echo \${mnt[1]} # /vol-mount-path
       $ssh_close
 ")"
