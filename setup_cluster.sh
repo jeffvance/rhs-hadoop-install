@@ -756,7 +756,7 @@ function ambari_server() {
 
 # update_yarn: yum installs the latest glusterfs client bits on the yarn node
 # if the gluster client version is older than 3.6. The yarn node is expected to
-# be a RHEL 6.5 server, but it could be a storage node. Returns 1 for errors.
+# be a RHEL 6.5+ server, but it could be a storage node. Returns 1 for errors.
 # Uses globals:
 #   YARN_INSIDE
 #   YARN_NODE
