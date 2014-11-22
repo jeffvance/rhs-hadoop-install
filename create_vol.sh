@@ -411,13 +411,14 @@ function create_vol() {
 
   # create the gluster volume, replica 2 is hard-coded for now
   out="$(ssh $FIRST_NODE "
-	    gluster volume create $VOLNAME replica $REPLICA_CNT $bricks 2>&1")"
+	gluster --mode=script volume create $VOLNAME replica $REPLICA_CNT \
+		$bricks 2>&1")"
   err=$?
   if (( err != 0 )) ; then
-    err $err "gluster vol create $VOLNAME $bricks: $out"
+    err $err "gluster volume create $VOLNAME $bricks: $out"
     return 1
   fi
-  debug "gluster vol create: $out"
+  debug "gluster volume create: $out"
   verbose "--- \"$VOLNAME\" created"
 
   verbose "--- setting performance options on $VOLNAME..."
