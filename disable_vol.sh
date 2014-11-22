@@ -26,13 +26,13 @@ $ME --version | --help
 $ME [-y] [--quiet | --verbose | --debug] \\
             [--user <ambari-admin-user>] [--pass <ambari-admin-password>] \\
             [--port <port-num>] [--hadoop-mgmt-node <node>] \\
-            [--rhs-node <node>] --yarn-master <node> \\
+            [--rhs-node <node>] [--yarn-master <node>] \\
             <volname>
 where:
 
 <volname>    : the RHS volume to be disabled for hadoop workloads.
---yarn-master: hostname or ip of the yarn-master server which is expected to
-               be outside of the storage pool.
+--yarn-master: (optional) hostname or ip of the yarn-master server. Default is
+               localhost.
 --rhs-node   : (optional) hostname of any of the storage nodes. This is needed
                in order to access the gluster command. Default is localhost
                which, must have gluster cli access.
