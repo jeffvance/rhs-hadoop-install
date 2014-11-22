@@ -6,7 +6,7 @@
 #   $@ = list of nodes expected to contain the hadoop users
 
 PREFIX="$(dirname $(readlink -f $0))"
-errcnt=0; usr_errcnt=0
+errcnt=0
 
 NODES=($@)
 (( ${#NODES[@]} < 2 )) && {
@@ -15,6 +15,8 @@ NODES=($@)
 
 for u in $($PREFIX/gen_users.sh); do # list of hadoop users
     uids=()
+    usr_errcnt=0
+
     for node in ${NODES[*]} ; do
 	[[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
 	# if user exists extract its UID
@@ -22,7 +24,7 @@ for u in $($PREFIX/gen_users.sh); do # list of hadoop users
 	err=$?
 	if (( err != 0 )) ; then
 	  ((usr_errcnt++))
-	  echo "ERROR $err: user \"$u\" missing on $node"
+	  echo "ERROR $err: user \"$u\" missing on $node: $out"
 	  continue
 	fi
 	out=(${out//:/ }) # array

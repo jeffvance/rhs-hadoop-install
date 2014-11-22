@@ -170,11 +170,11 @@ function show_todo() {
    local msg
 
   if [[ "$DEFAULT_VOL" == "$VOLNAME" ]] ; then
-    msg="will remain the default volume"
+    msg='will remain the default volume'
   elif [[ -z "$DEFAULT_VOL" || "$ACTION" == 'prepend' ]] ; then
-    msg="will become the DEFAULT volume"
+    msg='will become the DEFAULT volume'
   else
-    msg="will not be the default volume"
+    msg='will not be the default volume'
   fi
 
   echo
@@ -336,8 +336,8 @@ function copy_hcat_files() {
   fi
   
   if ! ssh $hcat_node "[[ -d "$tgt_dir" ]]" ; then
-    err "$tgt_dir target dir missing on $hcat_node, cannot copy post-processing jar and tar files"
-    return 1
+    debug "$tgt_dir target dir missing on $hcat_node, cannot copy post-processing jar and tar files"
+    return 0 # not an error
   fi
 
   out="$(ssh $hcat_node "
@@ -466,18 +466,12 @@ debug "nodes spanned by $VOLNAME: $NODES"
 # check for passwordless ssh connectivity to all nodes
 check_ssh $(uniq_nodes $MGMT_NODE $YARN_NODE $NODES) || exit 1
 
-VOLMNT="$($PREFIX/bin/find_volmnt.sh -n $RHS_NODE $VOLNAME)"  #includes volname
+VOLMNT="$($PREFIX/bin/find_volmnt.sh -n $RHS_NODE $VOLNAME)"  # includes volname
 if (( $? != 0 )) ; then
   err "$VOLNAME may not be mounted. $VOLMNT"
   exit 1
 fi
 debug "$VOLNAME mount point is $VOLMNT"
-
-DEFAULT_VOL="$($PREFIX/bin/find_default_vol.sh -n $RHS_NODE)"
-(( $? != 0 )) && {
-  warn "Cannot find configured default volume on node: $DEFAULT_VOL";
-  DEFAULT_VOL=''; }
-debug "Default volume: $DEFAULT_VOL"
 
 CLUSTER_NAME="$($PREFIX/bin/find_cluster_name.sh $MGMT_NODE:$MGMT_PORT \
 	$MGMT_USER:$MGMT_PASS)"
@@ -486,6 +480,14 @@ if (( $? != 0 )) ; then
   exit 1
 fi
 debug "Cluster name: $CLUSTER_NAME"
+
+DEFAULT_VOL="$($PREFIX/bin/find_default_vol.sh $MGMT_NODE:$MGMT_PORT \
+	$MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
+if (( $? != 0 )) ; then
+  warn "Cannot find configured default volume on node: $DEFAULT_VOL"
+  DEFAULT_VOL=''
+fi
+debug "Default volume: $DEFAULT_VOL"
 
 show_todo
 

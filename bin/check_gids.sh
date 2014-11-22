@@ -6,7 +6,7 @@
 #   $@ = list of nodes expected to contain the hadoop group(s)
 
 PREFIX="$(dirname $(readlink -f $0))"
-errcnt=0; grp_errcnt=0
+errcnt=0
 
 NODES=($@)
 (( ${#NODES[@]} < 2 )) && {
@@ -15,6 +15,7 @@ NODES=($@)
 
 for g in $($PREFIX/gen_groups.sh); do # list of hadoop groups (1 now)
     gids=()
+    grp_errcnt=0
     for node in ${NODES[*]} ; do
 	[[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
 	# if group exists extract its GID
@@ -22,7 +23,7 @@ for g in $($PREFIX/gen_groups.sh); do # list of hadoop groups (1 now)
 	err=$?
 	if (( err != 0 )) ; then
 	  ((grp_errcnt++))
-	  echo "ERROR $err: group \"$g\" missing on $node"
+	  echo "ERROR $err: group \"$g\" missing on $node: $out"
 	  continue
 	fi
 

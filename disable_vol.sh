@@ -71,6 +71,11 @@ function parse_cmd() {
   local long_opts='version,help,yarn-master:,rhs-node:,hadoop-mgmt-node:,user:,pass:,port:,verbose,quiet,debug'
   local errcnt=0
 
+  # global defaults
+  MGMT_PASS='admin'
+  MGMT_PORT=8080
+  MGMT_USER='admin'
+
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
 
   while true; do
@@ -128,26 +133,93 @@ function parse_cmd() {
   return 0
 }
 
+# show_todo: display values set by the user and discovered by disable_vol.
+# Uses globals:
+#   CLUSTER_NAME
+#   DEFAULT_VOL
+#   MGMT_NODE
+#   NEW_DFLT_VOL
+#   NODES
+#   VOLMNT
+#   VOLNAME
+#   YARN_NODE
+function show_todo() {
+
+  local msg=''
+
+  [[ "$DEFAULT_VOL" == "$VOLNAME" ]] && msg='(is the current default volume)'
+
+  echo
+  quiet "*** Volume             : $VOLNAME $msg"
+  quiet "*** Current default vol: $DEFAULT_VOL"
+  if [[ -z "$NEW_DFLT_VOL" ]] ; then
+    quiet "*** New default volume : !!! there will be no enabled Hadoop volumes !!!"
+  elif [[ "$DEFAULT_VOL" != "$NEW_DFLT_VOL" ]] ; then
+    quiet "*** New default volume : $NEW_DFLT_VOL"
+  fi
+  quiet "*** Cluster name       : $CLUSTER_NAME"
+  quiet "*** Nodes              : $(echo ${NODES[*]} | sed 's/ /, /g')"
+  quiet "*** Ambari mgmt node   : $MGMT_NODE"
+  quiet "*** Yarn-master server : $YARN_NODE"
+  echo
+}
+
+# new_default_volume: sets the global NEW_DFLT_VOL variable to "" or to the
+# name of the volume that will become the default volume if the user disables
+# the target volume. After accounting for VOLNAME, the new default vol will be
+# the first volume in the list of "fs.glusterfs.volumes" volumes.
+# Uses globals:
+#   CLUSTER_NAME
+#   DEFAULT_VOL
+#   MGMT_*
+#   PREFIX
+#   VOLNAME
+# Sets globals:
+#   NEW_DFLT_VOL
+function new_default_volume() {
+
+  local s # scratch string
+
+  NEW_DFLT_VOL="$DEFAULT_VOL" # global
+
+  if [[ "$DEFAULT_VOL" == "$VOLNAME" ]] ; then
+    NEW_DFLT_VOL="$($PREFIX/bin/find_prop_value.sh fs.glusterfs.volumes core \
+	$MGMT_NODE:$MGMT_PORT $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
+    (( $? != 0 )) && NEW_DFLT_VOL=''   # erase err msg if any
+
+    # if we have the volume list then extract the new default volname
+    if [[ -n "$NEW_DFLT_VOL" ]] ; then
+      s=",$NEW_DFLT_VOL,"     # bracket with ","
+      # remove VOLNAME from the list of vols	
+      s="${s/,$VOLNAME,/,}"   # always a comma between volnames
+      s="${s#,}"              # remove leading comma
+      NEW_DFLT_VOL="${s%%,*}" # 1st volname from new list
+    fi
+  fi
+
+  return 0
+}
+
 # edit_core_site: invoke bin/set_glusterfs_uri to edit the core-site file and
 # restart all ambari services across the cluster. Returns 1 on errors.
 # Uses globals:
+#   CLUSTER_NAME
 #   MGMT_*
 #   PREFIX
 #   VOLNAME
 function edit_core_site() {
 
-  local mgmt_node; local mgmt_u; local mgmt_p; local mgmt_port
+  local mgmt_u; local mgmt_p; local mgmt_port
   local err; local out
 
   verbose "--- disable $VOLNAME in all core-site.xml files..."
 
-  [[ -n "$MGMT_NODE" ]] && mgmt_node="-h $MGMT_NODE"
   [[ -n "$MGMT_USER" ]] && mgmt_u="-u $MGMT_USER"
   [[ -n "$MGMT_PASS" ]] && mgmt_p="-p $MGMT_PASS"
   [[ -n "$MGMT_PORT" ]] && mgmt_port="--port $MGMT_PORT"
 
-  out="$($PREFIX/bin/set_glusterfs_uri.sh $mgmt_node $mgmt_u $mgmt_p \
-	$mgmt_port --action remove $VOLNAME --debug)" 
+  out="$($PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE $mgmt_u $mgmt_p \
+	 $mgmt_port -c $CLUSTER_NAME --action remove $VOLNAME --debug)" 
   err=$?
   if (( err != 0 )) ; then
     err -e $err "unset_glusterfs_uri:\n$out"
@@ -190,24 +262,42 @@ debug "nodes spanned by $VOLNAME: ${NODES[*]}"
 # check for passwordless ssh connectivity to all nodes
 check_ssh $(uniq_nodes $MGMT_NODE $YARN_NODE $NODES) || exit 1
 
-DEFAULT_VOL="$($PREFIX/bin/find_default_vol.sh -n $RHS_NODE)"
+CLUSTER_NAME="$($PREFIX/bin/find_cluster_name.sh $MGMT_NODE:$MGMT_PORT \
+        $MGMT_USER:$MGMT_PASS)"
+if (( $? != 0 )) || [[ -z "$CLUSTER_NAME" ]] ; then
+  err "Cannot retrieve cluster name: $CLUSTER_NAME"
+  exit 1
+fi
+debug "Cluster name: $CLUSTER_NAME"
+
+DEFAULT_VOL="$($PREFIX/bin/find_default_vol.sh $MGMT_NODE:$MGMT_PORT \
+	$MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
+if (( $? != 0 )) || [[ -z "$DEFAULT_VOL" ]] ; then
+  err "Cannot find any volumes in core-site config file. $DEFAULT_VOL"
+  exit 1
+fi
 debug "Default volume: $DEFAULT_VOL"
 
-echo
-quiet "*** Volume            : $VOLNAME"
-quiet "*** Default volume    : $DEFAULT_VOL"
-quiet "*** Nodes             : $(echo ${NODES[*]} | sed 's/ /, /g')"
-quiet "*** Ambari mgmt node  : $MGMT_NODE"
-quiet "*** Yarn-master server: $YARN_NODE"
-echo
+# if the target vol is the default vol then get the new default vol
+new_default_volume # sets global NEW_DLFT_VOL
+debug "New default volume: $NEW_DFLT_VOL"
 
-msg=''
-[[ "$VOLNAME" == "$DEFAULT_VOL" ]] && msg=', which is the DEFAULT volume,'
+show_todo
 
-force -e "$VOLNAME$msg will be removed from the core-site config file and thus\n  will not be available for any hadoop workloads."
-if (( AUTO_YES )) || yesno "  Continue? [y|N] " ; then
-  edit_core_site || exit 1
+msg="$VOLNAME"
+[[ "$VOLNAME" == "$DEFAULT_VOL" ]] && msg+=', which is the DEFAULT volume,'
+msg+=' will be removed from the core-site config file and thus will not be available for any Hadoop workloads. '
+[[ -n "$NEW_DFLT_VOL" && "$NEW_DFLT_VOL" != "$DEFAULT_VOL" ]] &&
+  msg+="The new default volume will be \"$NEW_DFLT_VOL\"."
+force "$msg"
+(( ! AUTO_YES )) && ! yesno "  Continue? [y|N] " && exit 0
+
+if [[ -z "$NEW_DFLT_VOL" ]] ; then
+  force "$VOLNAME is the *only* volume enabled for Hadoop jobs. Disabling it means that no Hadoop jobs can be run on this cluster."
+  (( ! AUTO_YES )) && ! yesno "  Continue? [y|N] " && exit 0
 fi
 
+edit_core_site || exit 1
 quiet "$VOLNAME disabled for hadoop workloads"
+
 exit 0

@@ -3,39 +3,33 @@
 # find_default_vol.sh outputs the name of the default volume. This is the first
 # volume appearing in the core-site's "fs.glusterfs.volumes" property. Exits
 # with 1 on errors.
-# Args:
-#   -n=(optional) any storage node, if not supplied then localhost must be a
-#      storage node.
+# Args: $1=ambari server url (including :port),
+#       $2=ambari admin username:password,
+#       $3=(optional) ambari cluster name. If not provided it will be found 
+#          with an extra REST call.
 
-core_site='/etc/hadoop/conf/core-site.xml'
 prop='fs.glusterfs.volumes' # list of 1 or more vols, 1st is default
 
-# parse cmd opts
-while getopts ':n:' opt; do
-    case "$opt" in
-      n)
-        rhs_node="$OPTARG"
-        ;;
-      \?) # invalid option
-        ;;
-    esac
-done
+# check args
+(( $# < 2 || $# > 3 )) && {
+  echo "Syntax error: expect 2-3 args: ambari-url:port, ambari-admin-user:password, and optional cluster-name";
+  exit -1; }
 
-[[ -z "$rhs_node" ]] && rhs_node="$HOSTNAME"
+PREFIX="$(dirname $(readlink -f $0))"
 
-[[ "$rhs_node" == "$HOSTNAME" ]] && { ssh=''; ssh_close=''; } \
-				 || { ssh="ssh $rhs_node '"; ssh_close="'"; }
+url="$1"; userpass="$2"; cluster="$3" # may be blank
 
-vol="$(eval "$ssh 
-	sed -n \"/$prop/,/<\/property>/{/<value>/p}\" $core_site 2>&1
-     $ssh_close ")" 
-(( $? != 0 )) || [[ -z "$vol" ]] && {
-  echo "$rhs_node: \"$prop\" property value is missing from $core_site"; 
-  exit 1; }
+if [[ -z "$cluster" ]] ; then
+  cluster="$($PREFIX/find_cluster_name.sh $url "$userpass")" || {
+    echo "Could not get cluster name: $cluster"; # contains error msg
+    exit 1; }
+fi
 
-vol=${vol#*>} # delete leading <value>
-vol=${vol%<*} # delete trailing </value>, could be empty
-vol=${vol%,*} # extract 1st or only volname, can be ""
+vol="$($PREFIX/find_prop_value.sh $prop core $url $userpass $cluster)"
+if (( $? != 0 )) ; then
+  echo "ERROR: cannot retrieve the core-site $prop value: $vol"
+  exit 1
+fi
 
-echo "$vol"
+echo "${vol%%,*}" # 1st or only volname, can be ""
 exit 0
