@@ -462,11 +462,10 @@ function prep_rhel_nodes() {
       eval "$ssh [[ -f /etc/redhat-storage-release ]]"
       if (( $? != 0 )) ; then  # rhel node...
 	# which openssl version is installed on the rhel node
-	out=($(eval "$ssh yum list installed openssl 2>&1 | \
-		grep ^openssl | \
-		head -n 1"))
-	if (( ${#out[*]} > 1 )) ; then # see if current enough version
-	  ver="${out[1]}"
+	ver="$(eval "$ssh rpm -q --queryformat '%{Version}-%{RELEASE}' \
+		openssl 2>&1")"
+	if (( $? == 0 )) && [[ -n "$ver" ]] ; then
+	  # see if current enough version
 	  if version_ok "$ver" "$openssl_ver" ; then
 	    verbose "--- rhel node ($node) has the correct openssl version: $ver" 
 	    continue
@@ -770,11 +769,10 @@ function update_yarn() {
   (( YARN_INSIDE )) && return 0 # rhs nodes have the correct client bits
 
   # which glusterfs version is installed on the yarn-node
-  out=($(ssh $YARN_NODE "yum list installed glusterfs 2>&1 | \
-	grep ^glusterfs | \
-	head -n 1"))
-  if (( ${#out[*]} > 1 )) ; then # see if current enough version is installed
-    ver="${out[1]}"
+  ver="$(ssh $YARN_NODE "rpm -q --queryformat '%{Version}-%{RELEASE}' \
+		glusterfs 2>&1")"
+  if (( $? == 0 )) && [[ -n "$ver" ]] ; then
+    # see if current enough version is installed
     if version_ok "$ver" "$glusterfs_ver" ; then
       verbose "--- yarn-master ($YARN_NODE) has the correct glusterfs client version: $ver" 
       return 0 # no need to update glusterfs
@@ -783,22 +781,6 @@ function update_yarn() {
     fi
   else
     debug "no installed glusterfs client packages on $YARN_NODE"
-  fi
-
-  # check available glusterfs packages
-  out=($(ssh $YARN_NODE "yum list available glusterfs 2>&1 | \
-        grep ^glusterfs | \
-        head -n 1"))
-  if (( ${#out[*]} <= 1 )) ; then
-    err -e "unable to find any glusterfs packages to install on the yarn-master ($YARN_NODE).\nEnsure that the client channel \"$channel\" has been added"
-    return 1
-  fi
-
-  # we have available glusterfs pkg but is it 3.6+?
-  ver="${out[1]}"
-  if ! version_ok "$ver" "$glusterfs_ver" ; then
-    err -e "the available glusterfs client packages are older than $glusterfs_ver and therefore should not be yum installed on the yarn-master ($YARN_NODE).\nEnsure that the client channel \"$channel\" has been added"
-    return 1
   fi
 
   verbose "--- updating yarn-master ($YARN_NODE) to gluster client $ver..."
