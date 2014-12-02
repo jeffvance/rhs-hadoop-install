@@ -195,7 +195,7 @@ function setup_ntp() {
 
   # validate ntp config file
   if ! validate_ntp_conf ; then  # we're hosed: can't sync time nor start ntpd
-    echo "ERROR: cannot proceed with ntp validation due to config file error"
+    echo "ERROR: $HOSTNAME cannot proceed with ntp validation due to config file error"
     return 1
   fi
 

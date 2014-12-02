@@ -328,7 +328,7 @@ function uniq_nodes() {
 # one time-server suitable for ntp use. Return 1 for errors.
 function validate_ntp_conf(){
 
-  local timeserver; local i=1; local errcnt=0
+  local timeserver; local i=1
   local ntp_conf='/etc/ntp.conf'
   local servers=(); local numServers
 
@@ -342,7 +342,7 @@ function validate_ntp_conf(){
 
   if (( numServers == 0 )) ; then
     echo "ERROR: no server entries in $ntp_conf"
-    ((errcnt++))
+    return 1
   fi
 
   for timeserver in ${servers[@]} ; do
@@ -352,10 +352,9 @@ function validate_ntp_conf(){
   done
   if (( i > numServers )) ; then
     echo "ERROR: no suitable time-servers found in $ntp_conf"
-    ((errcnt++))
+    return 1
   fi
 
-  (( errcnt > 0 )) && return 1
   echo "NTP time-server $timeserver is acceptable"
   return 0
 }
