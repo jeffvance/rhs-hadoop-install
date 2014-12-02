@@ -80,7 +80,7 @@ done
 BRICKS=($(printf '%s\n' "$BRICKS" | sort -u))
 
 # check for passwordless ssh to the storage and yarn nodes
-check_ssh $(uniq_nodes $rhs_node $NODES $yarn_node) || exit 1
+check_ssh $(uniq_nodes $NODES $yarn_node) || exit 1
 
 echo
 echo "** The following nodes, volumes, bricks and vol mounts are affected:"
