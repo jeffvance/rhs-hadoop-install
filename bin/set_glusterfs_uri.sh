@@ -37,7 +37,7 @@ ambari-host : Optional. Ambari host name. Default is localhost.
 cluster-name: Optional. The name of the current cluster.
 port        : Optional. Port number for Ambari server. Default is '8080'.
 path        : Required. Mount path for the volume when the action is prepend or
-              append. Not used for the removee action.
+              append. Not used for the remove action.
 verb        : Required. action to perform to property value:
               prepend|append|remove.
 VOLNAME     : Required. RHS volume to be enabled/disabled.
