@@ -24,14 +24,14 @@ function usage() {
 
   cat <<EOF
 
-$ME creates and prepares a new volume designated for hadoop workloads.
-The replica factor is hard-coded to 2, per RHS requirements.
+$ME creates and prepares a new volume designated for hadoop workloads, after
+validating that the nodes spanned by the new volume are hadoop ready.
 
 SYNTAX:
 
 $ME --version | --help
 
-$ME [-y] [--quiet | --verbose | --debug] \\
+$ME [-y] [--quiet | --verbose | --debug] [--replica <cnt>] \\
            <volname> <vol-mnt-prefix> <nodes-spec-list>
 
 where:
@@ -48,6 +48,9 @@ where:
 <volname>       : name of the new volume.
 <vol-mnt-prefix>: path of the glusterfs-fuse mount point, eg. /mnt/glusterfs.
                   Note: the volume name will be appended to this mount point.
+cnt             : the volume replica count. Expected values are 2 or 3. The
+                  number of bricks must be a multiple of <cnt>. Default is 2,
+                  which assumes RAID-6 storage.
 -y              : (optional) auto answer "yes" to all prompts. Default is the 
                   script waits for the user to answer each prompt.
 --quiet         : (optional) output only basic progress/step messages. Default.
@@ -60,15 +63,18 @@ where:
 EOF
 }
 
-# parse_cmd: simple positional parsing. Returns 1 on errors.
+# parse_cmd: simple positional parsing. Returns 1 on errors or if user does not
+# continue if prompted.
 # Sets globals:
+#   AUTO_YES
 #   VOLNAME
 #   VOLMNT
 #   NODE_SPEC (node:brkmnt)
+#   REPLICA_CNT
 function parse_cmd() {
 
   local errcnt=0
-  local long_opts='help,version,quiet,verbose,debug'
+  local long_opts='help,version,quiet,verbose,debug,replica:'
 
   eval set -- "$(getopt -o 'y' --long $long_opts -- $@)"
 
@@ -79,6 +85,9 @@ function parse_cmd() {
         ;;
         --version) # version is already output, so nothing to do here
           exit 0
+        ;;
+        --replica)
+          REPLICA_CNT=$2; shift 2; continue
         ;;
         --quiet)
           VERBOSE=$LOG_QUIET; shift; continue
@@ -102,7 +111,7 @@ function parse_cmd() {
   VOLMNT="$1" ; shift
   NODE_SPEC=($@) # array of nodes:brick-mnts.
 
-  # check required args
+  # check required args and assign defaults
   [[ -z "$VOLNAME" ]] && {
     echo "Syntax error: volume name is required";
     ((errcnt++)); }
@@ -117,6 +126,11 @@ function parse_cmd() {
     echo "Syntax error: expect list of 2 or more nodes plus brick mount(s)"
     ((errcnt++))
   fi
+
+  [[ -z "$REPLICA_CNT" ]] && REPLICA_CNT=2  # assume RAID-6
+  (( REPLICA_CNT < 2 )) && {
+    echo "Error: replica count must be greater than 1 (one)";
+    ((errcnt++)); }
 
   (( errcnt > 0 )) && return 1
   return 0
@@ -380,7 +394,7 @@ function add_distributed_dirs() {
   return 0
 }
 
-# create_vol: gluster vol create VOLNAME with a hard-coded replica 2 and set
+# create_vol: gluster vol create VOLNAME with the replica count and set
 # its performance settings. Returns 1 on errors.
 # Uses globals:
 #   BRKMNTS()
@@ -409,7 +423,7 @@ function create_vol() {
   done
   debug "bricks: $bricks"
 
-  # create the gluster volume, replica 2 is hard-coded for now
+  # create the gluster volume
   out="$(ssh $FIRST_NODE "
 	gluster --mode=script volume create $VOLNAME replica $REPLICA_CNT \
 		$bricks 2>&1")"
@@ -468,12 +482,15 @@ ME="$(basename $0 .sh)"
 AUTO_YES=0 # assume false
 VOL_NODES=()
 declare -A BRKMNTS=() # assoc array, node=key list of 1 or more mnt=value
-REPLICA_CNT=2  # hard-coded for now
 VERBOSE=$LOG_QUIET # default
 
 report_version $ME $PREFIX
 
 parse_cmd $@ || exit -1
+
+(( REPLICA_CNT > 3 )) && (( ! AUTO_YES )) && \
+  ! yesno "Note: replica count is $REPLICA_CNT. Continue? [y|N] " && \
+  exit 1
 
 parse_nodes_brkmnts || exit -1
 FIRST_NODE=${VOL_NODES[0]} # use this storage node for all gluster cli cmds
