@@ -63,8 +63,7 @@ cnt             : the volume replica count. Expected values are 2 or 3. The
 EOF
 }
 
-# parse_cmd: simple positional parsing. Returns 1 on errors or if user does not
-# continue if prompted.
+# parse_cmd: simple positional parsing. Returns 1 on errors.
 # Sets globals:
 #   AUTO_YES
 #   VOLNAME
