@@ -49,8 +49,7 @@ where:
 <vol-mnt-prefix>: path of the glusterfs-fuse mount point, eg. /mnt/glusterfs.
                   Note: the volume name will be appended to this mount point.
 cnt             : the volume replica count. Expected values are 2 or 3. The
-                  number of bricks must be a multiple of <cnt>. Default is 2,
-                  which assumes RAID-6 storage.
+                  number of bricks must be a multiple of <cnt>. Default is 2.
 -y              : (optional) auto answer "yes" to all prompts. Default is the 
                   script waits for the user to answer each prompt.
 --quiet         : (optional) output only basic progress/step messages. Default.
