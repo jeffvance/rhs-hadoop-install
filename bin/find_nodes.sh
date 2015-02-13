@@ -11,7 +11,7 @@
 #      will all be output.
 
 PREFIX="$(dirname $(readlink -f $0))"
-ssh=''; ssh_close=''; rhs_opt=''
+ssh=''; ssh_close=''; rhs_opt=''; UNIQ=0 # false
 
 # parse cmd opts
 while getopts ':un:' opt; do
@@ -20,7 +20,7 @@ while getopts ':un:' opt; do
         rhs_node="$OPTARG"
         ;;
       u)
-        UNIQ=true # else, undefined
+        UNIQ=1 # true
         ;;
       \?) # invalid option
         ;;
@@ -57,6 +57,7 @@ else
   done
 fi
 
-[[ -z "$UNIQ" ]] && echo "${NODES[*]}" | tr ' ' '\n' ||
-    echo "$(printf '%s\n' "${NODES[@]}" | sort -u)"
+(( UNIQ )) && echo "$(printf '%s\n' "${NODES[@]}" | sort -u)" || \
+  echo "${NODES[*]}" | tr ' ' '\n'
+
 exit 0

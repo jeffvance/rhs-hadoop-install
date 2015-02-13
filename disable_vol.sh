@@ -252,8 +252,9 @@ vol_exists $VOLNAME $RHS_NODE || {
   err "volume $VOLNAME does not exist";
   exit 1; }
 
-NODES=($($PREFIX/bin/find_nodes.sh -n $RHS_NODE $VOLNAME)) # spanned by vol
-if (( $? != 0 )) ; then
+# uniq nodes spanned by vol
+NODES="$($PREFIX/bin/find_nodes.sh -un $RHS_NODE $VOLNAME)"
+if (( $? != 0 )) || [[ -z "$NODES" ]] ; then
   err "${NODE[*]}" # error msg from find_nodes
   exit 1
 fi

@@ -257,11 +257,12 @@ function setup_yarn() {
 #   NODES
 #   RHS_NODE
 #   VOLNAME
+#   YARN_NODE
 function chk_nodes() {
 
   local errcnt=0; local out; local err
 
-  verify_gid_uids $NODES $YARN_NODE 
+  verify_gid_uids $(uniq_nodes $NODES $YARN_NODE)
   (( $? != 0 )) && ((errcnt+))
 
   verbose "--- checking that $VOLNAME is setup for hadoop workloads..."
@@ -456,15 +457,21 @@ vol_exists $VOLNAME $RHS_NODE || {
   err "volume $VOLNAME does not exist";
   exit 1; }
 
-NODES="$($PREFIX/bin/find_nodes.sh -n $RHS_NODE $VOLNAME)" # spanned by vol
-if (( $? != 0 )) ; then
+# uniq nodes spanned by vol
+NODES="$($PREFIX/bin/find_nodes.sh -un $RHS_NODE $VOLNAME)"
+if (( $? != 0 )) || [[ -z "$NODES" ]] ; then
   err "cannot find nodes spanned by $VOLNAME. $NODES"
   exit 1
 fi
 debug "nodes spanned by $VOLNAME: $NODES"
 
+# for cases where storage nodes are repeated and/or the mgmt and/or yarn nodes
+# are inside the pool, there is some improved efficiency in reducing the nodes
+# to just the unique nodes
+UNIQ_NODES=($(uniq_nodes ${NODES[*]} $YARN_NODE $MGMT_NODE))
+
 # check for passwordless ssh connectivity to all nodes
-check_ssh $(uniq_nodes $MGMT_NODE $YARN_NODE $NODES) || exit 1
+check_ssh ${UNIQ_NODES[*} || exit 1
 
 VOLMNT="$($PREFIX/bin/find_volmnt.sh -n $RHS_NODE $VOLNAME)"  # includes volname
 if (( $? != 0 )) ; then
