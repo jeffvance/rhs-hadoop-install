@@ -464,13 +464,8 @@ if (( $? != 0 )) || [[ -z "$NODES" ]] ; then
 fi
 debug "nodes spanned by $VOLNAME: $NODES"
 
-# for cases where storage nodes are repeated and/or the mgmt and/or yarn nodes
-# are inside the pool, there is some improved efficiency in reducing the nodes
-# to just the unique nodes
-UNIQ_NODES=($(uniq_nodes ${NODES[*]} $YARN_NODE $MGMT_NODE))
-
 # check for passwordless ssh connectivity to all nodes
-check_ssh ${UNIQ_NODES[*]} || exit 1
+check_ssh $(uniq_nodes $NODES $YARN_NODE $MGMT_NODE) || exit 1
 
 VOLMNT="$($PREFIX/bin/find_volmnt.sh -n $RHS_NODE $VOLNAME)"  # includes volname
 if (( $? != 0 )) ; then
