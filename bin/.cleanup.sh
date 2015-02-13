@@ -19,8 +19,10 @@
 # +  only if --reset-ambari is specified
 #
 # Args:
-#   -n rhs-node to run gluster cli commands on
-#   -y yarn-master node
+#   --rhs-node <node>, storage node to run gluster cli commands on
+#   --yarn-master <node>, yarn-master node
+#   [--hadoop-mgmt-node <node>], ambari mgmt node
+#   [--reset-ambari], flag to stop and reset ambari-server and agents
 #
 # WARNING!! EXISTING DATA WILL BE DELETED!
 #

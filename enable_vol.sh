@@ -291,10 +291,9 @@ function chk_nodes() {
 #   PREFIX
 function setup_multi_tenancy() {
 
-  local nodes="$@"
   local node; local out; local err; local errcnt=0
 
-  for node in $nodes; do
+  for node in $@; do
       out="$(ssh $node $PREFIX/bin/setup_container_executor.sh)"
       err=$?
       debug "$node: setup_container_executor, status=$err: $out"
@@ -471,7 +470,7 @@ debug "nodes spanned by $VOLNAME: $NODES"
 UNIQ_NODES=($(uniq_nodes ${NODES[*]} $YARN_NODE $MGMT_NODE))
 
 # check for passwordless ssh connectivity to all nodes
-check_ssh ${UNIQ_NODES[*} || exit 1
+check_ssh ${UNIQ_NODES[*]} || exit 1
 
 VOLMNT="$($PREFIX/bin/find_volmnt.sh -n $RHS_NODE $VOLNAME)"  # includes volname
 if (( $? != 0 )) ; then

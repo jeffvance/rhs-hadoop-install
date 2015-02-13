@@ -59,7 +59,7 @@ for key in ${!EXPCT_SETTINGS[@]}; do
     val="${EXPCT_SETTINGS[$key]}"
     setting="$key:$val"
     if ! grep -q "$setting" <<<$out ; then
-      echo "WARN: $key not be set to \"$val\""
+      echo "WARN: $key not set to \"$val\""
       ((warncnt++))
     fi
 done
