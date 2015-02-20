@@ -94,6 +94,31 @@ function display() {
   (( pri >= verbose )) && echo $opt "$1"
 }
 
+# dup_env_vars: duplicate the RHS_HADOOP_INSTALL_* environment variables define
+# on this node (localhost) to each node in $@. Returns 1 on errors.
+function dup_env_vars() {
+
+  local err; local errcnt=0
+  local node; local vars # varname=value
+
+  # get list of rhs env vars
+  vars="$(env | grep ^RHS_HADOOP_INSTALL_)"
+
+  (( ${#vars} == 0 )) && return 0 # no env vars to dup
+
+  for node in $@; do
+      # assume var values are single, unquoted tokens
+      ssh $node "export $vars" # export v1=val1 v2=val2 v3=val3...
+      err=$?
+      (( err != 0 )) && {
+	((errcnt++));
+	echo "ERROR: export of \"$vars\" failed on node $node"; }
+  done
+
+  (( errcnt > 0 )) && return 1
+  return 0
+}
+
 # err: call force(). Prepend "ERROR" to msg.
 # $1= echo option or next arg,
 # $2= error number or next arg,
@@ -326,11 +351,19 @@ function uniq_nodes() {
 
 # validate_ntp_conf: validate the ntp config file by ensuring there is at least
 # one time-server suitable for ntp use. Return 1 for errors.
+# Note: if the RHS_HADOOP_INSTALL_SKIP_NTP env variable is set to 1 then this
+#   function skips all ntp checking and returns 0 (success).
 function validate_ntp_conf(){
 
   local timeserver; local i=1
   local ntp_conf='/etc/ntp.conf'
   local servers=(); local numServers
+
+  (( RHS_HADOOP_INSTALL_SKIP_NTP )) && {
+    verbose "RHS_HADOOP_INSTALL_SKIP_NTP=1, ntp checking skipped";
+    return 0; }
+
+  debug "export RHS_HADOOP_INSTALL_SKIP_NTP=1 to skip ntp checks..."
 
   if [[ ! -f $ntp_conf ]] ; then
     echo "ERROR: ntp config file \"$ntp_conf\" is missing"

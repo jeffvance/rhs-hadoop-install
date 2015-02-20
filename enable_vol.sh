@@ -263,7 +263,7 @@ function chk_nodes() {
   local errcnt=0; local out; local err
 
   verify_gid_uids $(uniq_nodes $NODES $YARN_NODE)
-  (( $? != 0 )) && ((errcnt+))
+  (( $? != 0 )) && ((errcnt++))
 
   verbose "--- checking that $VOLNAME is setup for hadoop workloads..."
 
@@ -462,10 +462,17 @@ if (( $? != 0 )) || [[ -z "$NODES" ]] ; then
   err "cannot find nodes spanned by $VOLNAME. $NODES"
   exit 1
 fi
-debug "nodes spanned by $VOLNAME: $NODES"
+debug "unique nodes spanned by $VOLNAME: $NODES"
+
+UNIQ_NODES="$(uniq_nodes $NODES $YARN_NODE $MGMT_NODE)"
 
 # check for passwordless ssh connectivity to all nodes
-check_ssh $(uniq_nodes $NODES $YARN_NODE $MGMT_NODE) || exit 1
+check_ssh $UNIQ_NODES || exit 1
+
+# export to each node all RHS_HADOOP_INSTALL_* env vars
+out="$(dup_env_vars $UNIQ_NODES)"
+(( $? != 0 )) && {
+  err $out; exit 1; }
 
 VOLMNT="$($PREFIX/bin/find_volmnt.sh -n $RHS_NODE $VOLNAME)"  # includes volname
 if (( $? != 0 )) ; then

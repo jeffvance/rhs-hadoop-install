@@ -189,6 +189,7 @@ function setup_ambari_agent() {
 
 # setup_ntp: validate the ntp conf file, start ntpd, synch time. Returns 1 on
 # errors.
+# ASSUMPTION: the RHS_HADOOP_INSTALL_SKIP_NTP env var is set locally if needed.
 function setup_ntp() {
 
   local errcnt=0; local warncnt=0; local cnt=0; local err

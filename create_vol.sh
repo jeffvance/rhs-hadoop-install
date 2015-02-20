@@ -496,6 +496,11 @@ FIRST_NODE=${VOL_NODES[0]} # use this storage node for all gluster cli cmds
 # check for passwordless ssh connectivity to storage nodes
 check_ssh ${VOL_NODES[*]} || exit 1
 
+# export to each node all RHS_HADOOP_INSTALL_* env vars
+out="$(dup_env_vars ${UNIQ_NODES[*]})"
+(( $? != 0 )) && {
+  err $out; exit 1; }
+
 # make sure the volume doesn't already exist
 vol_exists $VOLNAME $FIRST_NODE && {
   err "volume \"$VOLNAME\" already exists";
@@ -508,7 +513,9 @@ path_avail || exit 1
 set_non_vol_nodes || exit 1 # sets EXTRA_NODES array (can be empty)
 
 # check for passwordless ssh connectivity to extra nodes
-check_ssh ${EXTRA_NODES[*]} || exit 1
+if (( ${#EXTRA_NODES[*]} > 0 )) ; then
+  check_ssh ${EXTRA_NODES[*]} || exit 1
+fi
 
 show_todo
 

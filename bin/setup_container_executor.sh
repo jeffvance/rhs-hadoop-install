@@ -13,7 +13,8 @@ allowed_users='mapred,ambari_qa' # comma separated list
 process_group='hadoop'
 perms=6050 # setuid and setgid bits are set
 task_controller='/usr/lib/hadoop-yarn/bin/container-executor'
-task_cfg='/etc/hadoop/conf/container-executor.cfg'
+path_task_cfg='/etc/hadoop/conf'
+task_cfg="$path_task_cfg/container-executor.cfg"
 
 # The md5 of the container config file is hard-coded here. The reason is so 
 # that we don't overwrite a customer's custom container-executor file, which,
@@ -48,14 +49,15 @@ if [[ -f $task_cfg ]] ; then
   else
     echo "$task_cfg file will be over-written..."
   fi
-else
+elif [[ -d "$path_task_cfg" ]] ; then
   echo "$HOSTNAME: $task_cfg file does not exist, it will be created..."
+else
+  echo "ERROR: $HOSTNAME: $path_task_cfg does not exist or is not a directory"
+  exit 1
 fi
 
 echo "$HOSTNAME: configuring the Linux Container Executor for Hadoop"
 (( create_file )) && create_container_executor
-
-echo "$HOSTNAME: changing owner and permissions on $task_controller"
 chown root:$process_group $task_controller || ((errcnt++))
 chmod $perms $task_controller || ((errcnt++))
 
