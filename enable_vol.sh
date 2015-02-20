@@ -464,15 +464,8 @@ if (( $? != 0 )) || [[ -z "$NODES" ]] ; then
 fi
 debug "unique nodes spanned by $VOLNAME: $NODES"
 
-UNIQ_NODES="$(uniq_nodes $NODES $YARN_NODE $MGMT_NODE)"
-
 # check for passwordless ssh connectivity to all nodes
-check_ssh $UNIQ_NODES || exit 1
-
-# export to each node all RHS_HADOOP_INSTALL_* env vars
-out="$(dup_env_vars $UNIQ_NODES)"
-(( $? != 0 )) && {
-  err $out; exit 1; }
+check_ssh $(uniq_nodes $NODES $YARN_NODE $MGMT_NODE) || exit 1
 
 VOLMNT="$($PREFIX/bin/find_volmnt.sh -n $RHS_NODE $VOLNAME)"  # includes volname
 if (( $? != 0 )) ; then

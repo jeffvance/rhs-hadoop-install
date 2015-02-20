@@ -837,11 +837,6 @@ FIRST_NODE=${NODES[0]}
 # check for passwordless ssh connectivity to nodes
 check_ssh ${UNIQ_NODES[*]} || exit 1
 
-# export to each node all RHS_HADOOP_INSTALL_* env vars
-out="$(dup_env_vars ${UNIQ_NODES[*]})"
-(( $? != 0 )) && {
-  err $out; exit 1; }
-
 # log each storage node's version, error if not an RHS node
 storage_node_version ${NODES[@]} || exit 1
 

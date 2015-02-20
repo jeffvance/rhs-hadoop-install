@@ -260,15 +260,8 @@ if (( $? != 0 )) || [[ -z "$NODES" ]] ; then
 fi
 debug "unique nodes spanned by $VOLNAME: ${NODES[*]}"
 
-UNIQ_NODES="$(uniq_nodes $MGMT_NODE $YARN_NODE $NODES)"
-
 # check for passwordless ssh connectivity to all nodes
-check_ssh $UNIQ_NODES || exit 1
-
-# export to each node all RHS_HADOOP_INSTALL_* env vars
-out="$(dup_env_vars $UNIQ_NODES)"
-(( $? != 0 )) && {
-  err $out; exit 1; }
+check_ssh $(uniq_nodes $MGMT_NODE $YARN_NODE $NODES) || exit 1
 
 CLUSTER_NAME="$($PREFIX/bin/find_cluster_name.sh $MGMT_NODE:$MGMT_PORT \
         $MGMT_USER:$MGMT_PASS)"

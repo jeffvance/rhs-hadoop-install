@@ -137,7 +137,6 @@ function check_open_ports() {
 
 # check_ntp: verify that ntp is running and the config file has 1 or more
 # suitable server records.
-# ASSUMPTION: the RHS_HADOOP_INSTALL_SKIP_NTP env var is set locally if needed.
 function check_ntp() {
 
   local errcnt=0
