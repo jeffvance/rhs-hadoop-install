@@ -234,13 +234,15 @@ function setup_yarn() {
   fi
   dir="$(dirname $dir)" # save just the left-most dirs in the path
 
-  [[ -d "$dir" ]] || {
-    err "\"$dir\" missing on $YARN_NODE";
-    return 1; }
-
   # chown -R && chmod -R the yarn dir 
-  out="$(ssh $YARN_NODE "chown -R $yarn_owner $dir 2>&1 && \
-			 chmod -R $yarn_perms $dir 2>&1")"
+  out="$(ssh $YARN_NODE "
+	if [[ -d $dir ]] ; then
+	  chown -R $yarn_owner $dir 2>&1 && \
+  	  chmod -R $yarn_perms $dir 2>&1
+          exit
+	fi
+	echo \"$dir missing on $YARN_NODE\"
+        exit 1" )"
   (( $? != 0 )) && {
     err "chown/chmod local yarn dir \"$dir\": $out";
     return 1; }
