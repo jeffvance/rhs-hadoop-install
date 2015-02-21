@@ -287,7 +287,8 @@ function path_avail() {
 
 # chk_nodes: verify that each node that will be spanned by the new volume is 
 # prepped for hadoop workloads by invoking bin/check_node.sh. Also, verify that
-# the hadoop GID and user UIDs are consistent across the nodes. Returns 1 on
+# the hadoop GID and user UIDs are consistent across the nodes. And check that
+# each node spanned by the volume is ntp time sync'd. Returns 1 on
 # errors.
 # Uses globals:
 #   BRKMNTS()
@@ -318,6 +319,19 @@ function chk_nodes() {
 	debug -e "check_node on $node:\n$out"
       fi
   done
+
+  verbose "--- validate NTP time sync across cluster..."
+  out="$(ntp_time_sync_check ${VOL_NODES[@]})"
+  err=$?
+  if (( err == 2 )) ; then
+    err "$out"
+    ((errcnt++))
+  elif (( err == 1 )) ; then
+    warn "$out"
+  else
+    debug "ntp time sync check: $out"
+  fi
+  verbose "--- done validate NTP time sync across cluster..."
 
   (( errcnt > 0 )) && return 1
   verbose "all nodes passed check for hadoop workloads"

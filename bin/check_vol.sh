@@ -2,8 +2,8 @@
 #
 # check_vol.sh verifies that the supplied volume is setup correctly for hadoop
 # workloads. This includes: checking the glusterfs-fuse mount options, the
-# block device mount options, the volume performance settings, and executing
-# bin/check_node.sh for each node spanned by the volume.
+# block device mount options, the volume performance settings, ntp time sync
+# check, and executing bin/check_node.sh for each node spanned by the volume.
 #
 # Syntax:
 #   $1=volume name (required).
@@ -12,6 +12,8 @@
 
 errcnt=0; q=''
 PREFIX="$(dirname $(readlink -f $0))"
+
+source $PREFIX/functions
 
 # parse cmd opts
 while getopts ':n:' opt; do
@@ -37,11 +39,13 @@ for brick in $($PREFIX/find_brick_mnts.sh $rhs_node $VOLNAME); do
     node=${brick%:*}; NODES+="$node "
     brkmnt=${brick#*:}
     [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
-    eval "$ssh $PREFIX/check_node.sh $brkmnt" || ((errcnt++))
+    eval "$ssh $PREFIX/check_node.sh $brkmnt"        || ((errcnt++))
 done
 
+ntp_time_sync_check $NODES
+(( $? == 2 ))                                        && ((errcnt++)) 
 $PREFIX/check_vol_mount.sh $rhs_node $VOLNAME $NODES || ((errcnt++))
-$PREFIX/check_vol_perf.sh $rhs_node $VOLNAME || ((errcnt++))
+$PREFIX/check_vol_perf.sh $rhs_node $VOLNAME         || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
 echo "$VOLNAME is ready for hadoop workloads"

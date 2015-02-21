@@ -19,7 +19,7 @@
 # enforced by the script.
 #
 # On each rhs node the blk-device is setup as an xfs file system and mounted to
-# the brick mount dir, ntp config is verified, iptables are disabled, selinux
+# the brick mount dir, ntp sync is verified, iptables are disabled, selinux
 # is set to permissive, and the required hadoop local directories are created
 # (note: the required Hadoop distributed dirs are not created here). If a
 # profile is specified then that profile will be set by tuned-adm.
@@ -494,8 +494,10 @@ function prep_rhel_nodes() {
 
 # setup_nodes: setup each node for hadoop workloads by invoking bin/
 # setup_datanodes.sh, which is also run for the yarn-master node if it is
-# outside of the storage pool. Note: if the hadoop mgmt-node is outside of the
-# storage pool then it will not have the agent installed. Returns 1 on errors.
+# outside of the storage pool. NTP time sync across the cluster is also checked.
+# Note: if the hadoop mgmt-node is outside of the storage pool then it will not
+#   have the agent installed. Returns 1 on errors.
+# Returns 1 on errors.
 # Uses globals:
 #   AMBARI_REPO
 #   FORCE_AMBARI
@@ -508,7 +510,8 @@ function prep_rhel_nodes() {
 #   YARN_NODE
 function setup_nodes() {
 
-  local errcnt=0; local node; local brkmnt; local blkdev
+  local out; local err; local errcnt=0
+  local node; local brkmnt; local blkdev
 
   # nested function to call setup_datanodes on a passed-in node, blkdev and
   # brick-mnt.
@@ -517,9 +520,7 @@ function setup_nodes() {
     local node="$1"
     local blkdev="$2" # can be blank
     local brkmnt="$3" # can be blank
-    local out; local err; local ssh; local cmd
-
-    [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
+    local cmd
 
     verbose "+++"
     verbose "+++ begin node $node"
@@ -529,7 +530,7 @@ function setup_nodes() {
     [[ -n "$AMBARI_REPO" ]] && cmd+=" --ambari-repo $AMBARI_REPO"
     (( FORCE_AMBARI )) && cmd+=" --force-ambari"
 
-    out="$(eval "$ssh $cmd")"
+    out="$(ssh $node "$cmd")"
     err=$?
     if (( err != 0 )) ; then
       err -e $err "setup_datanode on $node:\n$out"
@@ -559,7 +560,21 @@ function setup_nodes() {
     err "total setup_datanode errors: $errcnt"
     return 1
   fi
-  verbose "--- setup_datanode completed on all nodes..."
+
+  verbose "--- validate NTP time sync across cluster..."
+  out="$(ntp_time_sync_check $(uniq_nodes ${NODES[@]} $YARN_NODE))"
+  err=$?
+  if (( err == 2 )) ; then
+    err "$out"
+    return 1
+  elif (( err == 1 )) ; then
+    warn "$out"
+  else
+    debug "ntp time sync: $out"
+  fi
+  verbose "--- done validate NTP time sync across cluster..."
+
+  verbose "--- done setup_datanode on all nodes"
   return 0
 }
 

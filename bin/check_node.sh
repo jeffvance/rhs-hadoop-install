@@ -1,10 +1,9 @@
 #!/bin/bash
 #
-# check_node.sh verifies that the node running this script is setup correctly
-# for hadoop workloads. This includes everything other than volume-specific
-# checks. So, we check: ntp config, required gluster and ambari ports being
-# open, ambari agent running, selinux not enabled, hadoop users and local hadoop
-# directories exist.
+# check_node.sh verifies that the node running this script (localhost) is setup
+# correctly for hadoop workloads. This includes everything other than volume-
+# specific checks. So, we check: ntpd is running, ambari agent running, selinux
+# not enabled, hadoop users and local hadoop directories exist.
 # Syntax:
 #  $@= required list of xfs brick mount directory paths, each includes the
 #      volume name. Typically the list is a single mount.
@@ -135,33 +134,6 @@ function check_open_ports() {
   return 1 # potentially hadoop needed ports have rules
 }
 
-# check_ntp: verify that ntp is running and the config file has 1 or more
-# suitable server records.
-function check_ntp() {
-
-  local errcnt=0
-
-  validate_ntp_conf || ((errcnt++))
-
-  # is ntpd configured to run on reboot?
-  chkconfig ntpd 
-  if (( $? != 0 )); then
-    echo "ERROR: ntpd not configured to run on reboot"
-    ((errcnt++))
-  fi
-
-  # verify that ntpd is running
-  ps -C ntpd >& /dev/null
-  if (( $? != 0 )) ; then
-    echo "ERROR: ntpd is not running"
-    ((errcnt++))
-  fi
-
-  (( errcnt > 0 )) && return 1
-  echo "ntpd is running on $NODE"
-  return 0
-}
-
 # check_selinux: if selinux is enabled then set it to permissive.
 function check_selinux() {
 
@@ -208,7 +180,7 @@ BRICKMNT="$@" # includes the vol name in path in each mount path
 check_brick_mount  || ((errcnt++))
 check_selinux      || ((errcnt++))
 check_open_ports   || ((errcnt++))
-check_ntp          || ((errcnt++))
+ntpd_running       || ((errcnt++))
 check_users        || ((errcnt++))
 check_dirs         || ((errcnt++))
 check_ambari_agent || ((errcnt++))

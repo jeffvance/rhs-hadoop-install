@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # setup_datanode.sh sets up this node's (localhost's) environment for hadoop
-# workloads. Everything needed other than volume-specific tasks is done here.
+# workloads. Everything needed other than volume-specific tasks are done here.
 # It is assumed that localhost has already been validated (eg. check_node.sh
 # has been run) prior to setting up the node.
 # Syntax:
@@ -187,48 +187,6 @@ function setup_ambari_agent() {
   return 0
 }
 
-# setup_ntp: validate the ntp conf file, start ntpd, synch time. Returns 1 on
-# errors.
-function setup_ntp() {
-
-  local errcnt=0; local warncnt=0; local cnt=0; local err
-
-  # validate ntp config file
-  if ! validate_ntp_conf ; then  # we're hosed: can't sync time nor start ntpd
-    echo "ERROR: $HOSTNAME cannot proceed with ntp validation due to config file error"
-    return 1
-  fi
-
-  # stop ntpd so that ntpd -qg can potentially do a large time change
-  while ps -C ntpd >& /dev/null ; do
-    service ntpd stop >& /dev/null
-    (( cnt > 2 )) && break
-    ((cnt++))
-  done
-  (( cnt > 2 )) && {
-    echo "ERROR: cannot stop ntpd so that time can be synched";
-    ((errcnt++)); }
-
-  # set time to ntp clock time now (ntpdate is being deprecated)
-  # note: ntpd can't be running...
-  ntpd -qg 2>&1
-  err=$?
-  (( err != 0 )) && {
-    echo "WARN $err: ntpd -qg (aka ntpdate)";
-    ((warncnt++)); }
-
-  # start ntpd
-  service ntpd start 2>&1
-  err=$?
-  (( err != 0 )) && {
-    echo "ERROR $err: ntpd start"
-    ((errcnt++)); }
-
-  (( errcnt > 0 )) && return 1
-  echo "ntp setup with $warncnt warnings"
-  return 0
-}
-
 # setup_xfs: on this storage node, mkfs.xfs on the block device. Returns 1 on
 # errors.
 function setup_xfs() {
@@ -301,7 +259,7 @@ parse_cmd $@ || exit -1
 setup_xfs          || ((errcnt++))
 mount_blkdev       || ((errcnt++))
 setup_selinux      || ((errcnt++))
-setup_ntp          || ((errcnt++))
+ntpd_running       || ((errcnt++))
 setup_ambari_agent || ((errcnt++))
 add_local_dirs     || ((errcnt++))
 setup_firewall     || ((errcnt++))
