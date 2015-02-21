@@ -232,44 +232,39 @@ function is_ip_addr() {
 
 # ntp_time_sync_check: return 0 if the time drift across the passed-in nodes is
 # less than the WARN threshold. Return 1 if the time drift across the nodes is 
-# between the WARN and ERROR thresholds. Return 0 if the time drift is less than
-# the WARN threshold.
+# between the WARN and ERROR thresholds. Return 2 if the time drift is greater
+# than-or-equal-to the ERROR threshold, or any other error is detected.
 function ntp_time_sync_check() {
 
-  # logic below supports a WARN threshold > 1 sec. When WARN=1 then we return 0
-  # immediately if the sorted/uniq times array has only a single entry
+  # logic below supports a WARN threshold > 1 sec. When WARN_DRIFT=1 then we
+  # return 0 immediately if the unique times array has only a single entry
   local WARN_DRIFT=1 # second
   local ERR_DRIFT=5  # seconds
-  local node; local times=(); local diff; local errcnt=0
+  local node; local times=(); local delta; local errcnt=0
 
   for node in $@; do # current times in seconds since 1970-01-01 00:00:00 UTC
       times+=($(ssh $node "date +%s"))
       (( $? != 0 )) && ((errcnt++))
   done
   if (( errcnt > 0 || ${#times[@]} == 0 )) ; then # can't get time from 1+ nodes
-    echo "\"date +%s\" failed on every node"
+    echo "ntp_time_sync_check: \"date +%s\" failed one or more nodes"
     return 2
   fi
+  echo "ntp_time_sync_check: times across nodes ($*): ${times[*]} seconds"
 
   times=($(printf '%s\n' "${times[@]}" | sort -u)) # sorted, uniq times
-  debug "sorted/uniq times across nodes ($*): ${times[*]} (seconds)"
+  echo "ntp_time_sync_check: unique times across nodes ($*): ${times[*]} seconds"
 
   if (( ${#times[@]} == 1 )) ; then # 1 entry means all times w/in <1 sec
-    echo "time differs across nodes by less than 1 second"
+    echo "ntp_time_sync_check: time delta across nodes is less than 1 second"
     return 0
   fi
 
-  diff=$((${times[${#times[@]}-1]} - ${times[0]})) # high-low in secs
+  delta=$((${times[${#times[@]}-1]} - ${times[0]})) # high-low in secs
+  echo "ntp_time_sync_check: time differs across nodes ($*) by $delta second"
 
-  if (( diff >= ERR_DRIFT )) ; then
-    echo "time differs across nodes ($*) by more than $ERR_DRIFT seconds"
-    return 2 # error
-  elif (( diff >= WARN_DRIFT )) ; then
-    echo "time differs across nodes ($*) by between $WARN_DRIFT and $ERR_DRIFT seconds"
-    return 1 # warning
-  fi
-
-  echo "time differs across nodes by less than $WARN_DRIFT seconds"
+  (( delta >= ERR_DRIFT  )) && return 2 || \
+  (( delta >= WARN_DRIFT )) && return 1 # 2=err, 1=warn
   return 0
 }
 
