@@ -263,8 +263,8 @@ function ntp_time_sync_check() {
   delta=$((${times[${#times[@]}-1]} - ${times[0]})) # high-low in secs
   echo "ntp_time_sync_check: time differs across nodes ($*) by $delta second"
 
-  (( delta >= ERR_DRIFT  )) && return 2 || \
-  (( delta >= WARN_DRIFT )) && return 1 # 2=err, 1=warn
+  (( delta >= ERR_DRIFT  )) && return 2 # error
+  (( delta >= WARN_DRIFT )) && return 1 # warn
   return 0
 }
 
