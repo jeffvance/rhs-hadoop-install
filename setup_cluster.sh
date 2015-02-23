@@ -777,7 +777,6 @@ function ambari_server() {
 function update_yarn() {
 
   local out; local err; local ver
-  local channel='rhel-x86_64-server-rhsclient-6'
   local gluster_rpms='glusterfs glusterfs-api glusterfs-fuse glusterfs-libs'
   local glusterfs_ver='3.6' # or higher
 
