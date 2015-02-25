@@ -3,8 +3,7 @@
 # gen_dirs.sh outputs a tuple of "dir:perms:owner" for each of the required
 # hadoop directories.
 # Note: the following users are expected to exist:
-#   ambari-qa, hbase, hcat, hive, mapred, oozie,
-#   tez, yarn, zookeeper
+#   ambari-qa, hbase, hcat, hive, mapred, oozie, tez, yarn, zookeeper
 # Note: the caller is expected to execute mkdir -p on the returned dirs.
 #
 # Syntax:

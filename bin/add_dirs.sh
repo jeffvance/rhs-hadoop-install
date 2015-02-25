@@ -2,7 +2,7 @@
 #
 # add_dirs.sh adds the supplied directories, with the passed-in permissions and
 # owners, on this node (localhost). The caller only needs to invoke add_dirs
-# once for distributed directors. However, for local dirs add_dirs needs to be
+# once for distributed directories. However, for local dirs add_dirs needs to be
 # invoked on each node.
 # Note: the hadoop users and group need to have the same UID and GID across
 #   all nodes in the storage pool and on the mgmt and yarn-master servers; 
