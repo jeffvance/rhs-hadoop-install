@@ -250,7 +250,7 @@ function ntp_time_sync_check() {
     echo "ntp_time_sync_check: \"date +%s\" failed one or more nodes"
     return 2
   fi
-  echo "ntp_time_sync_check: times across nodes ($*): ${times[*]} seconds"
+  #echo "ntp_time_sync_check: times across nodes ($*): ${times[*]} seconds"
 
   times=($(printf '%s\n' "${times[@]}" | sort -u)) # sorted, uniq times
   echo "ntp_time_sync_check: unique times across nodes ($*): ${times[*]} seconds"
