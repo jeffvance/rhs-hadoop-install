@@ -288,8 +288,7 @@ function path_avail() {
 # chk_nodes: verify that each node that will be spanned by the new volume is 
 # prepped for hadoop workloads by invoking bin/check_node.sh. Also, verify that
 # the hadoop GID and user UIDs are consistent across the nodes. And check that
-# each node spanned by the volume is ntp time sync'd. Returns 1 on
-# errors.
+# each node spanned by the volume is ntp time sync'd. Returns 1 on errors.
 # Uses globals:
 #   BRKMNTS()
 #   EXTRA_NODES

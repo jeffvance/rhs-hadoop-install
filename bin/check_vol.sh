@@ -10,7 +10,8 @@
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
 
-errcnt=0; q=''
+declare -A BRKMNTS=() # assoc array
+errcnt=0
 PREFIX="$(dirname $(readlink -f $0))"
 
 source $PREFIX/functions
@@ -32,14 +33,20 @@ VOLNAME="$1"
   echo "Syntax error: volume name is required";
   exit -1; }
 
-[[ -n "$rhs_node" ]] && rhs_node="-n $rhs_node" || rhs_node=''
+[[ -n "$rhs_node" ]] && rhs_node="-n $rhs_node"
 
-NODES=''
+# collect brick mnts per node (typically 1 brick mnt per node)
 for brick in $($PREFIX/find_brick_mnts.sh $rhs_node $VOLNAME); do
-    node=${brick%:*}; NODES+="$node "
+    node=${brick%:*}
     brkmnt=${brick#*:}
+    BRKMNTS[$node]+="$brkmnt "
+done
+NODES="${!BRKMNTS[@]}" # unique nodes
+
+# check unique nodes and brick mnts spanned by vol
+for node in $NODES; do
     [[ "$node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $node"
-    eval "$ssh $PREFIX/check_node.sh $brkmnt"        || ((errcnt++))
+    eval "$ssh $PREFIX/check_node.sh ${BRKMNTS[$node]}" || ((errcnt++))
 done
 
 ntp_time_sync_check $NODES

@@ -5,8 +5,8 @@
 # specific checks. So, we check: ntpd is running, ambari agent running, selinux
 # not enabled, hadoop users and local hadoop directories exist.
 # Syntax:
-#  $@= required list of xfs brick mount directory paths, each includes the
-#      volume name. Typically the list is a single mount.
+#  $@= required list of xfs brick mount directory paths. Typically the list is
+#      a single mount.
 
 PREFIX="$(dirname $(readlink -f $0))"
 
@@ -46,19 +46,20 @@ function check_brick_mount() {
 
   for mnt in $BRICKMNT; do # can be list but typically just one mnt
       [[ ! -d $mnt ]] && {
-	echo "ERROR: directory $mnt missing on $NODE";
-	return 1; }
+        echo "ERROR: directory $mnt missing on $NODE";
+        return 1; }
+
       out="$(xfs_info $mnt 2>&1)"
       err=$?
       if (( err != 0 )) ; then
-	echo "ERROR $err: xfs_info on $mnt: $out"
-	((errcnt++))
+        echo "ERROR $err: xfs_info on $mnt: $out"
+        ((errcnt++))
       else
         out="$(cut -d' ' -f2 <<<$out | cut -d'=' -f2)" # isize value
- 	if (( out != isize )) ; then
-	  echo "WARN: xfs size on $mnt expected to be $isize; found $out"
-	  ((warncnt++))
-	fi
+        if (( out != isize )) ; then
+          echo "WARN: xfs size on $mnt expected to be $isize; found $out"
+          ((warncnt++))
+        fi
       fi
   done
 
@@ -172,7 +173,7 @@ function check_users() {
 
 errcnt=0
 NODE="$HOSTNAME"
-BRICKMNT="$@" # includes the vol name in path in each mount path
+BRICKMNT="$@" # xfs brick mount
 [[ -z "$BRICKMNT" ]] && {
   echo "Syntax error: xfs brick mount path(s) is required";
   exit -1; }
