@@ -71,6 +71,8 @@ VOLMNT="$2"
   echo "Syntax error: volume mount is required";
   exit -1; }
 
+[[ -z "RHS_NODE" ]] && RHS_NODE="$HOSTNAME"
+
 # set up a glusterfs-fuse mount for the volume if it's not already mounted
 yarn_mount || ((errcnt++))
 

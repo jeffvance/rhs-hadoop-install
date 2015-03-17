@@ -213,7 +213,10 @@ function doUpdate() {
   # extract the properties section and write to tmp config file
   curl -k -s -u $USERID:$PASSWD \
    "$AMBARIURL/api/v1/clusters/$CLUSTER_NAME/configurations?type=$SITE&tag=$SITETAG" \
-  | sed -n '/\"properties\" :/,/}$/p' >$tmp_cfg # just the "properties" section
+  | sed -n '/\"properties\" :/,/}$/p' >$tmp_cfg # "properties" section
+  (( $? != 0 )) || [[ ! -s $tmp_cfg ]] && {
+    echo "ERROR: Cannot get $SITE file or file missing all properties";
+    return 1; }
 
   # extract the target key line, if present
   line="$(grep "\"$configkey\" :" $tmp_cfg)"

@@ -190,40 +190,51 @@ function show_todo() {
 
 }
 
-# setup_yarn: this is the first opportunity to setup the yarn-master server
+# setup_yarn_mount: this is the first opportunity to setup the yarn-master
 # because we need both the yarn-master node and a volume. Invokes setup_yarn.sh
-# script to create the glusterfs-fuse mount for the volume. Also, the yarn/
-# timeline dir is set with the correct owner:group and perms. Returns 1 on
+# script to create the glusterfs-fuse mount for the volume. Returns 1 on
 # errors.
 # Uses globals:
-#   CLUSTER_NAME
-#   MGMT_*
 #   PREFIX
 #   RHS_NODE
 #   VOLMNT
 #   VOLNAME
 #   YARN_INSIDE
 #   YARN_NODE
-function setup_yarn() {
+function setup_yarn_mount() {
 
-  local out; local err; local dir
+  local out; local err
+
+  (( YARN_INSIDE )) && return 0 # nothing to do
+
+  debug "creating the $VOLNAME mount on $YARN_NODE (yarn-master)..."
+  out="$(ssh $YARN_NODE $PREFIX/bin/setup_yarn.sh -n $RHS_NODE \
+	$VOLNAME $VOLMNT)"
+  err=$?
+  if (( err != 0 )) ; then
+    err $err "setup_yarn.sh on $YARN_NODE: $out"
+    return 1
+  fi
+
+  debug "setup_yarn on $YARN_NODE:\n$out"
+  debug "created the $VOLNAME mount on $YARN_NODE (yarn-master)"
+  return 0
+}
+
+# setup_yarn_timeline: sets the yarn timeline dir with the correct owner:group
+# and perms. Executed on the yarn node. Returns 1 on errors.
+# Uses globals:
+#   CLUSTER_NAME
+#   MGMT_*
+#   PREFIX
+#   YARN_NODE
+function setup_yarn_timeline() {
+
+  local out; local dir
   local yarn_owner='yarn:hadoop'; local yarn_perms='0755'
   local yarn_timeline_prop='yarn.timeline-service.leveldb-timeline-store.path'
 
-  if (( ! YARN_INSIDE )) ; then # yarn node is not a rhs node, so need vol mnt
-    verbose "--- setting up the yarn-master: $YARN_NODE..."
-    out="$(ssh $YARN_NODE $PREFIX/bin/setup_yarn.sh -n $RHS_NODE \
-	$VOLNAME $VOLMNT)"
-    err=$?
-    if (( err != 0 )) ; then
-      err $err "setup_yarn on $YARN_NODE: $out"
-      return 1
-    fi
-    debug -e "setup_yarn on $YARN_NODE:\n$out"
-  fi
-
-  # set yarn/timeline dir with correct owner and perms
-  debug "update yarn local directories on $YARN_NODE (yarn-master)..."
+  debug "set perms on yarn timeline dir on $YARN_NODE (yarn-master)..."
 
   dir="$($PREFIX/bin/find_prop_value.sh $yarn_timeline_prop yarn \
 	$MGMT_NODE:$MGMT_PORT $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
@@ -232,7 +243,9 @@ function setup_yarn() {
     err "$dir"
     return 1
   fi
+
   dir="$(dirname $dir)" # save just the left-most dirs in the path
+  debug "yarn timeline dir is $dir"
 
   # chown -R && chmod -R the yarn dir 
   out="$(ssh $YARN_NODE "
@@ -246,9 +259,8 @@ function setup_yarn() {
   (( $? != 0 )) && {
     err "chown/chmod local yarn dir \"$dir\": $out";
     return 1; }
-  debug "chown/chmod local yarn dir \"$dir\" on $YARN_NODE (yarn-master)"
 
-  verbose "--- done setting up the yarn-master"
+  debug "chown/chmod local yarn dir \"$dir\" on $YARN_NODE (yarn-master)"
   return 0
 }
 
@@ -325,7 +337,7 @@ function copy_hcat_files() {
   local tgt_dir="$VOLMNT/apps/webhcat"
   local owner='hcat:hadoop'; local perms='0755'
 
-  verbose "--- copying webhcat related jar and tar files as needed..."
+  debug "copying webhcat related jar and tar files as needed..."
 
   # determine which node is running the hcat/webhcat service
   hcat_node="$($PREFIX/bin/find_service_node.sh WEBHCAT WEBHCAT_SERVER \
@@ -367,13 +379,15 @@ function copy_hcat_files() {
   warncnt=$?
   debug "on node $hcat_node: copied jar and/or tar files with $warncnt warnings: $out"
 
-  verbose "--- copied webhcat related jar and tar files as needed"
+  debug "copied webhcat related jar and tar files as needed"
   return 0
 }
 
 # post_processing: do all post-ambari install steps. This includes creating 
-# some distributed dirs, fixing owner/perms on other dirs, coping some jar 
-# and tar files... Mostly done on the yarn node. Returns 1 on errors.
+# the volume mount on the yarn node, creating some distributed dirs, fixing
+# owner/perms on other dirs, copying some jar and tar files if the hcat
+# service was enabled, setting the yarn timeline dir with the correct owner:
+# group and perms. Mostly done on the yarn node. Returns 1 on errors.
 # Uses globals:
 #   PREFIX
 #   RHS_NODE
@@ -383,26 +397,26 @@ function post_processing() {
 
   local err; local ssh; local out
 
-  verbose "--- adding post-processing hadoop directories for $VOLNAME..."
+  verbose "--- post-processing for $VOLNAME..."
   [[ "$RHS_NODE" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $RHS_NODE"
+
+  # setup volume mount on yarn node
+  setup_yarn_mount || return 1
+
+  # set yarn/timeline dir with correct owner and perms
+  setup_yarn_timeline || return 1
 
   # add the required post-processing hadoop dirs
   out="$(eval "$ssh $PREFIX/bin/add_dirs.sh $VOLMNT \
 		    $($PREFIX/bin/gen_dirs.sh -p)")"
   err=$?
-  if (( err != 0 )) ; then
-    err $err "could not add required hadoop dirs: $out"
-    return 1
-  fi
-  debug "add_dirs -p $VOLMNT: $out"
-  verbose "--- added post-processing hadoop directories for $VOLNAME"
+  debug "add_dirs.sh: $out"
+  (( err != 0 )) && return 1
 
-  # if hcat service installed, copy select jar and tar files
+  # if hcat service is enabled then copy select jar and tar files
   copy_hcat_files || return 1
 
-  # do post-ambari install setup on the yarn node
-  setup_yarn || return 1
-
+  verbose "--- end post-processing for $VOLNAME"
   return 0
 }
 

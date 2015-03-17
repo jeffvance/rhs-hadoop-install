@@ -35,8 +35,8 @@ if [[ -z "$tag" ]] ; then
 fi
 
 # get the property value
-val="$(curl "http://$url/api/v1/clusters/$cluster/configurations?type={$site}-site&tag=$tag" -s -H 'X-Requested-By: X-Requested-By' -u $userpass \
-    | grep $prop)"
+val="$(curl "http://$url/api/v1/clusters/$cluster/configurations?type=${site}-site&tag=$tag" -s -H 'X-Requested-By: X-Requested-By' -u $userpass \
+    | grep \"$prop\")"
 if (( $? != 0 )) || [[ -z "$val" ]] ; then
   echo "ERROR: property \"$prop\" is missing: $val"
   exit 1

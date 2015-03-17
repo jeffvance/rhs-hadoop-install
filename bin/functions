@@ -472,14 +472,16 @@ function verify_gid_uids() {
 function version_ok() {
 
   local ver=(${1//./ }); local compare_ver=(${2//./ }) # arrays: (v u f)
-  local i
+  local i; local eq
 
   # nested function to parse out numbers and non-numerics from an individual
   # version string component. $1 and $2 are the two version pieces to compare.
-  # Returns 0(true) if $1 >= $2.
+  # Returns 0 if $1 == $2.
+  # Returns 1 if $1 < $2.
+  # Returns 2 if $1 > $2.
   # Note: numbers are compared using (( ... )) and non-numbers are compared
   #   using [[ ... ]]. This is needed so that "12" compares greater than "9".
-  function greater_or_eq() {
+  function equal() {
     local arg1; local arg2; local v1; local v2; local j
 
     # arg1 and arg2 are arrays of the number and/or string parts of a single
@@ -497,26 +499,32 @@ function version_ok() {
 	v1="${arg1[$j]}"
 	v2="${arg2[$j]}"
 	if [[ "$v1" =~ ^[0-9]+$ && "$v2" =~ ^[0-9]+$ ]]; then # all numeric
-	  (( v1 < v2 )) && return 1 # false
-	elif [[ "$v1" < "$v2" ]] ; then
-	  return 1 # false
+	  (( v1 < v2 )) && return 1
+	  (( v1 > v2 )) && return 2
+	else # non-numeric compare
+	  [[ "$v1" < "$v2" ]] && return 1
+	  [[ "$v1" > "$v2" ]] && return 2
 	fi
     done
-    return 0 # true
+    return 0 # same
   }
 
   ## main
 
   [[ -z "$compare_ver" ]] || (( ${#compare_ver[@]} == 0 )) && \
     return 0 # true, no compare-to version
+
   (( ${#compare_ver[@]} > ${#ver[@]} )) && return 1 # false, over specified
 
   # compare each version component, only look at compare_ver num components
   for (( i=0; i<${#compare_ver[@]}; i++ )); do
-      greater_or_eq "${ver[$i]}" "${compare_ver[$i]}" || return 1 # false
+      equal "${ver[$i]}" "${compare_ver[$i]}"
+      eq=$?
+      (( eq == 2 )) && return 0 # true, greater than compare version
+      (( eq == 1 )) && return 1 # false, less than compare version
+      # else, components are equal so far...
   done
-
-  return 0 # true
+  return 0 # true, equal
 }
 
 # vol_exists: invokes gluster vol info to see if VOLNAME exists. Returns 1 on
