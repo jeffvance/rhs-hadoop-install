@@ -478,10 +478,9 @@ vol_exists $VOLNAME $RHS_NODE || {
 
 # uniq nodes spanned by vol
 NODES="$($PREFIX/bin/find_nodes.sh -un $RHS_NODE $VOLNAME)"
-if (( $? != 0 )) || [[ -z "$NODES" ]] ; then
-  err "cannot find nodes spanned by $VOLNAME. $NODES"
-  exit 1
-fi
+(( $? != 0 )) && {
+  err "cannot find nodes spanned by $VOLNAME. $NODES";
+  exit 1; }
 debug "unique nodes spanned by $VOLNAME: $NODES"
 
 # check for passwordless ssh connectivity to all nodes

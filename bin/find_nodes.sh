@@ -49,6 +49,8 @@ fi
   echo "${NODES[@]}"; # errmsg from above
   exit 1; }
 
+[[ -z "$NODES" ]] && exit 1 # no nodes
+
 if [[ -z "$VOLNAME" ]] ; then 
   NODES+=($rhs_node) # since not included in peer status
 else

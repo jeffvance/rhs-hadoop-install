@@ -96,8 +96,9 @@ VOLS="$($PREFIX/find_volumes.sh -n $rhs_node)"  # all volumes in pool
   echo "WARN: cannot find volume(s). $VOLS"
 
 NODES="$($PREFIX/find_nodes.sh -un $rhs_node)"  # all storage nodes in pool
-(( $? != 0 )) || [[ -z "$NODES" ]]  && {
-  echo "ERROR: cannot find trusted pool nodes. $NODES"; exit 1; }
+(( $? != 0 )) && {
+  echo "ERROR: cannot find trusted pool nodes. $NODES";
+  exit 1; }
 
 BRICKS="$($PREFIX/find_brick_mnts.sh -xn $rhs_node)" # all bricks in pool
 (( $? != 0 )) || [[ -z "$BRICKS" ]]  &&
