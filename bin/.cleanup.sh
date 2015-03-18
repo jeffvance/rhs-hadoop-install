@@ -166,7 +166,7 @@ for node in $NODES $yarn_node; do
 	      umount \$mnt
 	    fi
 	    if grep -wqs \$mnt /etc/fstab ; then # delete from fstab
-	      sed -i '\|\$mnt|d' /etc/fstab
+	      sed -i '\|$mnt|d' /etc/fstab
 	    fi
 	    [[ -e \$mnt ]] && rm -rf \$mnt
 	done
