@@ -257,7 +257,7 @@ function setup_yarn_timeline() {
 	echo \"$dir missing on $YARN_NODE\"
         exit 1" )"
   (( $? != 0 )) && {
-    err "chown/chmod local yarn dir \"$dir\": $out";
+    err "chown/chmod local yarn dir: $out";
     return 1; }
 
   debug "chown/chmod local yarn dir \"$dir\" on $YARN_NODE (yarn-master)"
@@ -403,15 +403,15 @@ function post_processing() {
   # setup volume mount on yarn node
   setup_yarn_mount || return 1
 
-  # set yarn/timeline dir with correct owner and perms
-  setup_yarn_timeline || return 1
-
   # add the required post-processing hadoop dirs
   out="$(eval "$ssh $PREFIX/bin/add_dirs.sh $VOLMNT \
 		    $($PREFIX/bin/gen_dirs.sh -p)")"
   err=$?
   debug "add_dirs.sh: $out"
   (( err != 0 )) && return 1
+
+  # set yarn/timeline dir with correct owner and perms
+  setup_yarn_timeline || return 1
 
   # if hcat service is enabled then copy select jar and tar files
   copy_hcat_files || return 1
@@ -434,7 +434,7 @@ function edit_core_site() {
   local mgmt_u; local mgmt_p; local mgmt_port
   local err; local out
 
-  verbose "--- enable $VOLNAME in all core-site.xml files..."
+  quiet "--- enable $VOLNAME in all core-site.xml files..."
 
   [[ -n "$MGMT_USER" ]] && mgmt_u="-u $MGMT_USER"
   [[ -n "$MGMT_PASS" ]] && mgmt_p="-p $MGMT_PASS"
@@ -451,7 +451,7 @@ function edit_core_site() {
   fi
   debug -e "set_glusterfs_uri:\n$out"
 
-  verbose "--- core-site files modified for $VOLNAME"
+  quiet "--- core-site files modified for $VOLNAME"
   return 0
 }
 
