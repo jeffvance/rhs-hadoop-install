@@ -31,7 +31,8 @@ SYNTAX:
 
 $ME --version | --help
 
-$ME [-y] [--quiet | --verbose | --debug] [--replica <cnt>] \\
+$ME [-y] [--quiet | --verbose | --debug] [--replica <rcnt>] \\
+           [--disperse[=<dcnt>]] [--redundacny <Rcnt>] \\
            <volname> <vol-mnt-prefix> <nodes-spec-list>
 
 where:
@@ -48,8 +49,16 @@ where:
 <volname>       : name of the new volume.
 <vol-mnt-prefix>: path of the glusterfs-fuse mount point, eg. /mnt/glusterfs.
                   Note: the volume name will be appended to this mount point.
-cnt             : the volume replica count. Expected values are 2 or 3. The
-                  number of bricks must be a multiple of <cnt>. Default is 2.
+rcnt            : the volume replica count. Expected values are 2 or 3. The
+                  number of bricks must be a multiple of <rcnt>. Default is 2.
+dcnt            : the volume disperse count. Dcnt can be omitted in which case
+                  the number of bricks specified in the <nodes-spec-list> is
+                  used. For replicated volumes, dcnt must be less than the
+                  total number of bricks. 
+Rcnt            : the redundancy count. The default Rcnt is computed so that
+                  the number of bricks minus Rcnt is a power of 2.
+                  Note: if --disperse and/or --redundancy are specified the new
+                        volume will be a dispersed volume.
 -y              : (optional) auto answer "yes" to all prompts. Default is the 
                   script waits for the user to answer each prompt.
 --quiet         : (optional) output only basic progress/step messages. Default.
@@ -65,14 +74,18 @@ EOF
 # parse_cmd: simple positional parsing. Returns 1 on errors.
 # Sets globals:
 #   AUTO_YES
+#   DISPERSE
+#   DISPERSE_CNT
 #   VOLNAME
 #   VOLMNT
 #   NODE_SPEC (node:brkmnt)
 #   REPLICA_CNT
+#   REDUNDANCY_CNT
 function parse_cmd() {
 
   local errcnt=0
-  local long_opts='help,version,quiet,verbose,debug,replica:'
+  local cnt_opts='replica:,disperse::,redundancy:'
+  local long_opts="help,version,quiet,verbose,debug,$cnt_opts"
 
   eval set -- "$(getopt -o 'y' --long $long_opts -- $@)"
 
@@ -86,6 +99,15 @@ function parse_cmd() {
         ;;
         --replica)
           REPLICA_CNT=$2; shift 2; continue
+        ;;
+        --disperse) # dcnt is optional
+	  shift
+          DISPERSE=1 # true
+	  [[ -n "$1" ]] && DISPERSE_CNT=$1
+          shift; continue
+        ;;
+        --redundancy)
+          REDUNDANCY_CNT=$2; shift 2; continue
         ;;
         --quiet)
           VERBOSE=$LOG_QUIET; shift; continue
@@ -231,16 +253,28 @@ function set_non_vol_nodes() {
 # used to create the new volume.
 # Uses globals:
 #   BRKMNTS
+#   DISPERSE
+#   DISPERSE_CNT
 #   EXTRA_NODES
+#   REDUNDANCY_CNT
+#   REPLICA_CNT
 #   VOLMNT
 #   VOLNAME
 #   VOL_NODES
 function show_todo() {
 
-  local node; local fmt_node; local fill
+  local node; local fmt_node; local fill; local type=''
 
+  # determine volume type
+  (( ${#VOL_NODES[@]} > 1 ))       && type+='distributed, '
+  (( REPLICA_CNT > 1 ))            && type+='replicated, '
+  (( DISPERSE || REDUNDANCY_CNT )) && type+='dispersed, '
+  type="${type%, }" # delete trailing ", "
+  
   echo
   quiet "*** Volume        : $VOLNAME"
+  [[ -n "$type" ]] && \
+    quiet "*** Volume type   : $type"
   quiet "*** Nodes         : $(echo ${VOL_NODES[*]} | sed 's/ /, /g')"
   [[ -n "$EXTRA_NODES" ]] && {
     quiet "*** Nodes not spanned by vol: $(echo ${EXTRA_NODES[*]} | \
@@ -409,14 +443,17 @@ function add_distributed_dirs() {
 # its performance settings. Returns 1 on errors.
 # Uses globals:
 #   BRKMNTS()
+#   DISPERSE
+#   DISPERSE_CNT
 #   FIRST_NODE
+#   REDUNDANCY_CNT
 #   REPLICA_CNT
 #   VOLNAME
 #   VOL_NODES
 function create_vol() {
 
-  local bricks=''; local err; local out; local node; local i 
-  local mnt; local mnts_per_node
+  local bricks=''; local err; local out; local node; local i; local cmd=''
+  local mnt
   local mnts=(${BRKMNTS[@]}) # array of all mnts across all nodes
   let mnts_per_node=(${#mnts[@]} / ${#VOL_NODES[@]})
 
@@ -435,9 +472,11 @@ function create_vol() {
   debug "bricks: $bricks"
 
   # create the gluster volume
-  out="$(ssh $FIRST_NODE "
-	gluster --mode=script volume create $VOLNAME replica $REPLICA_CNT \
-		$bricks 2>&1")"
+  cmd="gluster --mode=script volume create $VOLNAME replica $REPLICA_CNT"
+  (( DISPERSE ))       && cmd+=" --disperse $DISPERSE_CNT" # dcnt can be empty
+  (( REDUNDANCY_CNT )) && cmd+=" --redundancy $REDUNDANCY_CNT"
+
+  out="$(ssh $FIRST_NODE "$cmd $bricks 2>&1")"
   err=$?
   if (( err != 0 )) ; then
     err $err "gluster volume create $VOLNAME $bricks: $out"
@@ -494,6 +533,9 @@ AUTO_YES=0 # assume false
 VOL_NODES=()
 declare -A BRKMNTS=() # assoc array, node=key list of 1 or more mnt=value
 VERBOSE=$LOG_QUIET # default
+DISPERSE=0 # false
+DISPERSE_CNT=
+REDUNDANCY_CNT=
 
 report_version $ME $PREFIX
 
