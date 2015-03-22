@@ -563,12 +563,9 @@ function setup_nodes() {
 
   verbose "--- validate NTP time sync across cluster..."
   out="$(ntp_time_sync_check $(uniq_nodes ${NODES[@]} $YARN_NODE))"
-  err=$?
-  if (( err == 2 )) ; then
+  if (( $? != 0 )) ; then
     err "$out"
     return 1
-  elif (( err == 1 )) ; then
-    warn "$out"
   else
     debug "ntp time sync: $out"
   fi

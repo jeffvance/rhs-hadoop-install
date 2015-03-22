@@ -230,41 +230,20 @@ function is_ip_addr() {
   return 1 # false
 }
 
-# ntp_time_sync_check: return 0 if the time drift across the passed-in nodes is
-# less than the WARN threshold. Return 1 if the time drift across the nodes is 
-# between the WARN and ERROR thresholds. Return 2 if the time drift is greater
-# than-or-equal-to the ERROR threshold, or any other error is detected.
+# ntp_time_sync_check: return 0 if ntpstat on each node exits with 0 (success),
+# else return 1. Previously this function attempted to measure time differences
+# across the nodes, but this approach was not scalable and had ssh overhead 
+# which could lead to returning an error when there wasn't one.
 function ntp_time_sync_check() {
 
-  # logic below supports a WARN threshold > 1 sec. When WARN_DRIFT=1 then we
-  # return 0 immediately if the unique times array has only a single entry
-  local WARN_DRIFT=1 # second
-  local ERR_DRIFT=5  # seconds
-  local node; local times=(); local delta; local errcnt=0
+  local node
 
-  for node in $@; do # current times in seconds since 1970-01-01 00:00:00 UTC
-      times+=($(ssh $node "date +%s"))
-      (( $? != 0 )) && ((errcnt++))
+  for node in $@; do
+      echo "ntpstat on node $node:"
+      ssh $node ntpstat
+      (( $? != 0 )) && return 1
   done
-  if (( errcnt > 0 || ${#times[@]} == 0 )) ; then # can't get time from 1+ nodes
-    echo "ntp_time_sync_check: \"date +%s\" failed one or more nodes"
-    return 2
-  fi
-  #echo "ntp_time_sync_check: times across nodes ($*): ${times[*]} seconds"
 
-  times=($(printf '%s\n' "${times[@]}" | sort -u)) # sorted, uniq times
-  echo "ntp_time_sync_check: unique times across nodes ($*): ${times[*]} seconds"
-
-  if (( ${#times[@]} == 1 )) ; then # 1 entry means all times w/in <1 sec
-    echo "ntp_time_sync_check: time delta across nodes is less than 1 second"
-    return 0
-  fi
-
-  delta=$((${times[${#times[@]}-1]} - ${times[0]})) # high-low in secs
-  echo "ntp_time_sync_check: time differs across nodes ($*) by $delta second"
-
-  (( delta >= ERR_DRIFT  )) && return 2 # error
-  (( delta >= WARN_DRIFT )) && return 1 # warn
   return 0
 }
 

@@ -280,10 +280,10 @@ function chk_nodes() {
 
   local errcnt=0; local out; local err
 
+  verbose "--- checking that $VOLNAME is setup for hadoop workloads..."
+
   verify_gid_uids $(uniq_nodes $NODES $YARN_NODE)
   (( $? != 0 )) && ((errcnt++))
-
-  verbose "--- checking that $VOLNAME is setup for hadoop workloads..."
 
   out="$($PREFIX/bin/check_vol.sh -n $RHS_NODE $VOLNAME)"
   err=$?
@@ -296,6 +296,16 @@ function chk_nodes() {
     force "all nodes in the cluster are set up correctly for Hadoop workloads."
     force "See the $LOGFILE log file for additional info."
   fi
+
+  verbose "--- validate NTP time sync across cluster..."
+  out="$(ntp_time_sync_check $(uniq_nodes $NODES $YARN_NODE))"
+  if (( $? != 0 )) ; then
+    err "$out"
+    ((errcnt++))
+  else
+    debug "ntp time sync check: $out"
+  fi
+  verbose "--- done validate NTP time sync across cluster"
 
   (( errcnt > 0 )) && return 1
   verbose "--- nodes spanned by $VOLNAME are ready for hadoop workloads"
