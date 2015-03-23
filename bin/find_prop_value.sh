@@ -4,7 +4,7 @@
 # in *-site file.
 # Args: $1=property
 #       $2=site file prefix, eg. "core" or "yarn",
-#       $3=ambari server url (including :port),
+#       $3=ambari server full url (including http:// or https:// and :port),
 #       $4=ambari admin username:password,
 #       $5=(optional) ambari cluster name. If not provided it will be found 
 #          with an extra REST call.
@@ -13,7 +13,7 @@
 
 # check args
 (( $# < 4 || $# > 6 )) && {
-  echo "Syntax error: expect 4-6 args: property, site-file-prefix, ambari url:port, ambari-admin-user:password, optional cluster-name, and optional site-tag(version)";
+  echo "Syntax error: expect 4-6 args: property, site-file-prefix, ambari-url:port, ambari-admin-user:password, optional cluster-name, and optional site-tag(version)";
   exit -1; }
 
 PREFIX="$(dirname $(readlink -f $0))"
@@ -35,7 +35,7 @@ if [[ -z "$tag" ]] ; then
 fi
 
 # get the property value
-val="$(curl "http://$url/api/v1/clusters/$cluster/configurations?type=${site}-site&tag=$tag" -s -H 'X-Requested-By: X-Requested-By' -u $userpass \
+val="$(curl "$url/api/v1/clusters/$cluster/configurations?type=${site}-site&tag=$tag" -s -H 'X-Requested-By: X-Requested-By' -u $userpass \
     | grep \"$prop\")"
 if (( $? != 0 )) || [[ -z "$val" ]] ; then
   echo "ERROR: property \"$prop\" is missing: $val"

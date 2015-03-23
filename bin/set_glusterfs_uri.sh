@@ -33,9 +33,12 @@ Usage: set_glusterfs_uri.sh [-u <ambari-user>] [-p <password>] \\
 
 ambari-user : Optional. Ambari user ID. Default is "admin".
 password    : Optional. Ambari password. Default is "admin".
-ambari-host : Optional. Ambari host name. Default is localhost.
+ambari_host : Optional. Host name for the Ambari server. To use https a url must
+              be provided as the host, eg. "https://ambari.vm". Default is
+              localhost over http.
+port        : Optional. Port number for Ambari server. Default is 8080 for http
+              and 8443 for https.
 cluster-name: Optional. The name of the current cluster.
-port        : Optional. Port number for Ambari server. Default is '8080'.
 path        : Required. Mount path for the volume when the action is prepend or
               append. Not used for the remove action.
 verb        : Required. action to perform to property value:
@@ -56,6 +59,7 @@ EOF
 #   MOUNTPATH
 #   PASSWD
 #   PORT
+#   PROTO
 #   USERID
 #   VOLNAME
 function parse_cmd() {
@@ -74,11 +78,7 @@ function parse_cmd() {
 		usage; exit 0
 	;;
 	--port)
-		if [[ -z "$2" ]]; then
-		  PORT=""
-		else
-		  PORT=":$2"
-		fi
+		PORT=$2
 		shift 2; continue
 	;;
 	--action)
@@ -105,7 +105,12 @@ function parse_cmd() {
 		shift 2; continue
 	;;
 	-h)
-		[[ -n "$2" ]] && AMBARI_HOST="$2"
+		AMBARI_HOST="$2"
+ 		if [[ "${AMBARI_HOST:0:8}" == 'https://' || \
+		      "${AMBARI_HOST:0:7}" == 'http://' ]] ; then
+		  PROTO="${AMBARI_HOST%://*}://"
+		  AMBARI_HOST="{$AMBARI_HOST#*://}" # exclude protocol
+		fi
 		shift 2; continue
 	;;
 	--) # no more args to parse
@@ -125,20 +130,27 @@ function parse_cmd() {
     echo "Syntax error: VOLNAME is missing"; usage; return 1; }
 
   # error is unexpected action
-  [[ -z "$ACTION" ]] && {
+  if [[ -z "$ACTION" ]] ; then
     echo "Syntax error: action verb is missing"; usage; return 1; }
-  case "$ACTION" in
-      append|prepend|remove) # expected...
-      ;;
-      *)
-	echo "Syntax error: action expected to be: prepend|append|remove"
-	usage; return 1
-      ;;
-  esac
+  else
+    case "$ACTION" in
+	append|prepend|remove) # expected...
+	;;
+	*)
+	  echo "Syntax error: action expected to be: prepend|append|remove"
+	  usage; return 1
+	;;
+    esac
+  fi
 
   # error if required options are missing
   [[ -z "$MOUNTPATH" && "$ACTION" != 'remove' ]] && {
     echo "Syntax error: MOUNTPATH is missing"; usage; return 1; }
+
+  # set default port
+  if [[ -z "$PORT" ]] ; then
+    [[ "$PROTO" == 'http://' ]] && PORT=8080 || PORT=8443
+  fi
 
   [[ $DEBUG == true ]] && debug echo "DEBUGGING ON"
   return 0
@@ -169,14 +181,14 @@ DEBUG=false
 _DEBUG="off"
 USERID="admin"
 PASSWD="admin"
-PORT=":8080"
+PROTO='http://'
 AMBARI_HOST='localhost'
 VOLNAME=''
 CLUSTER_NAME=''
 
 parse_cmd $@ || exit -1
 
-AMBARIURL="http://$AMBARI_HOST$PORT"
+AMBARIURL="$PROTO$AMBARI_HOST:$PORT"
 debug echo "########## AMBARIURL = $AMBARIURL"
 
 if [[ -z "$CLUSTER_NAME" ]] ; then

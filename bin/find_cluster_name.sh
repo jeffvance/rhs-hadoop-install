@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # find_cluster_name.sh outputs the name of the current ambari cluster.
-# Args: $1=ambari server url (including :port),
+# Args: $1=ambari server url (including http:// or https:// and :port),
 #       $2=ambari admin username:password.
 
 # check args

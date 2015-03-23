@@ -9,7 +9,7 @@ PREFIX="$(dirname $(readlink -f $0))"
 _DEBUG="off"
 USERID="admin"
 PASSWD="admin"
-PORT=":8080"
+PROTO='http://'
 AMBARI_HOST='localhost'
 SERVICENAME=''
 ACTION=""
@@ -34,8 +34,11 @@ Usage: ambari_service.sh [-u <user>] [-p <password>] [--port <port>] \\
 
 user       : Optional. Ambari user. Default is "admin".
 password   : Optional. Ambari password. Default is "admin".
-port       : Optional. Port number for Ambari server. Default is 8080.
-ambari_host: Optional. Host name for the Ambari server. Default is localhost.
+ambari_host: Optional. Host name for the Ambari server. To use https a url must 
+             be provided as the host, eg. "https://ambari.vm". Default is
+             localhost over http.
+port       : Optional. Port number for Ambari server. Default is 8080 for http
+             and 8443 for https.
 name       : Required. The ambari cluster name.
 verb       : Required. Action to be performed. Expected values: start|stop.
 SERVICE    : Required. The ambari service to be stopped or started, eg. Yarn.
@@ -46,15 +49,16 @@ EOF
 
 # parse_cmd: parses the command line via getopt. Returns 1 on errors. Sets the
 # following globals:
+#   ACTION
 #   AMBARI_HOST
 #   CLUSTER_NAME
 #   _DEBUG
 #   DEBUG
 #   PASSWD
 #   PORT
-#   USERID
-#   ACTION
+#   PROTO
 #   SERVICENAME
+#   USERID
 function parse_cmd(){
 
   local errcnt=0
@@ -72,19 +76,15 @@ function parse_cmd(){
         DEBUG=true;_DEBUG="on"; shift; continue
       ;;
       --port)
-        if [[ -z "$2" ]]; then
-          PORT=""
-        else
-          PORT=":$2"
-        fi
+        PORT=$2
         shift 2; continue
       ;;
       --cluster)
-	[[ -n "$2" ]] && CLUSTER_NAME="$2"
+	CLUSTER_NAME="$2"
 	shift 2; continue
       ;;
       --action)
-	[[ -n "$2" ]] && ACTION="$2"
+	ACTION="$2"
 	shift 2; continue
        ;;
       -u)
@@ -96,7 +96,12 @@ function parse_cmd(){
         shift 2; continue
       ;;
       -h)
-        [[ -n "$2" ]] && AMBARI_HOST="$2"
+        AMBARI_HOST="$2"
+        if [[ "${AMBARI_HOST:0:8}" == 'https://' || \
+           "${AMBARI_HOST:0:7}" == 'http://' ]] ; then
+          PROTO="${AMBARI_HOST%://*}://"
+	  AMBARI_HOST="{$AMBARI_HOST#*://}" # exclude protocol
+	fi
         shift 2; continue
       ;;
       --) # no more args to parse
@@ -124,6 +129,11 @@ function parse_cmd(){
 
   (( errcnt > 0 )) && {
     usage; return 1; }
+
+  # set default port
+  if [[ -z "$PORT" ]] ; then
+    [[ "$PROTO" == 'http://' ]] && PORT=8080 || PORT=8443
+  fi
 
   eval set -- "$@" # move arg pointer so $1 points to next arg past last opt
 
@@ -239,7 +249,7 @@ SCRIPT=$0
 
 parse_cmd $@ || exit -1
 
-AMBARIURL="http://$AMBARI_HOST$PORT"
+AMBARIURL="$PROTO$AMBARI_HOST:$PORT"
 debug echo "########## AMBARIURL = "$AMBARIURL
 debug echo "########## CLUSTER_NAME = "$CLUSTER_NAME
 debug echo "########## SERVICENAME  = "$SERVICENAME
