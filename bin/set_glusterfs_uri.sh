@@ -131,17 +131,19 @@ function parse_cmd() {
 
   # error is unexpected action
   if [[ -z "$ACTION" ]] ; then
-    echo "Syntax error: action verb is missing"; usage; return 1; }
-  else
-    case "$ACTION" in
-	append|prepend|remove) # expected...
-	;;
-	*)
-	  echo "Syntax error: action expected to be: prepend|append|remove"
-	  usage; return 1
-	;;
-    esac
+    echo "Syntax error: action verb is missing"
+    usage
+    return 1
   fi
+  case "$ACTION" in
+      append|prepend|remove) # expected...
+      ;;
+      *)
+	echo "Syntax error: action expected to be: prepend|append|remove"
+	usage
+	return 1
+      ;;
+  esac
 
   # error if required options are missing
   [[ -z "$MOUNTPATH" && "$ACTION" != 'remove' ]] && {

@@ -155,6 +155,31 @@ function parse_cmd() {
   return 0
 }
 
+# get_api_proto_and_port: sets global PROTO and PORT variables from the ambari
+# configuration file. If they are missing then defaults are provided. Returns
+# 1 for errors, else returns 0.
+# Uses globals:
+#   MGMT_NODE
+#   PREFIX
+# Sets globals:
+#   PORT
+#   PROTO
+function get_api_proto_and_port() {
+
+  local out; local ssh=''
+
+  [[ "$MGMT_NODE" == "$HOSTNAME" ]] || ssh="ssh $MGMT_NODE"
+
+  out="$(eval "$ssh $PREFIX/bin/find_proto_and_port.sh")"
+  (( $? != 0 )) && {
+    err "$out -- on $MGMT_NODE";
+    return 1; }
+
+  PROTO="${out% *}" # global
+  PORT=${out#* }    # global
+  return 0
+}
+
 # show_todo: display values set by the user and discovered by enable_vol.
 # Uses globals:
 #   ACTION
@@ -162,6 +187,8 @@ function parse_cmd() {
 #   DEFAULT_VOL
 #   MGMT_NODE
 #   NODES
+#   PORT
+#   PROTO
 #   VOLMNT
 #   VOLNAME
 #   YARN_NODE
@@ -185,6 +212,7 @@ function show_todo() {
   quiet "*** Nodes              : $(echo $NODES | sed 's/ /, /g')"
   quiet "*** Volume mount       : $VOLMNT"
   quiet "*** Ambari mgmt node   : $MGMT_NODE"
+  quiet "***        proto/port  : $PROTO on port $PORT"
   quiet "*** Yarn-master server : $YARN_NODE"
   echo
 
@@ -503,7 +531,11 @@ if (( $? != 0 )) ; then
 fi
 debug "$VOLNAME mount point is $VOLMNT"
 
-CLUSTER_NAME="$($PREFIX/bin/find_cluster_name.sh $MGMT_NODE:$MGMT_PORT \
+# get REST api protocol (http vs https) and port #
+get_api_proto_and_port || exit 1
+API_URL="$PROTO://$MGMT_NODE:$PORT"
+
+CLUSTER_NAME="$($PREFIX/bin/find_cluster_name.sh $API_URL \
 	$MGMT_USER:$MGMT_PASS)"
 if (( $? != 0 )) ; then
   err "Cannot retrieve cluster name: $CLUSTER_NAME"
@@ -511,7 +543,7 @@ if (( $? != 0 )) ; then
 fi
 debug "Cluster name: $CLUSTER_NAME"
 
-DEFAULT_VOL="$($PREFIX/bin/find_default_vol.sh $MGMT_NODE:$MGMT_PORT \
+DEFAULT_VOL="$($PREFIX/bin/find_default_vol.sh $API_URL \
 	$MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
 if (( $? != 0 )) ; then
   warn "Cannot find configured default volume on node: $DEFAULT_VOL"
