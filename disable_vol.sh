@@ -25,9 +25,8 @@ $ME --version | --help
 
 $ME [-y] [--quiet | --verbose | --debug] \\
             [--user <ambari-admin-user>] [--pass <ambari-admin-password>] \\
-            [--port <port-num>] [--hadoop-mgmt-node <node>] \\
-            [--rhs-node <node>] [--yarn-master <node>] \\
-            <volname>
+            [--hadoop-mgmt-node <node>] [--rhs-node <node>] \\
+            [--yarn-master <node>] <volname>
 where:
 
 <volname>    : the RHS volume to be disabled for hadoop workloads.
@@ -36,9 +35,9 @@ where:
 --rhs-node   : (optional) hostname of any of the storage nodes. This is needed
                in order to access the gluster command. Default is localhost
                which, must have gluster cli access.
---hadoop-mgmt-node : (optional) hostname or ip of the hadoop mgmt server which
-               is expected to be outside of the storage pool. Default is
-               localhost.
+--hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server which is
+               expected to be outside of the storage pool. The port number and
+               protocol (http/https) are both omitted. Default is localhost.
 -y           : (optional) auto answer "yes" to all prompts. Default is the
                script waits for the user to answer each prompt.
 --quiet      : (optional) output only basic progress/step messages. Default.
@@ -59,7 +58,6 @@ EOF
 #   AUTO_YES
 #   MGMT_NODE
 #   MGMT_PASS
-#   MGMT_PORT
 #   MGMT_USER
 #   RHS_NODE
 #   VERBOSE
@@ -68,12 +66,11 @@ EOF
 function parse_cmd() {
 
   local opts='y'
-  local long_opts='version,help,yarn-master:,rhs-node:,hadoop-mgmt-node:,user:,pass:,port:,verbose,quiet,debug'
+  local long_opts='version,help,yarn-master:,rhs-node:,hadoop-mgmt-node:,user:,pass:,verbose,quiet,debug'
   local errcnt=0
 
   # global defaults
   MGMT_PASS='admin'
-  MGMT_PORT=8080
   MGMT_USER='admin'
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
@@ -112,9 +109,6 @@ function parse_cmd() {
         ;;
         --pass)
           MGMT_PASS="$2"; shift 2; continue
-        ;;
-        --port)
-          MGMT_PORT="$2"; shift 2; continue
         ;;
         --)
           shift; break
@@ -232,8 +226,10 @@ function new_default_volume() {
 # edit_core_site: invoke bin/set_glusterfs_uri to edit the core-site file and
 # restart all ambari services across the cluster. Returns 1 on errors.
 # Uses globals:
+#   API_URL (omit :port)
 #   CLUSTER_NAME
 #   MGMT_*
+#   PORT
 #   PREFIX
 #   VOLNAME
 function edit_core_site() {
@@ -245,16 +241,15 @@ function edit_core_site() {
 
   [[ -n "$MGMT_USER" ]] && mgmt_u="-u $MGMT_USER"
   [[ -n "$MGMT_PASS" ]] && mgmt_p="-p $MGMT_PASS"
-  [[ -n "$MGMT_PORT" ]] && mgmt_port="--port $MGMT_PORT"
 
-  out="$($PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE $mgmt_u $mgmt_p \
-	 $mgmt_port -c $CLUSTER_NAME --action remove $VOLNAME --debug)" 
+  out="$($PREFIX/bin/set_glusterfs_uri.sh -h ${API_URL%:*} $mgmt_u $mgmt_p \
+	 --port $PORT -c $CLUSTER_NAME --action remove $VOLNAME --debug)" 
   err=$?
   if (( err != 0 )) ; then
-    err -e $err "unset_glusterfs_uri:\n$out"
+    err -e $err "set_glusterfs_uri:\n$out"
     return 1
   fi
-  debug -e "unset_glusterfs_uri:\n$out"
+  debug -e "set_glusterfs_uri:\n$out"
 
   verbose "--- disabled $VOLNAME"
   return 0

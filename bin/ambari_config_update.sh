@@ -128,7 +128,7 @@ function parse_cmd() {
         if [[ "${AMBARI_HOST:0:8}" == 'https://' || \
            "${AMBARI_HOST:0:7}" == 'http://' ]] ; then
           PROTO="${AMBARI_HOST%://*}://"
-          AMBARI_HOST="{$AMBARI_HOST#*://}" # exclude protocol
+          AMBARI_HOST="${AMBARI_HOST#*://}" # exclude protocol
         fi
         shift 2; continue
       ;;
@@ -343,8 +343,7 @@ AMBARIURL="$PROTO$AMBARI_HOST:$PORT"
 debug echo "########## AMBARIURL = "$AMBARIURL
 debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
 
-SITETAG="$(
-	$PREFIX/find_site_tag.sh core "$AMBARIURL" "$USERID:$PASSWD" \
+SITETAG="$($PREFIX/find_site_tag.sh core $AMBARIURL $USERID:$PASSWD \
 	    "$CLUSTER_NAME")" || {
   echo "ERROR: Cannot get current core-site tag: $SITETAG";
   exit 1; }

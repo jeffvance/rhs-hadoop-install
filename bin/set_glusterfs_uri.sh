@@ -109,7 +109,7 @@ function parse_cmd() {
  		if [[ "${AMBARI_HOST:0:8}" == 'https://' || \
 		      "${AMBARI_HOST:0:7}" == 'http://' ]] ; then
 		  PROTO="${AMBARI_HOST%://*}://"
-		  AMBARI_HOST="{$AMBARI_HOST#*://}" # exclude protocol
+		  AMBARI_HOST="${AMBARI_HOST#*://}" # exclude protocol
 		fi
 		shift 2; continue
 	;;
@@ -190,12 +190,13 @@ CLUSTER_NAME=''
 
 parse_cmd $@ || exit -1
 
-AMBARIURL="$PROTO$AMBARI_HOST:$PORT"
+API_URL="$PROTO$AMBARI_HOST:$PORT"
+AMBARIURL="$PROTO$AMBARI_HOST"
 debug echo "########## AMBARIURL = $AMBARIURL"
 
 if [[ -z "$CLUSTER_NAME" ]] ; then
   CLUSTER_NAME="$(
-	$PREFIX/find_cluster_name.sh $AMBARIURL "$USERID:$PASSWD")" || {
+	$PREFIX/find_cluster_name.sh $API_URL "$USERID:$PASSWD")" || {
     echo "$CLUSTER_NAME"; # contains error msg
     exit 1; }
 fi
@@ -204,25 +205,28 @@ debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
 PORT="$(echo "$PORT" | sed 's/[\"\,\:\ ]//g')"
 
 # update the fs.glusterfs.volumes attribute
-CMD="-u $USERID -p $PASSWD -h $AMBARI_HOST --port $PORT \
+CMD="-u $USERID -p $PASSWD -h $AMBARIURL --port $PORT \
     --cluster "$CLUSTER_NAME" --config core-site \
     --configkey fs.glusterfs.volumes --configvalue $VOLNAME --action $ACTION"
 [[ $DEBUG == true ]] && CMD+=" --debug"
 
 debug echo "ambari_config_update.sh $CMD" 
 $PREFIX/ambari_config_update.sh $CMD 
+(( $? != 0 )) && {
+  echo "Error returned by ambari_config_update"; exit 1; }
 
 # add or delete the fs.glusterfs.volume.fuse.<volname> property
 mode='add'
 [[ "$ACTION" == 'remove' ]] && mode='delete'
-CMD="-u $USERID -p $PASSWD -h $AMBARI_HOST --port $PORT \
+CMD="-u $USERID -p $PASSWD -h $AMBARIURL --port $PORT \
     --cluster "$CLUSTER_NAME" --config core-site \
     --configkey fs.glusterfs.volume.fuse.$VOLNAME --action $mode"
 [[ "$mode" == 'add' ]] && CMD+=" --configvalue $MOUNTPATH"
 
 debug echo "ambari_config_update.sh $CMD" 
 $PREFIX/ambari_config_update.sh $CMD 
+(( $? != 0 )) && {
+  echo "Error returned by ambari_config_update"; exit 1; }
 
 restartService
-
 exit 0

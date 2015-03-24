@@ -22,7 +22,7 @@ if [[ -z "$cluster" ]] ; then
     exit 1; }
 fi
 
-tag="$(curl -k -s -u $userpass \
+tag="$(curl -s -u $userpass \
 	$url/api/v1/clusters/$cluster?fields=Clusters/desired_configs \
 	| sed -n "/\"${site}-site\" :/,/\"tag\" :/p" \
 	| tail -n 1 \

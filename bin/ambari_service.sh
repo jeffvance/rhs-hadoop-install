@@ -100,7 +100,7 @@ function parse_cmd(){
         if [[ "${AMBARI_HOST:0:8}" == 'https://' || \
            "${AMBARI_HOST:0:7}" == 'http://' ]] ; then
           PROTO="${AMBARI_HOST%://*}://"
-	  AMBARI_HOST="{$AMBARI_HOST#*://}" # exclude protocol
+	  AMBARI_HOST="${AMBARI_HOST#*://}" # exclude protocol
 	fi
         shift 2; continue
       ;;
