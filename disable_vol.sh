@@ -197,6 +197,7 @@ function show_todo() {
 # the target volume. After accounting for VOLNAME, the new default vol will be
 # the first volume in the list of "fs.glusterfs.volumes" volumes.
 # Uses globals:
+#   API_URL
 #   CLUSTER_NAME
 #   DEFAULT_VOL
 #   MGMT_*
@@ -212,7 +213,7 @@ function new_default_volume() {
 
   if [[ "$DEFAULT_VOL" == "$VOLNAME" ]] ; then
     NEW_DFLT_VOL="$($PREFIX/bin/find_prop_value.sh fs.glusterfs.volumes core \
-	$MGMT_NODE:$MGMT_PORT $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
+	$API_URL $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
     (( $? != 0 )) && NEW_DFLT_VOL=''   # erase err msg if any
 
     # if we have the volume list then extract the new default volname

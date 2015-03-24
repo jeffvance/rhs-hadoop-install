@@ -9,27 +9,20 @@ ssl_prop='api.ssl'
 port_prop='client.api.ssl.port'
 DEF_SSL_PORT=8443
 DEF_NONSSL_PORT=8080
-DEF_PROTO='http'
 
 [[ ! -f "$ambari_conf" ]] && {
   echo "Ambari config file $ambari_conf missing";
   exit 1; }
 
 # see if api.ssl prop exists in ambari conf file
+proto='http'
 prop_val="$(grep ${ssl_prop}= $ambari_conf)"
-if (( $? != 0 )) || [[ -z "$prop_val" ]] ; then
-  proto="$DEF_PROTO"
-else  # have property
-  proto="#{prop_val#*=}"
-fi
+[[ "${prop_val#*=}" == true ]] && proto='https' # use ssl
 
 # see if port prop exists in ambari conf file
+port=$DEF_NONSSL_PORT
 prop_val="$(grep ${port_prop}= $ambari_conf)"
-if (( $? != 0 )) || [[ -z "$prop_val" ]] ; then
-  port=$DEF_NONSSL_PORT
-else  # have property
-  port=#{prop_val#*=}
-fi
+(( $? == 0 )) && [[ -n "$prop_val" ]] && port=${prop_val#*=}
 
 echo "$proto $port"
 exit 0

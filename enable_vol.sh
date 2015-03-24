@@ -252,6 +252,7 @@ function setup_yarn_mount() {
 # setup_yarn_timeline: sets the yarn timeline dir with the correct owner:group
 # and perms. Executed on the yarn node. Returns 1 on errors.
 # Uses globals:
+#   API_URL
 #   CLUSTER_NAME
 #   MGMT_*
 #   PREFIX
@@ -265,7 +266,7 @@ function setup_yarn_timeline() {
   debug "set perms on yarn timeline dir on $YARN_NODE (yarn-master)..."
 
   dir="$($PREFIX/bin/find_prop_value.sh $yarn_timeline_prop yarn \
-	$MGMT_NODE:$MGMT_PORT $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
+	$API_URL $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
   if (( $? != 0 )) || [[ -z "$dir" ]] ; then
     err "Cannot retrieve yarn dir path therefore cannot chown local yarn dir"
     err "$dir"
@@ -363,6 +364,7 @@ function setup_multi_tenancy() {
 # copy_hcat_files: if the hcat service is enabled then determine which node it
 # resides on, and copy select jar/tar files to that node.
 # Uses globals:
+#   API_URL
 #   CLUSTER_NAME
 #   MGMT_*
 #   PREFIX
@@ -379,7 +381,7 @@ function copy_hcat_files() {
 
   # determine which node is running the hcat/webhcat service
   hcat_node="$($PREFIX/bin/find_service_node.sh WEBHCAT WEBHCAT_SERVER \
-	$MGMT_NODE:$MGMT_PORT $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
+	$API_URL $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
   if (( $? != 0)) || [[ -z "$hcat_node" ]]; then
     debug "cannot find WEBHCAT service node, copy cannot be done: $hcat_node"
     return 0 # not an error
