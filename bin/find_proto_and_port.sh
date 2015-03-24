@@ -14,13 +14,16 @@ DEF_NONSSL_PORT=8080
   echo "Ambari config file $ambari_conf missing";
   exit 1; }
 
-# see if api.ssl prop exists in ambari conf file
+# protocol
 proto='http'
+# see if api.ssl prop exists in ambari conf file
 prop_val="$(grep ${ssl_prop}= $ambari_conf)"
 [[ "${prop_val#*=}" == true ]] && proto='https' # use ssl
 
-# see if port prop exists in ambari conf file
+# port
 port=$DEF_NONSSL_PORT
+[[ "$proto" == 'https' ]] && port=$DEF_SSL_PORT
+# see if port prop exists in ambari conf file
 prop_val="$(grep ${port_prop}= $ambari_conf)"
 (( $? == 0 )) && [[ -n "$prop_val" ]] && port=${prop_val#*=}
 
