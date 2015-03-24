@@ -61,7 +61,6 @@ where:
                debugging.
 --user       : the ambari admin user name. Default: "admin".
 --pass       : the password for --user. Default: "admin".
---port       : the port number used by the ambari server. Default: 8080.
 --version    : output only the version string.
 --help       : this text.
 
