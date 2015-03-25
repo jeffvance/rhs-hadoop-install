@@ -190,19 +190,16 @@ CLUSTER_NAME=''
 
 parse_cmd $@ || exit -1
 
-API_URL="$PROTO$AMBARI_HOST:$PORT"
 AMBARIURL="$PROTO$AMBARI_HOST"
 debug echo "########## AMBARIURL = $AMBARIURL"
 
 if [[ -z "$CLUSTER_NAME" ]] ; then
   CLUSTER_NAME="$(
-	$PREFIX/find_cluster_name.sh $API_URL "$USERID:$PASSWD")" || {
+	$PREFIX/find_cluster_name.sh $AMBARIURL:$PORT $USERID:$PASSWD)" || {
     echo "$CLUSTER_NAME"; # contains error msg
     exit 1; }
 fi
 debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
-
-PORT="$(echo "$PORT" | sed 's/[\"\,\:\ ]//g')"
 
 # update the fs.glusterfs.volumes attribute
 CMD="-u $USERID -p $PASSWD -h $AMBARIURL --port $PORT \
