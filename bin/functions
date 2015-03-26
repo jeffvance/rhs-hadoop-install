@@ -355,14 +355,9 @@ function setup_selinux() {
 # $@=list of nodes.
 function uniq_nodes() {
 
-  local node; local uniq=()
+  local nodes=($@)
  
-  for node in $@; do
-      [[ "${uniq[*]}" =~ $node ]] && continue
-      uniq+=($node)
-  done
-
-  echo "${uniq[*]}"
+  printf '%s\n' "${nodes[@]}" | sort -u
 }
 
 # validate_ntp_conf: validate the ntp config file by ensuring there is at least
