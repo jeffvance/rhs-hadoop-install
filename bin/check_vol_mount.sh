@@ -6,7 +6,8 @@
 # settings, defined in /etc/fstab.
 # Syntax:
 #   $1=volume name
-#   $2=optional list of nodes to check
+#   $2=optional list of nodes to check. If omitted the nodes are derived using
+#      the -n storage node value.
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
 
@@ -21,18 +22,18 @@
 function chk_mnt() {
 
   local curr_opts="$1"; local expt_opts="$2"; local warn_opts="$3"
-  local errcnt=0; local warncnt=0; local mnt
+  local errcnt=0; local warncnt=0; local opt
 
-  for mnt in $expt_opts; do
-      if ! grep -q "$mnt" <<<$curr_opts; then
-	echo "ERROR: required gluster mount option $mnt must be set"
+  for opt in $expt_opts; do
+      if [[ "$curr_opts" =~ "$opt" ]] ; then
+	echo "ERROR: required volume mount option \"${opt%=*}\" must be set to \"${opt#*=}\""
 	((errcnt++))
       fi
   done
 
-  for mnt in $warn_opts; do
-      if grep -q "$mnt" <<<$curr_opts; then
-	echo "WARN: \"$mnt\" option should not be set"
+  for opt in $warn_opts; do
+      if [[ "$curr_opts" =~ "$opt" ]] ; then
+	echo "WARN: volume mount option \"${opt%=*}\" should not be set to \"${opt#*=}\""
 	((warncnt++))
       fi
   done
@@ -116,10 +117,11 @@ function check_vol_mnt_attrs() {
       return 1
     fi
     
-    mntopts="$(grep "$VOLNAME\s.*\sglusterfs\s" $tmpfstab)"
-    mntopts=${mntopts#* glusterfs }
+    mntopts="$(grep "\s+$VOLMNT\s+glusterfs\s" $tmpfstab)"
+    mntopts="${mntopts#* glusterfs }"
+    mntopts="${mntopts%% *}" # skip runlevels
     # call chk_mnt() and return it's rtncode
-    chk_mnt "$mntopts" "$CHK_MNTOPTS" "$CHK_MNTOPTS_WARN"
+    chk_mnt "${mntopts//,/ }" "$CHK_MNTOPTS" "$CHK_MNTOPTS_WARN"
   }
 
   ## main 
@@ -160,18 +162,13 @@ PREFIX="$(dirname $(readlink -f $0))"
 # required fstab mount options
 CHK_MNTOPTS="$($PREFIX/gen_vol_mnt_options.sh)"
 CHK_MNTOPTS="${CHK_MNTOPTS//,/ }" # replace commas with spaces
-
 # required "live" mount options
 CHK_MNTOPTS_LIVE="$($PREFIX/gen_vol_mnt_options.sh -l)"
-CHK_MNTOPTS_LIVE="${CHK_MNTOPTS_LIVE//,/ }"
-
 # fstab opts to warn user if set
 CHK_MNTOPTS_WARN="$($PREFIX/gen_vol_mnt_options.sh -w)"
-CHK_MNTOPTS_WARN="${CHK_MNTOPTS_WARN//,/ }"
-
+CHK_MNTOPTS_WARN="${CHK_MNTOPTS_WARN//,/ }" # replace commas with spaces
 # "live" opts to warn user if set
 CHK_MNTOPTS_LIVE_WARN="$($PREFIX/gen_vol_mnt_options.sh -wl)"
-CHK_MNTOPTS_LIVE_WARN="${CHK_MNTOPTS_LIVE_WARN//,/ }"
 
 # parse cmd opts
 while getopts ':n:' opt; do
