@@ -4,6 +4,9 @@
 # workloads. This includes: checking the glusterfs-fuse mount options, the
 # block device mount options, the volume performance settings, and executing
 # bin/check_node.sh for each node spanned by the volume.
+# Exit status 1 indicates one or more errors (and possibly warnings).
+# Exit status 2 indicates one or more warnings and no errors.
+# Exit status 0 indicates no errors or warnings.
 #
 # Syntax:
 #   $1=volume name (required).
@@ -11,7 +14,7 @@
 #      storage node.
 
 declare -A BRKMNTS=() # assoc array
-errcnt=0
+errcnt=0; warncnt=0
 PREFIX="$(dirname $(readlink -f $0))"
 
 source $PREFIX/functions
@@ -49,9 +52,19 @@ for node in $NODES; do
     eval "$ssh $PREFIX/check_node.sh ${BRKMNTS[$node]}" || ((errcnt++))
 done
 
-$PREFIX/check_vol_mount.sh $rhs_node $VOLNAME $NODES || ((errcnt++))
-$PREFIX/check_vol_perf.sh $rhs_node $VOLNAME         || ((errcnt++))
+$PREFIX/check_vol_mount.sh $VOLNAME $NODES
+rtn=$?
+(( rtn == 1 )) && ((errcnt++)) || \
+(( rtn == 2 )) && ((warncnt++))
+
+$PREFIX/check_vol_perf.sh $rhs_node $VOLNAME || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
-echo "$VOLNAME is ready for hadoop workloads"
+echo -n "$VOLNAME is ready for hadoop workloads"
+(( warncnt > 0 )) && {
+  echo -n " with $warncnt warnings";
+  echo;
+  exit 2; }
+
+echo # flush
 exit 0

@@ -287,14 +287,19 @@ function chk_nodes() {
 
   out="$($PREFIX/bin/check_vol.sh -n $RHS_NODE $VOLNAME)"
   err=$?
-  debug "check_vol: $out"
-  if (( err != 0 )) ; then # 1 or more issues detected on volume
+  if (( err == 1 )) ; then
     ((errcnt++))
     err "issues with 1 or more nodes spanned by $VOLNAME"
-    debug "Nodes spanned by $VOLNAME: $NODES"
+    err "$out"
     force "A suggestion is to re-run the setup_cluster.sh script to ensure that"
     force "all nodes in the cluster are set up correctly for Hadoop workloads."
     force "See the $LOGFILE log file for additional info."
+  elif (( err == 2 )) ; then
+    warn "potential issues with 1 or more nodes spanned by $VOLNAME"
+    warn "$out"
+    warn "See the $LOGFILE log file for additional info."
+  else
+    debug "check_vol: $out"
   fi
 
   verbose "--- validate NTP time sync across cluster..."

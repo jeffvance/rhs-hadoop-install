@@ -172,7 +172,8 @@ function gluster_mnt_vol() {
     fi
     mntopts+=',_netdev' # always append _netdev
     # persist mnt in fstab
-    echo $node:/$vol $mnt glusterfs $mntopts 0 0 >>/etc/fstab
+    echo "adding to /etc/fstab: $node:/$vol $mnt glusterfs $mntopts 0 0"
+    echo "$node:/$vol $mnt glusterfs $mntopts 0 0" >>/etc/fstab
   fi
 
   # create the mount dir
@@ -180,7 +181,8 @@ function gluster_mnt_vol() {
 
   # mount the vol if not already mounted. MUST be done before chmod/chown!
   if (( err == 0 )) && ! grep -qs $mnt /proc/mounts ; then
-    mount $mnt 2>&1
+    echo "creating $vol mount: $mnt with $mntopts"
+    mount $mnt 2>&1 # mount via fstab
     err=$?
     (( err == 32 )) && err=0 # 32==already mounted
   fi

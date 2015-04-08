@@ -4,12 +4,16 @@
 # has the vol mount setup correctly. This include verifying both the "live"
 # settings, determined by the gluster "state" file, and the "persistent"
 # settings, defined in /etc/fstab.
+# Exit status 1 indicates one or more errors (and possibly warnings).
+# Exit status 2 indicates one or more warnings and no errors.
+# Exit status 0 indicates no errors or warnings.
 # Syntax:
 #   $1=volume name
 #   $2=optional list of nodes to check. If omitted the nodes are derived using
-#      the -n storage node value.
-#   -n=any storage node. Optional, but if not supplied then localhost must be a
-#      storage node.
+#      the -n storage node.
+#   -n=any storage node. Optional. If not supplied and $2 (nodes) is supplied
+#      then the first $2 node is used as -n. If not supplied and $2 is also not
+#      supplied then localhost is assumed for -n.
 
 
 # chk_mnt: given the passed-in existing vol mount opts and the passed-in
@@ -25,7 +29,7 @@ function chk_mnt() {
   local errcnt=0; local warncnt=0; local opt
 
   for opt in $expt_opts; do
-      if [[ "$curr_opts" =~ "$opt" ]] ; then
+      if [[ ! "$curr_opts" =~ "$opt" ]] ; then
 	echo "ERROR: required volume mount option \"${opt%=*}\" must be set to \"${opt#*=}\""
 	((errcnt++))
       fi
@@ -91,6 +95,8 @@ function check_vol_mnt_attrs() {
 
     # extract mount opts section from state file
     mntopts="$(sed -n "/$section/,/^\[/p" $state_file | tr '\n' ' ')"
+    mntopts=${mntopts#*] }  # remove leading section name
+    mntopts=${mntopts%  [*} # remove trailing section name
 
     # verify the current mnt options and return chk_mnts rtncode
     chk_mnt "$mntopts" "$CHK_MNTOPTS_LIVE" "$CHK_MNTOPTS_LIVE_WARN"
@@ -117,7 +123,7 @@ function check_vol_mnt_attrs() {
       return 1
     fi
     
-    mntopts="$(grep "\s+$VOLMNT\s+glusterfs\s" $tmpfstab)"
+    mntopts="$(grep -E "\s+$VOLMNT\s+glusterfs\s" $tmpfstab)"
     mntopts="${mntopts#* glusterfs }"
     mntopts="${mntopts%% *}" # skip runlevels
     # call chk_mnt() and return it's rtncode
@@ -129,22 +135,16 @@ function check_vol_mnt_attrs() {
   echo "--- $node: live $VOLNAME mount options check..."
   live_check $node
   err=$?
-  if (( err == 1 )) ; then
-    ((errcnt++))
-  elif (( err == 2 )) ; then
-    ((warncnt++))
-  fi
+  (( err == 1 )) && ((errcnt++)) || (( err == 2 )) && ((warncnt++))
 
   echo "--- $node: /etc/fstab $VOLNAME mount options check..."
   fstab_check $node
   err=$?
-  if (( err == 1 )) ; then
-    ((errcnt++))
-  elif (( err == 2 )) ; then
-    ((warncnt++))
-  fi
+  (( err == 1 )) && ((errcnt++)) || (( err == 2 )) && ((warncnt++))
 
-  (( errcnt > 0 )) && return 1
+  (( errcnt > 0 )) && {
+    echo "$VOLNAME mount on $node has errors and needs to be corrected";
+    return 1; }
 
   echo -n "$VOLNAME mount setup correctly on $node"
   (( warncnt > 0 )) && echo -n " with warnings"
@@ -155,7 +155,7 @@ function check_vol_mnt_attrs() {
 
 ## main ## 
 
-errcnt=0; cnt=0
+warncnt=0; errcnt=0; cnt=0
 PREFIX="$(dirname $(readlink -f $0))"
 
 # assign all combos of mount options (live, fstab, warn, required)
@@ -187,9 +187,15 @@ VOLNAME="$1"; shift
   echo "Syntax error: volume name is required";
   exit -1; }
 
-[[ -n "$rhs_node" ]] && rhs_node="-n $rhs_node" || rhs_node=''
-
 NODES="$@" # optional list of nodes
+
+# set default for rhs_node
+if [[ -z "$rhs_node" ]] ; then
+  [[ -z "$NODES" ]] && rhs_node='' || rhs_node="${NODES%% *}" # first node
+fi
+[[ -n "$rhs_node" ]] && rhs_node="-n $rhs_node"
+
+# get list of nodes if needed
 [[ -z "$NODES" ]] && NODES="$($PREFIX/find_nodes.sh $rhs_node $VOLNAME)" 
 
 # find volume mount
@@ -201,9 +207,15 @@ fi
 
 for node in $NODES; do
     ((cnt++)) # num of nodes
-    check_vol_mnt_attrs $node || ((errcnt++))
+    check_vol_mnt_attrs $node
+    rtn=$?
+    (( rtn == 1 )) && ((errcnt++)) || \
+    (( rtn == 2 )) && ((warnrcnt++))
 done
 
 (( errcnt > 0 )) && exit 1
-echo "The $cnt nodes spanned by $VOLNAME have the correct vol mount settings"
+
+echo "The $cnt nodes spanned by $VOLNAME have the correct volume mount"
+(( warncnt > 0 )) && exit 2
+
 exit 0
