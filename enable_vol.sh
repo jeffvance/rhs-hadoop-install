@@ -287,17 +287,17 @@ function chk_nodes() {
 
   out="$($PREFIX/bin/check_vol.sh -n $RHS_NODE $VOLNAME)"
   err=$?
-  if (( err == 1 )) ; then
-    ((errcnt++))
-    err "issues with 1 or more nodes spanned by $VOLNAME"
-    err "$out"
-    force "A suggestion is to re-run the setup_cluster.sh script to ensure that"
-    force "all nodes in the cluster are set up correctly for Hadoop workloads."
+  if (( err == 1 || err == 2 )) ; then
+    if (( err == 1 )) ; then
+      ((errcnt++))
+      err "issues with 1 or more nodes spanned by $VOLNAME"
+      force "A suggestion is to re-run the setup_cluster.sh script to ensure that"
+      force "all nodes in the cluster are set up correctly for Hadoop workloads."}
+    else
+      warn "potential issues with 1 or more nodes spanned by $VOLNAME"
+    fi
+    force "$out"
     force "See the $LOGFILE log file for additional info."
-  elif (( err == 2 )) ; then
-    warn "potential issues with 1 or more nodes spanned by $VOLNAME"
-    warn "$out"
-    warn "See the $LOGFILE log file for additional info."
   else
     debug "check_vol: $out"
   fi

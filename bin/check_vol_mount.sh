@@ -50,7 +50,9 @@ function chk_mnt() {
 # check_vol_mnt_attrs: verify that the correct mount settings for VOLNAME have
 # been set on the passed-in node. This include verifying both the "live" 
 # settings, defined by gluster state; and the "persistent" settings, defined
-# in /etc/fstab.
+# in /etc/fstab. Returns 1 if any error is detected. Returns 2 if there are no
+# errors but one or more warnings are detected. Returns 0 of there are no errors
+# and no warnings.
 function check_vol_mnt_attrs() {
 
   local node="$1"
@@ -142,12 +144,16 @@ function check_vol_mnt_attrs() {
   err=$?
   (( err == 1 )) && ((errcnt++)) || (( err == 2 )) && ((warncnt++))
 
-  (( errcnt > 0 )) && {
-    echo "$VOLNAME mount on $node has errors and needs to be corrected";
-    return 1; }
+  if (( errcnt > 0 )) ; then
+    echo "$VOLNAME mount on $node has errors and needs to be corrected"
+    return 1
+  else
+    echo -n "$VOLNAME mount setup correctly on $node"
+    (( warncnt > 0 )) && {
+      echo " with warnings"; 
+      return 2; }
+  fi
 
-  echo -n "$VOLNAME mount setup correctly on $node"
-  (( warncnt > 0 )) && echo -n " with warnings"
   echo # flush
   return 0
 }
@@ -210,7 +216,7 @@ for node in $NODES; do
     check_vol_mnt_attrs $node
     rtn=$?
     (( rtn == 1 )) && ((errcnt++)) || \
-    (( rtn == 2 )) && ((warnrcnt++))
+    (( rtn == 2 )) && ((warncnt++))
 done
 
 (( errcnt > 0 )) && exit 1

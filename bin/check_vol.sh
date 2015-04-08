@@ -54,12 +54,12 @@ done
 
 $PREFIX/check_vol_mount.sh $VOLNAME $NODES
 rtn=$?
-(( rtn == 1 )) && ((errcnt++)) || \
-(( rtn == 2 )) && ((warncnt++))
+(( rtn == 1 )) && ((errcnt++)) || (( rtn == 2 )) && ((warncnt++))
 
 $PREFIX/check_vol_perf.sh $rhs_node $VOLNAME || ((errcnt++))
 
 (( errcnt > 0 )) && exit 1
+
 echo -n "$VOLNAME is ready for hadoop workloads"
 (( warncnt > 0 )) && {
   echo -n " with $warncnt warnings";
