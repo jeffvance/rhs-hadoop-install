@@ -110,9 +110,12 @@ function check_vol_mnt_attrs() {
 
     local node="$1"
     local mntopts; local cnt
+    local tmpfstab="$(mktemp --suffix _fstab)"
 
-    # volume mount should appear only once in fstab (skip comments)
-    cnt=$(grep -E "\s+$VOLMNT\s+glusterfs\s" | grep -cvE '^#|^ *#'
+    # create tmp file containing non-blank, non-comment records in /etc/fstab
+    ssh $node "sed '/^ *#/d;/^ *$/d;s/#.*//' /etc/fstab" >$tmpfstab
+
+    cnt=$(grep -c -E "\s+$VOLMNT\s+glusterfs\s" $tmpfstab)
     if (( cnt != 1 )) ; then
       echo -n "ERROR on $node: $VOLMNT mount "
       (( cnt == 0 )) && 
@@ -122,8 +125,7 @@ function check_vol_mnt_attrs() {
       return 1
     fi
     
-    # use same grep to get the actual volume mount (skip comments again)
-    mntopts="$(grep -E "\s+$VOLMNT\s+glusterfs\s" | grep -vE '^#|^ *#')"
+    mntopts="$(grep -E "\s+$VOLMNT\s+glusterfs\s" $tmpfstab)"
     mntopts="${mntopts#* glusterfs }"
     mntopts="${mntopts%% *}" # skip runlevels
     # call chk_mnt() and return it's rtncode
@@ -213,8 +215,8 @@ for node in $NODES; do
     ((cnt++)) # num of nodes
     check_vol_mnt_attrs $node
     rtn=$?
-    (( rtn == 1 )) && ((errcnt++)) || \
-    (( rtn == 2 )) && ((warncnt++))
+    (( rtn == 1 )) && ((errcnt++)) \
+    || (( rtn == 2 )) && ((warncnt++))
 done
 
 (( errcnt > 0 )) && exit 1
