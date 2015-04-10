@@ -7,13 +7,12 @@
 #   kernel/fuse bugs/issues. We need these values set to 1(default) to get
 #   acceptable performance, but due kernel/fuse/ESTALE issues, we have to 
 #   temporarily set them to 0, meaning no fuse caching.
-# Note: different options and formats are returned depending on the -l and -w
-#   flags.
+# Note: different formats are returned depending on the -l and -w flags.
 # Args:
 #   -l : return "live" data meaning mount info you find in the /var/run/gluster
-#        "state" file. Default is to return mnt options used in /etc/fstab.
+#        "state" file. Default is to return mnt format used in /etc/fstab.
 #   -w : return mnt options we want to warn about. Default is to return the
-#        required mnt options.
+#        required mnt format.
 
 LIVE=0 # false
 WARN=0 # false
