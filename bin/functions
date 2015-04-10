@@ -148,8 +148,11 @@ function get_ambari_repo(){
 }
 
 # gluster_mnt_vol: on localhost, persist the passed-in volume, node, and mount
-# as a native glusterfs-fuse mount with the correct owner and permissions.
-# Returns the exit-code from the mount command.
+# (via fstab) as a native glusterfs-fuse mount with the correct owner and
+# permissions. Returns the exit-code from the mount command.
+# Note: if the volume mount is present in fstab then it is used as is. If not
+#   present in fstab then the required mount is added to fstab. The mount is 
+#   always done via fstab.
 # Note: the order of mounting first then setting perms and owner matters!
 # Note: _netdev is appended to the mount opts.
 # Args:
@@ -170,7 +173,11 @@ function gluster_mnt_vol() {
       prefix="$(dirname $BASH_SOURCE)" # sourced functions file dir
       mntopts="$($prefix/gen_vol_mnt_options.sh)" # required mnt opts
     fi
-    mntopts+=',_netdev' # always append _netdev
+    # append _netdev to mntopts if not present
+    if [[ ! "$mntopts" =~ _netdev ]] ; then
+      [[ -n "$mntopt" ]] && mntopts+=','
+      mntopts+='_netdev'
+    fi
     # persist mnt in fstab
     echo "adding to /etc/fstab: $node:/$vol $mnt glusterfs $mntopts 0 0"
     echo "$node:/$vol $mnt glusterfs $mntopts 0 0" >>/etc/fstab
