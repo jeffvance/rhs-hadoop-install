@@ -110,12 +110,9 @@ function check_vol_mnt_attrs() {
 
     local node="$1"
     local mntopts; local cnt
-    local tmpfstab="$(mktemp --suffix _fstab)"
 
-    # create tmp file containing all non-blank, non-comment records in /etc/fstab
-    ssh $node "sed '/^ *#/d;/^ *$/d;s/#.*//' /etc/fstab" >$tmpfstab
-
-    cnt=$(grep -c -E "\s+$VOLMNT\s+glusterfs\s" $tmpfstab)
+    # volume mount should appear only once in fstab (skip comments)
+    cnt=$(grep -E "\s+$VOLMNT\s+glusterfs\s" | grep -cvE '^#|^ *#'
     if (( cnt != 1 )) ; then
       echo -n "ERROR on $node: $VOLMNT mount "
       (( cnt == 0 )) && 
@@ -125,7 +122,8 @@ function check_vol_mnt_attrs() {
       return 1
     fi
     
-    mntopts="$(grep -E "\s+$VOLMNT\s+glusterfs\s" $tmpfstab)"
+    # use same grep to get the actual volume mount (skip comments again)
+    mntopts="$(grep -E "\s+$VOLMNT\s+glusterfs\s" | grep -vE '^#|^ *#')"
     mntopts="${mntopts#* glusterfs }"
     mntopts="${mntopts%% *}" # skip runlevels
     # call chk_mnt() and return it's rtncode

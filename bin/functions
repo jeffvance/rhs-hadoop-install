@@ -167,15 +167,16 @@ function gluster_mnt_vol() {
   local perms=0755 # rwxr-xr-x
   local prefix; local err=0
 
-  # append to fstab if not present
-  if ! grep -qs $mnt /etc/fstab ; then # mnt not present in fstab
+  # append to fstab if not present (ignore comments)
+  grep $mnt /etc/fstab | grep -vqE '^#|^ *#'
+  if (( $? != 0 )) ; then # mnt not present
     if [[ -z "$mntopts" ]] ; then # set default mount opts
       prefix="$(dirname $BASH_SOURCE)" # sourced functions file dir
       mntopts="$($prefix/gen_vol_mnt_options.sh)" # required mnt opts
     fi
     # append _netdev to mntopts if not present
     if [[ ! "$mntopts" =~ _netdev ]] ; then
-      [[ -n "$mntopt" ]] && mntopts+=','
+      [[ -n "$mntopts" ]] && mntopts+=','
       mntopts+='_netdev'
     fi
     # persist mnt in fstab
