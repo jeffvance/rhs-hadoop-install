@@ -118,9 +118,8 @@ function check_vol_mnt_attrs() {
     cnt=$(grep -c -E "\s+$VOLMNT\s+glusterfs\s" $tmpfstab)
     if (( cnt != 1 )) ; then
       echo -n "ERROR on $node: $VOLMNT mount "
-      (( cnt == 0 )) && 
-	echo "missing in /etc/fstab." ||
-	echo "appears more than once in /etc/fstab."
+      (( cnt == 0 )) && echo "missing in /etc/fstab." \
+      || echo "appears more than once in /etc/fstab."
       echo "  Expect the following mount options: $CHK_MNTOPTS"
       return 1
     fi
