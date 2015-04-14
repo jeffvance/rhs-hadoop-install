@@ -5,7 +5,7 @@
 # the full brick or volume mount record, or the number of matching mounts, or
 # shell true if the mount exists, depending on options.
 # Syntax:
-#   find_mount.sh [--vol|--brick] [--live|fstab] [--filter <grep-extra>] \
+#   find_mount.sh [--vol|--brick] [--live|--fstab] [--filter <grep-extra>] \
 #                 [--rtn-mnt|--rtn-cnt|--rtn-exists] [<node>]
 # Example:
 #   find_mount.sh --fstab --filter $VOLNAME rhs-1.vm
@@ -84,7 +84,7 @@ type=" $type "
 filter=''
 [[ -n "$FILTER" ]] && filter="grep -E \"$FILTER\" $tgt_file |"
 
-# handle comments if fstab
+# handle comments in fstab
 skip_comments=''
 if (( FSTAB )) ; then
   skip_comments='grep -vE "^#|^ *#"'
@@ -103,8 +103,7 @@ fi
 
 out="$(eval "$ssh 
 	$filter $skip_comments grep $grep_opts "$type" $tgt_file
-      $ssh_close
-")"
+      $ssh_close ")"
 err=$?
 
 (( RTN_EXISTS )) && exit $err

@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# find_volmnt.sh discovers the gluster volume mount directory for the passed in
-# volume (required). A single line containing just the "vol-mnt" is output. Eg.
-# "/mnt/glusterfs/HadoopVol".
+# find_volmnt.sh outputs the mounted (live) gluster volume mount directory
+# for the passed in volume (required). A single line containing just the
+# "vol-mnt" is output. Eg. "/mnt/glusterfs/HadoopVol".
 # Args:
 #   $1=volume name (required).
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
@@ -27,7 +27,7 @@ VOLNAME="$1"
   echo "Syntax error: volume name is required";
   exit -1; }
 
-mnt=($($PREFIX/find_mount.sh --live --vol --filter $VOLNAME $rhs_node))
+mnt=($($PREFIX/find_mount.sh --live --vol --filter $VOLNAME $rhs_node)) # array
 
 [[ -z "$mnt" ]] || (( ${#mnt[@]} < 2 )) && exit 1
 

@@ -168,7 +168,7 @@ function gluster_mnt_vol() {
   local err
   local prefix="$(dirname $BASH_SOURCE)" # sourced functions file dir
 
-  # append to fstab if not present (ignore comments)
+  # append to fstab if not present
   if ! $prefix/find_mount.sh --fstab --vol --filter $mnt --rtn-exists ; then
     if [[ -z "$mntopts" ]] ; then # set default mount opts
       mntopts="$($prefix/gen_vol_mnt_options.sh)" # required mnt opts
