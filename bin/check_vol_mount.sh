@@ -110,12 +110,8 @@ function check_vol_mnt_attrs() {
 
     local node="$1"
     local mntopts; local cnt
-    local tmpfstab="$(mktemp --suffix _fstab)"
 
-    # create tmp file containing non-blank, non-comment records in /etc/fstab
-    ssh $node "sed '/^ *#/d;/^ *$/d;s/#.*//' /etc/fstab" >$tmpfstab
-
-    cnt=$(grep -c -E "\s+$VOLMNT\s+glusterfs\s" $tmpfstab)
+    cnt=$($PREFIX/find_mount.sh --vol --fstab --filter $VOLMNT --rtn-cnt $node)
     if (( cnt != 1 )) ; then
       echo -n "ERROR on $node: $VOLMNT mount "
       (( cnt == 0 )) && echo "missing in /etc/fstab." \
@@ -124,7 +120,7 @@ function check_vol_mnt_attrs() {
       return 1
     fi
     
-    mntopts="$(grep -E "\s+$VOLMNT\s+glusterfs\s" $tmpfstab)"
+    mntopts="$($PREFIX/find_mount.sh --vol --fstab --filter $VOLMNT $node)"
     mntopts="${mntopts#* glusterfs }"
     mntopts="${mntopts%% *}" # skip runlevels
     # call chk_mnt() and return it's rtncode
@@ -136,12 +132,20 @@ function check_vol_mnt_attrs() {
   echo "--- $node: live $VOLNAME mount options check..."
   live_check $node
   err=$?
-  (( err == 1 )) && ((errcnt++)) || (( err == 2 )) && ((warncnt++))
+  if (( err == 1 )) ; then
+    ((errcnt++))
+  elif (( err == 2 )) ; then
+    ((warncnt++))
+  fi
 
   echo "--- $node: /etc/fstab $VOLNAME mount options check..."
   fstab_check $node
   err=$?
-  (( err == 1 )) && ((errcnt++)) || (( err == 2 )) && ((warncnt++))
+  if (( err == 1 )) ; then
+    ((errcnt++))
+  elif (( err == 2 )) ; then
+    ((warncnt++))
+  fi
 
   if (( errcnt > 0 )) ; then
     echo "$VOLNAME mount on $node has errors and needs to be corrected"
@@ -214,8 +218,11 @@ for node in $NODES; do
     ((cnt++)) # num of nodes
     check_vol_mnt_attrs $node
     rtn=$?
-    (( rtn == 1 )) && ((errcnt++)) \
-    || (( rtn == 2 )) && ((warncnt++))
+    if (( rtn == 1 )) ; then
+      ((errcnt++))
+    elif (( rtn == 2 )) ; then
+      ((warncnt++))
+    fi
 done
 
 (( errcnt > 0 )) && exit 1

@@ -8,6 +8,8 @@
 #   -n=any storage node. Optional, but if not supplied then localhost must be a
 #      storage node.
 
+PREFIX="$(dirname $(readlink -f $0))"
+
 # parse cmd opts
 while getopts ':n:' opt; do
     case "$opt" in
@@ -19,23 +21,15 @@ while getopts ':n:' opt; do
     esac
 done
 shift $((OPTIND-1))
+
 VOLNAME="$1"
 [[ -z "$VOLNAME" ]] && {
   echo "Syntax error: volume name is required";
   exit -1; }
 
-if [[ -z "$rhs_node" ]] ; then
-  ssh=''; ssh_close='' # assume localhost
-else  # use supplied node
-  ssh="ssh $rhs_node '"; ssh_close="'"
-fi
+mnt=($($PREFIX/find_mount.sh --live --vol --filter $VOLNAME $rhs_node))
 
-out="$(eval "$ssh 
-	mnt=(\$(grep -E \":/$VOLNAME\s+.*\s+fuse.glusterfs\s\" /proc/mounts))
-	echo \${mnt[1]} # /vol-mount-path
-      $ssh_close
-")"
+[[ -z "$mnt" ]] || (( ${#mnt[@]} < 2 )) && exit 1
 
-[[ -z "$out" ]] && exit 1
-echo $out
+echo ${mnt[1]} # /vol-mount-path
 exit 0

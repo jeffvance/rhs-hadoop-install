@@ -165,13 +165,12 @@ function gluster_mnt_vol() {
   local node=$1; local vol=$2; local mnt=$3; local mntopts=$4
   local owner="yarn:hadoop" # assumes both have been created!
   local perms=0755 # rwxr-xr-x
-  local prefix; local err=0
+  local err
+  local prefix="$(dirname $BASH_SOURCE)" # sourced functions file dir
 
   # append to fstab if not present (ignore comments)
-  grep $mnt /etc/fstab | grep -vqE '^#|^ *#'
-  if (( $? != 0 )) ; then # mnt not present
+  if ! $prefix/find_mount.sh --fstab --vol --filter $mnt --rtn-exists ; then
     if [[ -z "$mntopts" ]] ; then # set default mount opts
-      prefix="$(dirname $BASH_SOURCE)" # sourced functions file dir
       mntopts="$($prefix/gen_vol_mnt_options.sh)" # required mnt opts
     fi
     # append _netdev to mntopts if not present
@@ -186,9 +185,11 @@ function gluster_mnt_vol() {
 
   # create the mount dir
   mkdir -p $mnt 2>&1
+  err=$?
 
   # mount the vol if not already mounted. MUST be done before chmod/chown!
-  if (( err == 0 )) && ! grep -qs $mnt /proc/mounts ; then
+  if (( err == 0 )) && \
+     ! $prefix/find_mount.sh --live --vol --filter $mnt --rtn-exists ; then
     echo "creating $vol mount: $mnt with $mntopts"
     mount $mnt 2>&1 # mount via fstab
     err=$?

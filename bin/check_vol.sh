@@ -54,7 +54,11 @@ done
 
 $PREFIX/check_vol_mount.sh $VOLNAME $NODES
 rtn=$?
-(( rtn == 1 )) && ((errcnt++)) || (( rtn == 2 )) && ((warncnt++))
+if (( rtn == 1 )) ; then
+  ((errcnt++))
+elif (( rtn == 2 )) ; then
+  ((warncnt++))
+fi
 
 $PREFIX/check_vol_perf.sh $rhs_node $VOLNAME || ((errcnt++))
 
