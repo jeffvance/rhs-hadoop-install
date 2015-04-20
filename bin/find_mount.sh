@@ -1,24 +1,25 @@
 #!/bin/bash
 #
-# find_mount.sh greps in /proc/mounts or /etc/fstab, depending on options, 
-# searching for the volume or brick mount, depending on options, and returns
-# the full brick or volume mount record, or the number of matching mounts, or
-# shell true if the mount exists, depending on options.
+# find_mount.sh greps in /proc/mounts or /etc/fstab on the optional passed-in
+# node, searching for the volume or brick mount, depending on options, and
+# returns the full brick or volume mount record, or the number of matching
+# mounts, or shell true if the mount exists, depending on options.
 # Syntax:
 #   find_mount.sh [--vol|--brick] [--live|--fstab] [--filter <grep-extra>] \
 #                 [--rtn-mnt|--rtn-cnt|--rtn-exists] [<node>]
 # Example:
 #   find_mount.sh --fstab --filter $VOLNAME rhs-1.vm
-# outputs the gluster voume mount on node rhs-1.vm for the supplied volume
+# outputs the gluster-fuse mount on node rhs-1.vm for the supplied volume.
 #
 # Args:
-#   --vol|--brick, flag to find volume vs brick mount, default is vol.
-#   --fstab|--live, flag to find mount in /etc/fstab or /proc/mounts, default
-#     is live.
-#   --rtn-mnt|--rtn-cnt|--rtn-exists, flag indicating what to return either via
-#     output or exit status, default is rtn-mnt.
-#   --filter, additional grep filter, default is "".
-#   <node>, node to execute grep on, default is localhost.
+#   --vol|--brick   flag to find the volume vs brick mount, default is vol.
+#   --fstab|--live  flag to find the mount in /etc/fstab or /proc/mounts,
+#		    default is live.
+#   --rtn-mnt|--rtn-cnt|--rtn-exists
+#                   flag indicating what to return either via output or the exit
+#		    status, default is rtn-mnt.
+#   --filter        additional grep filter, default is "".
+#   <node>          node to execute grep on, default is localhost.
 
 # defaults
 VOLMNT=1     # true
@@ -102,7 +103,7 @@ fi
 [[ -n "$filter" || -n "$skip_comments" ]] && tgt_file='' # already handled
 
 out="$(eval "$ssh 
-	$filter $skip_comments grep $grep_opts "$type" $tgt_file
+	$filter $skip_comments grep $grep_opts \"$type\" $tgt_file
       $ssh_close ")"
 err=$?
 
