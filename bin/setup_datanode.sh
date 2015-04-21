@@ -99,11 +99,13 @@ function mount_blkdev() {
       blkdev=${BLKDEV[$i]}
       [[ ! -e $brkmnt ]] && mkdir -p $brkmnt
 
-      if ! grep -qsw $brkmnt /etc/fstab ; then
+      if ! $PREFIX/find_mount.sh --brick --fstab --filter $brkmnt \
+		--rtn-exists; then
  	echo "$blkdev $brkmnt xfs $mntopts 0 0" >>/etc/fstab
       fi
 
-      if ! grep -qsw $brkmnt /proc/mounts ; then
+      if ! $PREFIX/find_mount.sh --brick --live --filter $brkmnt \
+		--rtn-exists; then
  	mount $brkmnt 2>&1 # via fstab entry
  	err=$?
  	if (( err != 0 )) ; then

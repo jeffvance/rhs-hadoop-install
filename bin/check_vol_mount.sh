@@ -4,11 +4,16 @@
 # has the vol mount setup correctly. This include verifying both the "live"
 # settings, determined by the gluster "state" file, and the "persistent"
 # settings, defined in /etc/fstab.
+# Exit status 1 indicates one or more errors (and possibly warnings).
+# Exit status 2 indicates one or more warnings and no errors.
+# Exit status 0 indicates no errors or warnings.
 # Syntax:
 #   $1=volume name
-#   $2=optional list of nodes to check
-#   -n=any storage node. Optional, but if not supplied then localhost must be a
-#      storage node.
+#   $2=optional list of nodes to check. If omitted the nodes are derived using
+#      the -n storage node.
+#   -n=any storage node. Optional. If not supplied and $2 (nodes) is supplied
+#      then the first $2 node is used as -n. If not supplied and $2 is also not
+#      supplied then localhost is assumed for -n.
 
 
 # chk_mnt: given the passed-in existing vol mount opts and the passed-in
@@ -21,18 +26,18 @@
 function chk_mnt() {
 
   local curr_opts="$1"; local expt_opts="$2"; local warn_opts="$3"
-  local errcnt=0; local warncnt=0; local mnt
+  local errcnt=0; local warncnt=0; local opt
 
-  for mnt in $expt_opts; do
-      if ! grep -q "$mnt" <<<$curr_opts; then
-	echo "ERROR: required gluster mount option $mnt must be set"
+  for opt in $expt_opts; do
+      if [[ ! "$curr_opts" =~ "$opt" ]] ; then
+	echo "ERROR: required volume mount option \"${opt%=*}\" must be set to \"${opt#*=}\""
 	((errcnt++))
       fi
   done
 
-  for mnt in $warn_opts; do
-      if grep -q "$mnt" <<<$curr_opts; then
-	echo "WARN: \"$mnt\" option should not be set"
+  for opt in $warn_opts; do
+      if [[ "$curr_opts" =~ "$opt" ]] ; then
+	echo "WARN: volume mount option \"${opt%=*}\" should not be set to \"${opt#*=}\""
 	((warncnt++))
       fi
   done
@@ -45,7 +50,9 @@ function chk_mnt() {
 # check_vol_mnt_attrs: verify that the correct mount settings for VOLNAME have
 # been set on the passed-in node. This include verifying both the "live" 
 # settings, defined by gluster state; and the "persistent" settings, defined
-# in /etc/fstab.
+# in /etc/fstab. Returns 1 if any error is detected. Returns 2 if there are no
+# errors but one or more warnings are detected. Returns 0 of there are no errors
+# and no warnings.
 function check_vol_mnt_attrs() {
 
   local node="$1"
@@ -90,6 +97,8 @@ function check_vol_mnt_attrs() {
 
     # extract mount opts section from state file
     mntopts="$(sed -n "/$section/,/^\[/p" $state_file | tr '\n' ' ')"
+    mntopts=${mntopts#*] }  # remove leading section name
+    mntopts=${mntopts%  [*} # remove trailing section name
 
     # verify the current mnt options and return chk_mnts rtncode
     chk_mnt "$mntopts" "$CHK_MNTOPTS_LIVE" "$CHK_MNTOPTS_LIVE_WARN"
@@ -101,25 +110,21 @@ function check_vol_mnt_attrs() {
 
     local node="$1"
     local mntopts; local cnt
-    local tmpfstab="$(mktemp --suffix _fstab)"
 
-    # create tmp file containing all non-blank, non-comment records in /etc/fstab
-    ssh $node "sed '/^ *#/d;/^ *$/d;s/#.*//' /etc/fstab" >$tmpfstab
-
-    cnt=$(grep -c -E "\s+$VOLMNT\s+glusterfs\s" $tmpfstab)
+    cnt=$($PREFIX/find_mount.sh --vol --fstab --filter $VOLMNT --rtn-cnt $node)
     if (( cnt != 1 )) ; then
       echo -n "ERROR on $node: $VOLMNT mount "
-      (( cnt == 0 )) && 
-	echo "missing in /etc/fstab." ||
-	echo "appears more than once in /etc/fstab."
+      (( cnt == 0 )) && echo "missing in /etc/fstab." \
+      || echo "appears more than once in /etc/fstab."
       echo "  Expect the following mount options: $CHK_MNTOPTS"
       return 1
     fi
     
-    mntopts="$(grep "$VOLNAME\s.*\sglusterfs\s" $tmpfstab)"
-    mntopts=${mntopts#* glusterfs }
+    mntopts="$($PREFIX/find_mount.sh --vol --fstab --filter $VOLMNT $node)"
+    mntopts="${mntopts#* glusterfs }"
+    mntopts="${mntopts%% *}" # skip runlevels
     # call chk_mnt() and return it's rtncode
-    chk_mnt "$mntopts" "$CHK_MNTOPTS" "$CHK_MNTOPTS_WARN"
+    chk_mnt "${mntopts//,/ }" "$CHK_MNTOPTS" "$CHK_MNTOPTS_WARN"
   }
 
   ## main 
@@ -142,10 +147,16 @@ function check_vol_mnt_attrs() {
     ((warncnt++))
   fi
 
-  (( errcnt > 0 )) && return 1
+  if (( errcnt > 0 )) ; then
+    echo "$VOLNAME mount on $node has errors and needs to be corrected"
+    return 1
+  else
+    echo -n "$VOLNAME mount setup correctly on $node"
+    (( warncnt > 0 )) && {
+      echo " with warnings"; 
+      return 2; }
+  fi
 
-  echo -n "$VOLNAME mount setup correctly on $node"
-  (( warncnt > 0 )) && echo -n " with warnings"
   echo # flush
   return 0
 }
@@ -153,25 +164,20 @@ function check_vol_mnt_attrs() {
 
 ## main ## 
 
-errcnt=0; cnt=0
+warncnt=0; errcnt=0; cnt=0
 PREFIX="$(dirname $(readlink -f $0))"
 
 # assign all combos of mount options (live, fstab, warn, required)
 # required fstab mount options
 CHK_MNTOPTS="$($PREFIX/gen_vol_mnt_options.sh)"
 CHK_MNTOPTS="${CHK_MNTOPTS//,/ }" # replace commas with spaces
-
 # required "live" mount options
 CHK_MNTOPTS_LIVE="$($PREFIX/gen_vol_mnt_options.sh -l)"
-CHK_MNTOPTS_LIVE="${CHK_MNTOPTS_LIVE//,/ }"
-
 # fstab opts to warn user if set
 CHK_MNTOPTS_WARN="$($PREFIX/gen_vol_mnt_options.sh -w)"
-CHK_MNTOPTS_WARN="${CHK_MNTOPTS_WARN//,/ }"
-
+CHK_MNTOPTS_WARN="${CHK_MNTOPTS_WARN//,/ }" # replace commas with spaces
 # "live" opts to warn user if set
 CHK_MNTOPTS_LIVE_WARN="$($PREFIX/gen_vol_mnt_options.sh -wl)"
-CHK_MNTOPTS_LIVE_WARN="${CHK_MNTOPTS_LIVE_WARN//,/ }"
 
 # parse cmd opts
 while getopts ':n:' opt; do
@@ -190,9 +196,15 @@ VOLNAME="$1"; shift
   echo "Syntax error: volume name is required";
   exit -1; }
 
-[[ -n "$rhs_node" ]] && rhs_node="-n $rhs_node" || rhs_node=''
-
 NODES="$@" # optional list of nodes
+
+# set default for rhs_node
+if [[ -z "$rhs_node" ]] ; then
+  [[ -z "$NODES" ]] && rhs_node='' || rhs_node="${NODES%% *}" # first node
+fi
+[[ -n "$rhs_node" ]] && rhs_node="-n $rhs_node"
+
+# get list of nodes if needed
 [[ -z "$NODES" ]] && NODES="$($PREFIX/find_nodes.sh $rhs_node $VOLNAME)" 
 
 # find volume mount
@@ -204,9 +216,18 @@ fi
 
 for node in $NODES; do
     ((cnt++)) # num of nodes
-    check_vol_mnt_attrs $node || ((errcnt++))
+    check_vol_mnt_attrs $node
+    rtn=$?
+    if (( rtn == 1 )) ; then
+      ((errcnt++))
+    elif (( rtn == 2 )) ; then
+      ((warncnt++))
+    fi
 done
 
 (( errcnt > 0 )) && exit 1
-echo "The $cnt nodes spanned by $VOLNAME have the correct vol mount settings"
+
+echo "The $cnt nodes spanned by $VOLNAME have the correct volume mount"
+(( warncnt > 0 )) && exit 2
+
 exit 0

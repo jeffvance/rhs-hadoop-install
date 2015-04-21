@@ -148,8 +148,11 @@ function get_ambari_repo(){
 }
 
 # gluster_mnt_vol: on localhost, persist the passed-in volume, node, and mount
-# as a native glusterfs-fuse mount with the correct owner and permissions.
-# Returns the exit-code from the mount command.
+# (via fstab) as a native glusterfs-fuse mount with the correct owner and
+# permissions. Returns the exit-code from the mount command.
+# Note: if the volume mount is present in fstab then it is used as is. If not
+#   present in fstab then the required mount is added to fstab. The mount is 
+#   always done via fstab.
 # Note: the order of mounting first then setting perms and owner matters!
 # Note: _netdev is appended to the mount opts.
 # Args:
@@ -162,25 +165,33 @@ function gluster_mnt_vol() {
   local node=$1; local vol=$2; local mnt=$3; local mntopts=$4
   local owner="yarn:hadoop" # assumes both have been created!
   local perms=0755 # rwxr-xr-x
-  local prefix; local err=0
+  local err
+  local prefix="$(dirname $BASH_SOURCE)" # sourced functions file dir
 
   # append to fstab if not present
-  if ! grep -qs $mnt /etc/fstab ; then # mnt not present in fstab
+  if ! $prefix/find_mount.sh --fstab --vol --filter $mnt --rtn-exists ; then
     if [[ -z "$mntopts" ]] ; then # set default mount opts
-      prefix="$(dirname $BASH_SOURCE)" # sourced functions file dir
       mntopts="$($prefix/gen_vol_mnt_options.sh)" # required mnt opts
     fi
-    mntopts+=',_netdev' # always append _netdev
+    # append _netdev to mntopts if not present
+    if [[ ! "$mntopts" =~ _netdev ]] ; then
+      [[ -n "$mntopts" ]] && mntopts+=','
+      mntopts+='_netdev'
+    fi
     # persist mnt in fstab
-    echo $node:/$vol $mnt glusterfs $mntopts 0 0 >>/etc/fstab
+    echo "adding to /etc/fstab: $node:/$vol $mnt glusterfs $mntopts 0 0"
+    echo "$node:/$vol $mnt glusterfs $mntopts 0 0" >>/etc/fstab
   fi
 
   # create the mount dir
   mkdir -p $mnt 2>&1
+  err=$?
 
   # mount the vol if not already mounted. MUST be done before chmod/chown!
-  if (( err == 0 )) && ! grep -qs $mnt /proc/mounts ; then
-    mount $mnt 2>&1
+  if (( err == 0 )) && \
+     ! $prefix/find_mount.sh --live --vol --filter $mnt --rtn-exists ; then
+    echo "creating $vol mount: $mnt with $mntopts"
+    mount $mnt 2>&1 # mount via fstab
     err=$?
     (( err == 32 )) && err=0 # 32==already mounted
   fi

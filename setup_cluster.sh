@@ -622,10 +622,10 @@ function pool_exists() {
     local node
 
     # extract node from glusterfs-fuse mount if it exists
-    node="$(ssh $YARN_NODE "grep -m 1 ' glusterfs ' /etc/fstab | cut -d: -f1")"
+    node="$($PREFIX/bin/find_mount.sh --vol --fstab $YARN_NODE | cut -d: -f1)"
     [[ -z "$node" ]] && {
       debug "no glusterfs-fuse mount found on yarn-master ($YARN_NODE)";
-      return 1; } # no pool
+      return 1; }
 
     debug "found node $node in /etc/fstab on $YARN_NODE"
     # set FIRST_NODE to node and return 0 (true)
