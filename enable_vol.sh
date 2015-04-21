@@ -37,9 +37,8 @@ $ME --version | --help
 
 $ME [-y] [--quiet | --verbose | --debug] [--make-default] \\
            [--user <ambari-admin-user>] [--pass <ambari-admin-password>] \\
-           [--port <port-num>] [--hadoop-mgmt-node <node>] \\
-           [--rhs-node <node>] [--yarn-master <node>] \\
-           <volname>
+           [--hadoop-mgmt-node <node>] [--rhs-node <node>] \\
+           [--yarn-master <node>] <volname>
 where:
 
 <volname>    : the RHS volume to be enabled for hadoop workloads.
@@ -49,7 +48,8 @@ where:
                in order to access the gluster command. Default is localhost
                which, must have gluster cli access.
 --hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server which is
-               expected to be outside of the storage pool. Default is localhost.
+               expected to be outside of the storage pool. The port number and
+               protocol (http/https) are both omitted. Default is localhost.
 --make-default: if specified then the volume is set to be the default volume
                used when hadoop job URIs are unqualified. Default is to NOT 
                make this volume the default volume.
@@ -61,7 +61,6 @@ where:
                debugging.
 --user       : the ambari admin user name. Default: "admin".
 --pass       : the password for --user. Default: "admin".
---port       : the port number used by the ambari server. Default: 8080.
 --version    : output only the version string.
 --help       : this text.
 
@@ -74,7 +73,6 @@ EOF
 #   AUTO_YES
 #   MGMT_NODE
 #   MGMT_PASS
-#   MGMT_PORT
 #   MGMT_USER
 #   RHS_NODE
 #   VERBOSE
@@ -83,12 +81,11 @@ EOF
 function parse_cmd() {
 
   local opts='y'
-  local long_opts='version,help,make-default,yarn-master:,rhs-node:,hadoop-mgmt-node:,user:,pass:,port:,verbose,quiet,debug'
+  local long_opts='version,help,make-default,yarn-master:,rhs-node:,hadoop-mgmt-node:,user:,pass:,verbose,quiet,debug'
   local errcnt=0
 
   # global defaults
   MGMT_PASS='admin'
-  MGMT_PORT=8080
   MGMT_USER='admin'
   
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
@@ -131,9 +128,6 @@ function parse_cmd() {
         --pass)
           MGMT_PASS="$2"; shift 2; continue
         ;;
-        --port)
-          MGMT_PORT="$2"; shift 2; continue
-        ;;
         --)
           shift; break
         ;;
@@ -155,6 +149,32 @@ function parse_cmd() {
   return 0
 }
 
+# get_api_proto_and_port: sets global PROTO and PORT variables from the ambari
+# configuration file. If they are missing then defaults are provided. Returns
+# 1 for errors, else returns 0.
+# Uses globals:
+#   MGMT_NODE
+#   PREFIX
+# Sets globals:
+#   PORT
+#   PROTO
+function get_api_proto_and_port() {
+
+  local out; local ssh=''
+
+  [[ "$MGMT_NODE" == "$HOSTNAME" ]] || ssh="ssh $MGMT_NODE"
+
+  out="$(eval "$ssh $PREFIX/bin/find_proto_and_port.sh")"
+  (( $? != 0 )) && {
+    err "$out -- on $MGMT_NODE";
+    return 1; }
+  debug "proto/port= $out"
+
+  PROTO="${out% *}" # global
+  PORT=${out#* }    # global
+  return 0
+}
+
 # show_todo: display values set by the user and discovered by enable_vol.
 # Uses globals:
 #   ACTION
@@ -162,6 +182,8 @@ function parse_cmd() {
 #   DEFAULT_VOL
 #   MGMT_NODE
 #   NODES
+#   PORT
+#   PROTO
 #   VOLMNT
 #   VOLNAME
 #   YARN_NODE
@@ -185,6 +207,7 @@ function show_todo() {
   quiet "*** Nodes              : $(echo $NODES | sed 's/ /, /g')"
   quiet "*** Volume mount       : $VOLMNT"
   quiet "*** Ambari mgmt node   : $MGMT_NODE"
+  quiet "***        proto/port  : $PROTO on port $PORT"
   quiet "*** Yarn-master server : $YARN_NODE"
   echo
 
@@ -224,6 +247,7 @@ function setup_yarn_mount() {
 # setup_yarn_timeline: sets the yarn timeline dir with the correct owner:group
 # and perms. Executed on the yarn node. Returns 1 on errors.
 # Uses globals:
+#   API_URL
 #   CLUSTER_NAME
 #   MGMT_*
 #   PREFIX
@@ -237,7 +261,7 @@ function setup_yarn_timeline() {
   debug "set perms on yarn timeline dir on $YARN_NODE (yarn-master)..."
 
   dir="$($PREFIX/bin/find_prop_value.sh $yarn_timeline_prop yarn \
-	$MGMT_NODE:$MGMT_PORT $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
+	$API_URL $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
   if (( $? != 0 )) || [[ -z "$dir" ]] ; then
     err "Cannot retrieve yarn dir path therefore cannot chown local yarn dir"
     err "$dir"
@@ -335,6 +359,7 @@ function setup_multi_tenancy() {
 # copy_hcat_files: if the hcat service is enabled then determine which node it
 # resides on, and copy select jar/tar files to that node.
 # Uses globals:
+#   API_URL
 #   CLUSTER_NAME
 #   MGMT_*
 #   PREFIX
@@ -351,7 +376,7 @@ function copy_hcat_files() {
 
   # determine which node is running the hcat/webhcat service
   hcat_node="$($PREFIX/bin/find_service_node.sh WEBHCAT WEBHCAT_SERVER \
-	$MGMT_NODE:$MGMT_PORT $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
+	$API_URL $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
   if (( $? != 0)) || [[ -z "$hcat_node" ]]; then
     debug "cannot find WEBHCAT service node, copy cannot be done: $hcat_node"
     return 0 # not an error
@@ -434,8 +459,10 @@ function post_processing() {
 # restart all ambari services across the cluster. Returns 1 on errors.
 # Uses globals:
 #   ACTION (append, prepend, or remove volname in core-site)
+#   API_URL (omit :port)
 #   CLUSTER_NAME
 #   MGMT_*
+#   PORT
 #   PREFIX
 #   VOLMNT
 #   VOLNAME
@@ -448,10 +475,9 @@ function edit_core_site() {
 
   [[ -n "$MGMT_USER" ]] && mgmt_u="-u $MGMT_USER"
   [[ -n "$MGMT_PASS" ]] && mgmt_p="-p $MGMT_PASS"
-  [[ -n "$MGMT_PORT" ]] && mgmt_port="--port $MGMT_PORT"
 
-  out="$($PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE $mgmt_u $mgmt_p \
-	$mgmt_port -c $CLUSTER_NAME --mountpath $VOLMNT --action $ACTION \
+  out="$($PREFIX/bin/set_glusterfs_uri.sh -h ${API_URL%:*} $mgmt_u $mgmt_p \
+	--port $PORT -c $CLUSTER_NAME --mountpath $VOLMNT --action $ACTION \
 	$VOLNAME --debug)"
   err=$?
 
@@ -503,7 +529,11 @@ if (( $? != 0 )) ; then
 fi
 debug "$VOLNAME mount point is $VOLMNT"
 
-CLUSTER_NAME="$($PREFIX/bin/find_cluster_name.sh $MGMT_NODE:$MGMT_PORT \
+# get REST api protocol (http vs https) and port #
+get_api_proto_and_port || exit 1
+API_URL="$PROTO://$MGMT_NODE:$PORT"
+
+CLUSTER_NAME="$($PREFIX/bin/find_cluster_name.sh $API_URL \
 	$MGMT_USER:$MGMT_PASS)"
 if (( $? != 0 )) ; then
   err "Cannot retrieve cluster name: $CLUSTER_NAME"
@@ -511,7 +541,7 @@ if (( $? != 0 )) ; then
 fi
 debug "Cluster name: $CLUSTER_NAME"
 
-DEFAULT_VOL="$($PREFIX/bin/find_default_vol.sh $MGMT_NODE:$MGMT_PORT \
+DEFAULT_VOL="$($PREFIX/bin/find_default_vol.sh $API_URL \
 	$MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
 if (( $? != 0 )) ; then
   warn "Cannot find configured default volume on node: $DEFAULT_VOL"

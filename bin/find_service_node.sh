@@ -4,7 +4,7 @@
 # REST API call.
 # Args: $1=service name, eg "WEBHCAT",
 #       $2=component name, eg "WEBHCAT_SERVER",
-#       $3=ambari server url (including :port),
+#       $3=ambari server full url (including http:// or https:// and :port),
 #       $4=ambari admin username:password,
 #       $5=(optional) ambari cluster name. If not provided it will be found 
 #          with an extra REST call.
@@ -24,7 +24,7 @@ if [[ -z "$cluster" ]] ; then
     exit 1; }
 fi
 
-node="$(curl "http://$url/api/v1/clusters/$cluster/services/$service/components/$component" -s -H 'X-Requested-By: X-Requested-By' -u $userpass \
+node="$(curl "$url/api/v1/clusters/$cluster/services/$service/components/$component" -s -H 'X-Requested-By: X-Requested-By' -u $userpass \
 	| grep host_name)"
 (( $? != 0 )) || [[ -z "$node" ]] && {
   echo "$service service not enabled: $node";

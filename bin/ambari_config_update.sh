@@ -19,7 +19,7 @@ PREFIX="$(dirname $(readlink -f $0))"
 _DEBUG="off"
 USERID="admin"
 PASSWD="admin"
-PORT=":8080"
+PROTO='http://'
 AMBARI_HOST='localhost'
 PROPERTY=''
 SITE='core-site'
@@ -47,12 +47,15 @@ value      : Optional. Property value to update <site-file> with. If --action
              is delete no <value> is required (or expected).
 verb       : Required. Action to be done to <site-file>. Expected values:
              add|delete|prepend|append|replace|remove.
-ambari_host: Optional. Host name for the Ambari server. Default is localhost.
+ambari_host: Optional. Host name for the Ambari server. To use https a url must
+             be provided as the host, eg. "https://ambari.vm". Default is
+             localhost over http.
 site-file  : Optional. Hadoop "site" file. Expect "core-site", "mapred-site",
              or "yarn-site" . Default is "core-site".
 user       : Optional. Ambari user. Default is "admin".
 password   : Optional. Ambari password. Default is "admin".
-port       : Optional. Port number for Ambari server. Default is 8080.
+port       : Optional. Port number for Ambari server. Default is 8080 for http
+             and 8443 for https.
 name       : Required. The ambari cluster name.
 
 EOF
@@ -63,14 +66,15 @@ EOF
 # following globals:
 #   AMBARI_HOST
 #   CLUSTER_NAME
+#   CONFIG_KEY
+#   CONFIG_VALUE
 #   _DEBUG
 #   DEBUG
 #   PASSWD
 #   PORT
-#   USERID
 #   PROPERTY
-#   CONFIG_KEY 
-#   CONFIG_VALUE
+#   PROTO
+#   USERID
 function parse_cmd() {
 
   local errcnt=0
@@ -85,34 +89,30 @@ function parse_cmd() {
   while true ; do
     case "$1" in
       --debug)
-        DEBUG=true;_DEBUG="on"; shift; continue
+        DEBUG=true; _DEBUG="on"; shift; continue
       ;;
       --port)
-        if [[ -z "$2" ]]; then
-          PORT=''
-        else
-          PORT=":$2"
-        fi
+        PORT=$2
         shift 2; continue
       ;;
       --cluster)
-        [[ -n "$2" ]] && CLUSTER_NAME="$2"
+        CLUSTER_NAME="$2"
         shift 2; continue
        ;;
       --config)
-        [[ -n "$2" ]] && SITE="$2"
+        SITE="$2"
         shift 2; continue
        ;;
       --action)
-        [[ -n "$2" ]] && ACTION="$2"
+        ACTION="$2"
         shift 2; continue
        ;;
       --configkey)
-        [[ -n "$2" ]] && CONFIG_KEY="$2"
+        CONFIG_KEY="$2"
         shift 2; continue
        ;;
       --configvalue)
-        [[ -n "$2" ]] && CONFIG_VALUE="$2"
+        CONFIG_VALUE="$2"
         shift 2; continue
        ;;
       -u)
@@ -124,7 +124,12 @@ function parse_cmd() {
         shift 2; continue
       ;;
       -h)
-        [[ -n "$2" ]] && AMBARI_HOST="$2"
+        AMBARI_HOST="$2"
+        if [[ "${AMBARI_HOST:0:8}" == 'https://' || \
+           "${AMBARI_HOST:0:7}" == 'http://' ]] ; then
+          PROTO="${AMBARI_HOST%://*}://"
+          AMBARI_HOST="${AMBARI_HOST#*://}" # exclude protocol
+        fi
         shift 2; continue
       ;;
       --) # no more args to parse
@@ -139,15 +144,18 @@ function parse_cmd() {
   [[ -z "$CLUSTER_NAME" ]] && {
     echo "Syntax error: cluster name is missing"; ((errcnt++)); }
 
-  [[ -z "$ACTION" ]] && {
-    echo "Syntax error: ACTION is missing"; ((errcnt++)); }
-  case "$ACTION" in
-      add|append|delete|remove|replace|prepend) # valid
-      ;;
-      *)
-	echo "Syntax error: unknown action \"$ACTION\""; ((errcnt++))
-      ;;
-  esac
+  if [[ -z "$ACTION" ]] ; then
+    echo "Syntax error: ACTION is missing"
+    ((errcnt++))
+  else
+    case "$ACTION" in
+	add|append|delete|remove|replace|prepend) # valid
+	;;
+ 	*)
+	  echo "Syntax error: unknown action \"$ACTION\""; ((errcnt++))
+	;;
+    esac
+  fi
 
   [[ -z "$CONFIG_KEY" ]] && {
     echo "Syntax error: <key> is missing"; ((errcnt++)); }
@@ -160,6 +168,11 @@ function parse_cmd() {
 
   (( errcnt > 0 )) && {
     usage; return 1; }
+
+  # set default port
+  if [[ -z "$PORT" ]] ; then
+    [[ "$PROTO" == 'http://' ]] && PORT=8080 || PORT=8443
+  fi
 
   eval set -- "$@" # move arg pointer so $1 points to next arg past last opt
 
@@ -326,12 +339,11 @@ SCRIPT=$0
 
 parse_cmd $@ || exit -1
 
-AMBARIURL="http://$AMBARI_HOST$PORT"
+AMBARIURL="$PROTO$AMBARI_HOST:$PORT"
 debug echo "########## AMBARIURL = "$AMBARIURL
 debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
 
-SITETAG="$(
-	$PREFIX/find_site_tag.sh core "$AMBARIURL" "$USERID:$PASSWD" \
+SITETAG="$($PREFIX/find_site_tag.sh core $AMBARIURL $USERID:$PASSWD \
 	    "$CLUSTER_NAME")" || {
   echo "ERROR: Cannot get current core-site tag: $SITETAG";
   exit 1; }

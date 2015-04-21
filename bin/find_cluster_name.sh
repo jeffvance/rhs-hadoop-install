@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # find_cluster_name.sh outputs the name of the current ambari cluster.
-# Args: $1=ambari server url (including :port),
+# Args: $1=ambari server url (including http:// or https:// and :port),
 #       $2=ambari admin username:password.
 
 # check args
@@ -12,10 +12,12 @@
 url="$1"; userpass="$2"
 
 name="$(curl -s -u $userpass "$url/api/v1/clusters/" | grep cluster_name)"
+[[ -z "$name" ]] && {
+  echo "ERROR: cluster name not found at $url"; exit 1; }
+
 name="${name%,}"    # remove trailing comma if present
 name="${name#*: }"  # extract cluster name value
 name="${name//\"/}" # remove double-quotes
-
 [[ -z "$name" ]] && {
   echo "ERROR: cluster name not found"; exit 1; }
 

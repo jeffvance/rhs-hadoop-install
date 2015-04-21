@@ -33,9 +33,12 @@ Usage: set_glusterfs_uri.sh [-u <ambari-user>] [-p <password>] \\
 
 ambari-user : Optional. Ambari user ID. Default is "admin".
 password    : Optional. Ambari password. Default is "admin".
-ambari-host : Optional. Ambari host name. Default is localhost.
+ambari_host : Optional. Host name for the Ambari server. To use https a url must
+              be provided as the host, eg. "https://ambari.vm". Default is
+              localhost over http.
+port        : Optional. Port number for Ambari server. Default is 8080 for http
+              and 8443 for https.
 cluster-name: Optional. The name of the current cluster.
-port        : Optional. Port number for Ambari server. Default is '8080'.
 path        : Required. Mount path for the volume when the action is prepend or
               append. Not used for the remove action.
 verb        : Required. action to perform to property value:
@@ -56,6 +59,7 @@ EOF
 #   MOUNTPATH
 #   PASSWD
 #   PORT
+#   PROTO
 #   USERID
 #   VOLNAME
 function parse_cmd() {
@@ -74,11 +78,7 @@ function parse_cmd() {
 		usage; exit 0
 	;;
 	--port)
-		if [[ -z "$2" ]]; then
-		  PORT=""
-		else
-		  PORT=":$2"
-		fi
+		PORT=$2
 		shift 2; continue
 	;;
 	--action)
@@ -105,7 +105,12 @@ function parse_cmd() {
 		shift 2; continue
 	;;
 	-h)
-		[[ -n "$2" ]] && AMBARI_HOST="$2"
+		AMBARI_HOST="$2"
+ 		if [[ "${AMBARI_HOST:0:8}" == 'https://' || \
+		      "${AMBARI_HOST:0:7}" == 'http://' ]] ; then
+		  PROTO="${AMBARI_HOST%://*}://"
+		  AMBARI_HOST="${AMBARI_HOST#*://}" # exclude protocol
+		fi
 		shift 2; continue
 	;;
 	--) # no more args to parse
@@ -125,20 +130,29 @@ function parse_cmd() {
     echo "Syntax error: VOLNAME is missing"; usage; return 1; }
 
   # error is unexpected action
-  [[ -z "$ACTION" ]] && {
-    echo "Syntax error: action verb is missing"; usage; return 1; }
+  if [[ -z "$ACTION" ]] ; then
+    echo "Syntax error: action verb is missing"
+    usage
+    return 1
+  fi
   case "$ACTION" in
       append|prepend|remove) # expected...
       ;;
       *)
 	echo "Syntax error: action expected to be: prepend|append|remove"
-	usage; return 1
+	usage
+	return 1
       ;;
   esac
 
   # error if required options are missing
   [[ -z "$MOUNTPATH" && "$ACTION" != 'remove' ]] && {
     echo "Syntax error: MOUNTPATH is missing"; usage; return 1; }
+
+  # set default port
+  if [[ -z "$PORT" ]] ; then
+    [[ "$PROTO" == 'http://' ]] && PORT=8080 || PORT=8443
+  fi
 
   [[ $DEBUG == true ]] && debug echo "DEBUGGING ON"
   return 0
@@ -169,46 +183,47 @@ DEBUG=false
 _DEBUG="off"
 USERID="admin"
 PASSWD="admin"
-PORT=":8080"
+PROTO='http://'
 AMBARI_HOST='localhost'
 VOLNAME=''
 CLUSTER_NAME=''
 
 parse_cmd $@ || exit -1
 
-AMBARIURL="http://$AMBARI_HOST$PORT"
+AMBARIURL="$PROTO$AMBARI_HOST"
 debug echo "########## AMBARIURL = $AMBARIURL"
 
 if [[ -z "$CLUSTER_NAME" ]] ; then
   CLUSTER_NAME="$(
-	$PREFIX/find_cluster_name.sh $AMBARIURL "$USERID:$PASSWD")" || {
+	$PREFIX/find_cluster_name.sh $AMBARIURL:$PORT $USERID:$PASSWD)" || {
     echo "$CLUSTER_NAME"; # contains error msg
     exit 1; }
 fi
 debug echo "########## CLUSTER_NAME = $CLUSTER_NAME"
 
-PORT="$(echo "$PORT" | sed 's/[\"\,\:\ ]//g')"
-
 # update the fs.glusterfs.volumes attribute
-CMD="-u $USERID -p $PASSWD -h $AMBARI_HOST --port $PORT \
+CMD="-u $USERID -p $PASSWD -h $AMBARIURL --port $PORT \
     --cluster "$CLUSTER_NAME" --config core-site \
     --configkey fs.glusterfs.volumes --configvalue $VOLNAME --action $ACTION"
 [[ $DEBUG == true ]] && CMD+=" --debug"
 
 debug echo "ambari_config_update.sh $CMD" 
 $PREFIX/ambari_config_update.sh $CMD 
+(( $? != 0 )) && {
+  echo "Error returned by ambari_config_update"; exit 1; }
 
 # add or delete the fs.glusterfs.volume.fuse.<volname> property
 mode='add'
 [[ "$ACTION" == 'remove' ]] && mode='delete'
-CMD="-u $USERID -p $PASSWD -h $AMBARI_HOST --port $PORT \
+CMD="-u $USERID -p $PASSWD -h $AMBARIURL --port $PORT \
     --cluster "$CLUSTER_NAME" --config core-site \
     --configkey fs.glusterfs.volume.fuse.$VOLNAME --action $mode"
 [[ "$mode" == 'add' ]] && CMD+=" --configvalue $MOUNTPATH"
 
 debug echo "ambari_config_update.sh $CMD" 
 $PREFIX/ambari_config_update.sh $CMD 
+(( $? != 0 )) && {
+  echo "Error returned by ambari_config_update"; exit 1; }
 
 restartService
-
 exit 0

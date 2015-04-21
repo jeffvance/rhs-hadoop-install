@@ -25,9 +25,8 @@ $ME --version | --help
 
 $ME [-y] [--quiet | --verbose | --debug] \\
             [--user <ambari-admin-user>] [--pass <ambari-admin-password>] \\
-            [--port <port-num>] [--hadoop-mgmt-node <node>] \\
-            [--rhs-node <node>] [--yarn-master <node>] \\
-            <volname>
+            [--hadoop-mgmt-node <node>] [--rhs-node <node>] \\
+            [--yarn-master <node>] <volname>
 where:
 
 <volname>    : the RHS volume to be disabled for hadoop workloads.
@@ -36,9 +35,9 @@ where:
 --rhs-node   : (optional) hostname of any of the storage nodes. This is needed
                in order to access the gluster command. Default is localhost
                which, must have gluster cli access.
---hadoop-mgmt-node : (optional) hostname or ip of the hadoop mgmt server which
-               is expected to be outside of the storage pool. Default is
-               localhost.
+--hadoop-mgmt-node: (optional) hostname or ip of the hadoop mgmt server which is
+               expected to be outside of the storage pool. The port number and
+               protocol (http/https) are both omitted. Default is localhost.
 -y           : (optional) auto answer "yes" to all prompts. Default is the
                script waits for the user to answer each prompt.
 --quiet      : (optional) output only basic progress/step messages. Default.
@@ -47,7 +46,6 @@ where:
                debugging.
 --user       : the ambari admin user name. Default: "admin".
 --pass       : the password for --user. Default: "admin".
---port       : the port number used by the ambari server. Default: 8080.
 --version    : output only the version string.
 --help       : this text.
 
@@ -59,7 +57,6 @@ EOF
 #   AUTO_YES
 #   MGMT_NODE
 #   MGMT_PASS
-#   MGMT_PORT
 #   MGMT_USER
 #   RHS_NODE
 #   VERBOSE
@@ -68,12 +65,11 @@ EOF
 function parse_cmd() {
 
   local opts='y'
-  local long_opts='version,help,yarn-master:,rhs-node:,hadoop-mgmt-node:,user:,pass:,port:,verbose,quiet,debug'
+  local long_opts='version,help,yarn-master:,rhs-node:,hadoop-mgmt-node:,user:,pass:,verbose,quiet,debug'
   local errcnt=0
 
   # global defaults
   MGMT_PASS='admin'
-  MGMT_PORT=8080
   MGMT_USER='admin'
 
   eval set -- "$(getopt -o $opts --long $long_opts -- $@)"
@@ -113,9 +109,6 @@ function parse_cmd() {
         --pass)
           MGMT_PASS="$2"; shift 2; continue
         ;;
-        --port)
-          MGMT_PORT="$2"; shift 2; continue
-        ;;
         --)
           shift; break
         ;;
@@ -133,6 +126,32 @@ function parse_cmd() {
   return 0
 }
 
+# get_api_proto_and_port: sets global PROTO and PORT variables from the ambari
+# configuration file. If they are missing then defaults are provided. Returns
+# 1 for errors, else returns 0.
+# Uses globals:
+#   MGMT_NODE
+#   PREFIX
+# Sets globals:
+#   PORT
+#   PROTO
+function get_api_proto_and_port() {
+
+  local out; local ssh=''
+
+  [[ "$MGMT_NODE" == "$HOSTNAME" ]] || ssh="ssh $MGMT_NODE"
+
+  out="$(eval "$ssh $PREFIX/bin/find_proto_and_port.sh")"
+  (( $? != 0 )) && {
+    err "$out -- on $MGMT_NODE";
+    return 1; }
+  debug "proto/port= $out"
+
+  PROTO="${out% *}" # global
+  PORT=${out#* }    # global
+  return 0
+}
+
 # show_todo: display values set by the user and discovered by disable_vol.
 # Uses globals:
 #   CLUSTER_NAME
@@ -140,6 +159,8 @@ function parse_cmd() {
 #   MGMT_NODE
 #   NEW_DFLT_VOL
 #   NODES
+#   PORT
+#   PROTO
 #   VOLMNT
 #   VOLNAME
 #   YARN_NODE
@@ -160,6 +181,7 @@ function show_todo() {
   quiet "*** Cluster name       : $CLUSTER_NAME"
   quiet "*** Nodes              : $(echo ${NODES[*]} | sed 's/ /, /g')"
   quiet "*** Ambari mgmt node   : $MGMT_NODE"
+  quiet "***        proto/port  : $PROTO on port $PORT"
   quiet "*** Yarn-master server : $YARN_NODE"
   echo
 }
@@ -169,6 +191,7 @@ function show_todo() {
 # the target volume. After accounting for VOLNAME, the new default vol will be
 # the first volume in the list of "fs.glusterfs.volumes" volumes.
 # Uses globals:
+#   API_URL
 #   CLUSTER_NAME
 #   DEFAULT_VOL
 #   MGMT_*
@@ -184,7 +207,7 @@ function new_default_volume() {
 
   if [[ "$DEFAULT_VOL" == "$VOLNAME" ]] ; then
     NEW_DFLT_VOL="$($PREFIX/bin/find_prop_value.sh fs.glusterfs.volumes core \
-	$MGMT_NODE:$MGMT_PORT $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
+	$API_URL $MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
     (( $? != 0 )) && NEW_DFLT_VOL=''   # erase err msg if any
 
     # if we have the volume list then extract the new default volname
@@ -203,8 +226,10 @@ function new_default_volume() {
 # edit_core_site: invoke bin/set_glusterfs_uri to edit the core-site file and
 # restart all ambari services across the cluster. Returns 1 on errors.
 # Uses globals:
+#   API_URL (omit :port)
 #   CLUSTER_NAME
 #   MGMT_*
+#   PORT
 #   PREFIX
 #   VOLNAME
 function edit_core_site() {
@@ -216,16 +241,15 @@ function edit_core_site() {
 
   [[ -n "$MGMT_USER" ]] && mgmt_u="-u $MGMT_USER"
   [[ -n "$MGMT_PASS" ]] && mgmt_p="-p $MGMT_PASS"
-  [[ -n "$MGMT_PORT" ]] && mgmt_port="--port $MGMT_PORT"
 
-  out="$($PREFIX/bin/set_glusterfs_uri.sh -h $MGMT_NODE $mgmt_u $mgmt_p \
-	 $mgmt_port -c $CLUSTER_NAME --action remove $VOLNAME --debug)" 
+  out="$($PREFIX/bin/set_glusterfs_uri.sh -h ${API_URL%:*} $mgmt_u $mgmt_p \
+	 --port $PORT -c $CLUSTER_NAME --action remove $VOLNAME --debug)" 
   err=$?
   if (( err != 0 )) ; then
-    err -e $err "unset_glusterfs_uri:\n$out"
+    err -e $err "set_glusterfs_uri:\n$out"
     return 1
   fi
-  debug -e "unset_glusterfs_uri:\n$out"
+  debug -e "set_glusterfs_uri:\n$out"
 
   verbose "--- disabled $VOLNAME"
   return 0
@@ -262,7 +286,11 @@ debug "unique nodes spanned by $VOLNAME: ${NODES[*]}"
 # check for passwordless ssh connectivity to all nodes
 check_ssh $(uniq_nodes $MGMT_NODE $YARN_NODE $NODES) || exit 1
 
-CLUSTER_NAME="$($PREFIX/bin/find_cluster_name.sh $MGMT_NODE:$MGMT_PORT \
+# get REST api protocol (http vs https) and port #
+get_api_proto_and_port || exit 1
+API_URL="$PROTO://$MGMT_NODE:$PORT"
+
+CLUSTER_NAME="$($PREFIX/bin/find_cluster_name.sh $API_URL \
         $MGMT_USER:$MGMT_PASS)"
 if (( $? != 0 )) || [[ -z "$CLUSTER_NAME" ]] ; then
   err "Cannot retrieve cluster name: $CLUSTER_NAME"
@@ -270,7 +298,7 @@ if (( $? != 0 )) || [[ -z "$CLUSTER_NAME" ]] ; then
 fi
 debug "Cluster name: $CLUSTER_NAME"
 
-DEFAULT_VOL="$($PREFIX/bin/find_default_vol.sh $MGMT_NODE:$MGMT_PORT \
+DEFAULT_VOL="$($PREFIX/bin/find_default_vol.sh $API_URL \
 	$MGMT_USER:$MGMT_PASS $CLUSTER_NAME)"
 if (( $? != 0 )) || [[ -z "$DEFAULT_VOL" ]] ; then
   err "Cannot find any volumes in core-site config file. $DEFAULT_VOL"

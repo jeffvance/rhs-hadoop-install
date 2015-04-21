@@ -3,7 +3,7 @@
 # find_site_tag.sh outputs the name of the current tag in the supplied site
 # config file via a REST API call.
 # Args: $1=site file prefix, eg. "core" or "yarn",
-#       $2=ambari server url (including :port),
+#       $2=ambari server url (including http:// or https:// and :port),
 #       $3=ambari admin username:password,
 #       $4=(optional) ambari cluster name. If not provided it will be found 
 #          with an extra REST call.
@@ -22,7 +22,7 @@ if [[ -z "$cluster" ]] ; then
     exit 1; }
 fi
 
-tag="$(curl -k -s -u $userpass \
+tag="$(curl -s -u $userpass \
 	$url/api/v1/clusters/$cluster?fields=Clusters/desired_configs \
 	| sed -n "/\"${site}-site\" :/,/\"tag\" :/p" \
 	| tail -n 1 \
