@@ -2,13 +2,14 @@
 #
 # find_proto_and_port.sh outputs the protocol (http or https) and port number
 # used by the current ambari cluster running on localhost (this node). Output
-# format is "http|https port#" so that it can be used as an array.
+# format is "http|https port#" so that it can also be used as an array.
 
 ambari_conf='/etc/ambari-server/conf/ambari.properties'
-ssl_prop='api.ssl'
-port_prop='client.api.ssl.port'
-DEF_SSL_PORT=8443
+ssl_prop='api.ssl'		    # 'true' then using https
+nonssl_port_prop='client.api.port'  # can be missing
+ssl_port_prop='client.api.ssl.port' # can be missing
 DEF_NONSSL_PORT=8080
+DEF_SSL_PORT=8443
 
 [[ ! -f "$ambari_conf" ]] && {
   echo "Ambari config file $ambari_conf missing";
@@ -16,19 +17,22 @@ DEF_NONSSL_PORT=8080
 
 # protocol
 proto='http'
-# see if api.ssl prop exists in ambari conf file
+# see if we're using ssl or not
 prop_val="$(grep ${ssl_prop}= $ambari_conf)"
 [[ "${prop_val#*=}" == true ]] && proto='https' # use ssl
 
 # port
-port=$DEF_NONSSL_PORT
-[[ "$proto" == 'https' ]] && port=$DEF_SSL_PORT
-
-# if https see if port prop exists in ambari conf, else use default port
 if [[ "$proto" == 'https' ]] ; then
-  prop_val="$(grep ${port_prop}= $ambari_conf)"
-  (( $? == 0 )) && [[ -n "$prop_val" ]] && port=${prop_val#*=}
+  port=$DEF_SSL_PORT
+  port_prop="$ssl_port_prop"
+else
+  port=$DEF_NONSSL_PORT
+  port_prop="$nonssl_port_prop"
 fi
+
+# see if 1 of the port props exists in ambari conf, else use default port
+prop_val="$(grep ${port_prop}= $ambari_conf)"
+(( $? == 0 )) && [[ -n "$prop_val" ]] && port=${prop_val#*=}
 
 echo "$proto $port"
 exit 0
