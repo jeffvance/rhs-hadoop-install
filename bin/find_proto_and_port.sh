@@ -21,14 +21,13 @@ proto='http'
 prop_val="$(grep ${ssl_prop}= $ambari_conf)"
 [[ "${prop_val#*=}" == true ]] && proto='https' # use ssl
 
-# port
-if [[ "$proto" == 'https' ]] ; then
-  port=$DEF_SSL_PORT
-  port_prop="$ssl_port_prop"
-else
-  port=$DEF_NONSSL_PORT
-  port_prop="$nonssl_port_prop"
-fi
+# port number
+port_prop="$nonssl_port_prop" # default for http
+port=$DEF_NONSSL_PORT	      # default for http
+[[ "$proto" == 'https' ]] && {
+  port_prop="$ssl_port_prop";
+  port=$DEF_SSL_PORT;
+}
 
 # see if 1 of the port props exists in ambari conf, else use default port
 prop_val="$(grep ${port_prop}= $ambari_conf)"
