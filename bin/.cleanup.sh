@@ -159,7 +159,7 @@ done
 
 echo
 force "-- unmount and remove all vols and bricks mounts..."
-for node in $NODES $yarn_node; do
+for node in $(uniq_nodes $NODES $yarn_node); do
     ssh $node "
 	for mnt in $VOLMNTS $BRICKS; do
 	    if $PREFIX/find_mount.sh --live --vol --rtn-exists --filter \$mnt \
