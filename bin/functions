@@ -524,7 +524,7 @@ function vol_exists() {
 
   [[ "$rhs_node" == "$HOSTNAME" ]] && ssh='' || ssh="ssh $rhs_node"
 
-  eval "$ssh gluster volume info $VOLNAME >& /dev/null"
+  eval "$ssh gluster volume info $vol >& /dev/null"
   (( $? != 0 )) && return 1
   return 0
 }

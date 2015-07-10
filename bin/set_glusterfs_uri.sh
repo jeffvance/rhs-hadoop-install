@@ -165,12 +165,12 @@ function restartService() {
 
   for service in MAPREDUCE2 YARN GLUSTERFS ; do # order matters
       $PREFIX/ambari_service.sh -u $USERID -p $PASSWD --port $PORT \
-	  -h $AMBARI_HOST --cluster "$CLUSTER_NAME" --action stop $service
+	  -h $AMBARIURL --cluster "$CLUSTER_NAME" --action stop $service
   done
   
   for service in GLUSTERFS MAPREDUCE2 YARN ; do # order matters
       $PREFIX/ambari_service.sh -u $USERID -p $PASSWD --port $PORT \
-	  -h $AMBARI_HOST --cluster "$CLUSTER_NAME" --action start $service
+	  -h $AMBARIURL --cluster "$CLUSTER_NAME" --action start $service
   done
 }
 
