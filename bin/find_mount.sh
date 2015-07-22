@@ -4,11 +4,15 @@
 # node, searching for the volume or brick mount, depending on options, and
 # returns the full brick or volume mount record, or the number of matching
 # mounts, or shell true if the mount exists, depending on options.
+#
+# Note: the returned mount record has spaces and tabs squeezed to a single
+#   space delimiter per field.
+#
 # Syntax:
 #   find_mount.sh [--vol|--brick] [--live|--fstab] [--filter <grep-extra>] \
 #                 [--rtn-mnt|--rtn-cnt|--rtn-exists] [<node>]
 # Example:
-#   find_mount.sh --fstab --filter $VOLNAME rhs-1.vm
+#   find_mount.sh --fstab --filter $volmnt rhs-1.vm
 # outputs the gluster-fuse mount on node rhs-1.vm for the supplied volume.
 #
 # Args:
@@ -80,7 +84,7 @@ fi
 
 (( VOLMNT )) && type='glusterfs' || type='xfs'
 (( LIVE && VOLMNT )) && type="fuse.$type"
-type=" $type "
+type="\s$type\s" # handle space or tab delimiter
 
 filter=''
 [[ -n "$FILTER" ]] && filter="grep -E \"$FILTER\" $tgt_file |"
@@ -109,5 +113,6 @@ err=$?
 
 (( RTN_EXISTS )) && exit $err
 
-echo $out
+# replace all spaces and tabs with a single space
+echo "$out" | tr -s [:space:] ' '
 exit 0
